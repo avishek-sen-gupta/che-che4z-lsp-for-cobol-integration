@@ -1414,8 +1414,8 @@ dbs_like_predicate: dbs_sql_identifier NOT? LIKE dbs_expressions (ESCAPE dbs_exp
 dbs_null_predicate: dbs_expression IS NOT? NULL;
 dbs_predicate: (dbs_basic_predicate | dbs_quantified_predicate | dbs_array_exists_predicate | dbs_between_predicate |
  dbs_distinct_predicate | dbs_exist_predicate | dbs_in_predicate | dbs_like_predicate | dbs_null_predicate ) ;
-dbs_searched_when_clause : (WHEN ((LPARENCHAR dbs_predicate RPARENCHAR) | dbs_predicate) THEN (dbs_result_expression1 | NULL))+;
-
+dbs_searched_when_clause : (WHEN prx (AND prx)* (OR prx)* THEN (dbs_result_expression1 | NULL))+;
+prx : ((LPARENCHAR dbs_predicate RPARENCHAR) | dbs_predicate);
 dbs_function_invocation : dbs_function_name LPARENCHAR (ALL | DISTINCT)? (TABLE dbs_transition_table_name |
 (dbs_expressions | DATELITERAL) (dbs_comma_separator (dbs_expressions | DATELITERAL) | NUMERICLITERAL)*)? RPARENCHAR;
 dbs_cast_specification: CAST LPARENCHAR (dbs_expression | NULL | dbs_parameter_marker) AS dbs_comment_parameter_type RPARENCHAR;
