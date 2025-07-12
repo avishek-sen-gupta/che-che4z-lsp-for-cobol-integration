@@ -213,7 +213,7 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
         String contextTextReference = PersistentData.next();
         ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
         ctx.getCustomData().put("DIALECT", "IDMS");
-        String terminator = ".".equals(ctx.stop.getText()) ? "." : "";
+        String terminator = ".".equals(ctx.stop.getText()) ? "" : ".";
         addReplacementContext(ctx, String.format("%s_DIALECT_ %s %s", staticPrefix, contextTextReference, terminator));
         extractions++;
     }

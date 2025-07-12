@@ -59,6 +59,10 @@ public class AnalysisConfig {
         this(copybookProcessingMode, dialects, isCicsTranslatorEnabled, collectAstChanges, dialectRegistry, dialectsSettings, false, false);
     }
 
+    public AnalysisConfig(CopybookProcessingMode copybookProcessingMode, List<String> dialects, boolean isCicsTranslatorEnabled, Map<String, JsonElement> dialectsSettings, boolean collectAstChanges, List<DialectRegistryItem> dialectRegistry) {
+        this(copybookProcessingMode, dialects, isCicsTranslatorEnabled, collectAstChanges, dialectRegistry, dialectsSettings, false, false);
+    }
+
     /**
    * Create the default language features config, containing all features and the given copybook
    * processing mode

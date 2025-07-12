@@ -1205,7 +1205,7 @@ public final class CobolVisitor extends CobolParserBaseVisitor<List<Node>> {
                                             .statementLocality(
                                                     retrieveLocality(ctx, extendedDocument, copybooks).orElse(null))
                                             .valueClauses(retrieveValues(ctx.dataValueClause()))
-                                            .valueToken(retrieveValueTokenOld(valueToken))
+                                            .valueToken(retrieveValueToken(valueToken))
                                             .build(),
                                     visitChildren(ctx)))
             .orElse(ImmutableList.of());
@@ -1914,6 +1914,7 @@ public final class CobolVisitor extends CobolParserBaseVisitor<List<Node>> {
   }
 
   protected void areaBWarning(ParserRuleContext ctx) {
+    if (ctx.getClass() == StatementContext.class && ctx.getChild(0).getClass() == DialectStatementContext.class) return;
     final int start = ctx.getStart().getTokenIndex();
     int stop = ctx.getStop().getTokenIndex();
     if (start < 0 || stop < 0) return;

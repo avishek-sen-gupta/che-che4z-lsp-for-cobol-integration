@@ -81,8 +81,9 @@ public class UseCase {
             copybookProcessingMode,
             dialects,
             cicsTranslator,
-                dialectsSettings, false,
-            ImmutableList.of()
+                false,
+                ImmutableList.of(),
+                dialectsSettings
         );
     analysisConfig.getCompilerOptions().addAll(compilerOptions);
     if (preprocessorsDirectives != null)

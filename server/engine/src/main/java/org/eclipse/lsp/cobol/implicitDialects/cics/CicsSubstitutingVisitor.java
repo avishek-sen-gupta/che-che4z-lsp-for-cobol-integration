@@ -135,12 +135,6 @@ class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
   }
 
   @Override
-  public List<Node> visitCompilerXOpts(CICSParser.CompilerXOptsContext ctx) {
-    addReplacementContext(ctx);
-    return visitChildren(ctx);
-  }
-
-  @Override
   public List<Node> visitAllExciRules(CICSParser.AllExciRulesContext ctx) {
     // TODO: uncomment and adjust below when we decide to support this feature based on compiler directive
     //    boolean isExciModeEnabled = context
@@ -194,7 +188,7 @@ class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
 
     Node node =
         new CodeBlockUsageNode(
-            Locality.builder().range(location.getRange()).uri(location.getUri()).build(), name);
+            Locality.builder().range(location.getRange()).uri(location.getUri()).build(), name, null);
     visitChildren(ctx).forEach(node::addChild);
     return ImmutableList.of(node);
   }

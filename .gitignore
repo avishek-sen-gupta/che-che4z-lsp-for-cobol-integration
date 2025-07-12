@@ -146,3 +146,4 @@ clients/cobol-lsp-vscode-extensiontest-report
 clients/cobol-lsp-vscode-extension/test-report.xml
 .scannerwork
 /server-delomboked
+**/gen

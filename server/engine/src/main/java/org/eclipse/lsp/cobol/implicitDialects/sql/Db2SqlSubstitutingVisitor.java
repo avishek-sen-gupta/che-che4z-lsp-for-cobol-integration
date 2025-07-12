@@ -25,7 +25,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.lsp.cobol.AntlrRangeUtils;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
 import org.eclipse.lsp.cobol.common.dialects.CobolDialect;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
@@ -43,10 +43,7 @@ import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -76,11 +73,6 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         this.context = context;
         this.messageService = messageService;
         this.copybookService = copybookService;
-    }
-
-    @Override
-    public List<Node> visitDbs_host_variable(Db2SqlParser.Dbs_host_variableContext ctx) {
-        return addTreeNode(ctx, QualifiedReferenceNode::new);
     }
 
     @Override
@@ -117,17 +109,30 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
 
     @Override
     public List<Node> visitLob_xml_host_variables(Db2SqlParser.Lob_xml_host_variablesContext ctx) {
-        List<Node> hostVariableDefinitionNode = createHostVariableDefinitionNode(ctx, ctx.dbs_host_var_levels(), ctx.entry_name());
-        VariableDefinitionNode variableDefinitionNode = (VariableDefinitionNode) hostVariableDefinitionNode.get(0);
+        List<Node> hostVariableDefinitionNode =
+                createHostVariableDefinitionNode(ctx, ctx.dbs_host_var_levels(), ctx.entry_name());
+        VariableDefinitionNode variableDefinitionNode =
+                (VariableDefinitionNode) hostVariableDefinitionNode.get(0);
         int generatedVariableLevel = 49;
 
         if (ctx.xml_lobNO_size() != null) {
             addXmlLobNodes(variableDefinitionNode, generatedVariableLevel);
         } else if (ctx.lobWithSize() != null) {
-            addLobWithSizeNodes(variableDefinitionNode, generatedVariableLevel, ctx.lobWithSize().dbs_integer().getText());
+            addLobWithSizeNodes(
+                    variableDefinitionNode, generatedVariableLevel, lobSize(ctx.lobWithSize().lobSize()));
         }
 
         return hostVariableDefinitionNode;
+    }
+
+    private String lobSize(Db2SqlParser.LobSizeContext ctx) {
+        // lobSize: (dbs_integer k_m_g?| T=IDENTIFIER {validateTokenWithRegex($T.text, "\\d+[kKmMgG]",
+        // "unexpected token");} );
+        if (ctx.IDENTIFIER() != null) {
+            return ctx.IDENTIFIER().getText();
+        }
+        String sizePrefix = ctx.k_m_g() != null ? " " + ctx.k_m_g().getText() : "";
+        return ctx.dbs_integer().getText() + sizePrefix;
     }
 
     private void addXmlLobNodes(VariableDefinitionNode variableDefinitionNode, int generatedVariableLevel) {
@@ -171,20 +176,27 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
 
     @Override
     public List<Node> visitLob_host_variables(Db2SqlParser.Lob_host_variablesContext ctx) {
-        List<Node> hostVariableDefinitionNode = createHostVariableDefinitionNode(ctx, ctx.dbs_integer(), ctx.entry_name());
+        List<Node> hostVariableDefinitionNode =
+                createHostVariableDefinitionNode(ctx, ctx.dbs_integer(), ctx.entry_name());
         if (ctx.lobWithSize() != null) {
-            generateVarbinVariables((VariableDefinitionNode) hostVariableDefinitionNode.get(0),
-                    ctx.lobWithSize().dbs_integer().getText(), ctx);
+            generateVarbinVariables(
+                    (VariableDefinitionNode) hostVariableDefinitionNode.get(0),
+                    lobSize(ctx.lobWithSize().lobSize()),
+                    ctx);
         }
         return hostVariableDefinitionNode;
     }
 
     @Override
-    public List<Node> visitLob_host_variables_arrays(Db2SqlParser.Lob_host_variables_arraysContext ctx) {
-        List<Node> hostVariableDefinitionNode = createHostVariableDefinitionNode(ctx, ctx.dbs_host_var_levels_arrays(), ctx.entry_name());
+    public List<Node> visitLob_host_variables_arrays(
+            Db2SqlParser.Lob_host_variables_arraysContext ctx) {
+        List<Node> hostVariableDefinitionNode =
+                createHostVariableDefinitionNode(ctx, ctx.dbs_host_var_levels_arrays(), ctx.entry_name());
         if (ctx.lobWithSize() != null) {
-            generateVarbinVariables((VariableDefinitionNode) hostVariableDefinitionNode.get(0),
-                    ctx.lobWithSize().dbs_integer().getText(), ctx);
+            generateVarbinVariables(
+                    (VariableDefinitionNode) hostVariableDefinitionNode.get(0),
+                    lobSize(ctx.lobWithSize().lobSize()),
+                    ctx);
         }
         return hostVariableDefinitionNode;
     }
@@ -343,28 +355,20 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
 
     @Override
     public List<Node> visitSqlCode(Db2SqlParser.SqlCodeContext ctx) {
-        //    String intervalText = VisitorHelper.getIntervalText(ctx);
         String sqlCode = preProcessSqlComment(ctx);
 
-        List<Node> nodes = this.visitStartSqlRule(parseSQL(sqlCode, ctx));
+        List<Node> nodes =
+                new Db2SqlExecVisitor(context, copybookService, messageService)
+                        .visitStartSqlRule(parseSQL(sqlCode, ctx));
         Db2SqlVisitorHelper.adjustNodeLocations(ctx, context, nodes);
-
+        Location location =
+                context.getExtendedDocument().mapLocation(AntlrRangeUtils.constructRange(ctx.getParent()));
         Locality locality =
-            VisitorHelper.buildNameRangeLocality(
-                ctx.getParent(), VisitorHelper.getName(ctx.getParent()), context.getProgramDocumentUri());
-        Location location = context.getExtendedDocument().mapLocation(locality.getRange());
-        locality = Locality.builder().range(location.getRange()).uri(location.getUri()).build();
+                Locality.builder().range(location.getRange()).uri(location.getUri()).build();
 
-        boolean isWhenever = nodes.stream().anyMatch(n ->
-            n.getDepthFirstStream().anyMatch(nd -> nd instanceof ExecSqlWheneverNode));
-
-        if (!isWhenever) {
-            Node sqlNode = new ExecSqlNode(locality);
-            nodes = new LinkedList<>(nodes);
-            nodes.add(0, sqlNode);
-        }
-
-        return nodes;
+        Node sqlNode = new ExecSqlNode(locality);
+        nodes.forEach(sqlNode::addChild);
+        return Collections.singletonList(sqlNode);
     }
 
     private String preProcessSqlComment(Db2SqlParser.SqlCodeContext ctx) {
@@ -398,44 +402,11 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         return new Position(line, col);
     }
 
-    @Override
-    public List<Node> visitRulesAllowedInWorkingStorageAndLinkageSection(
-            Db2SqlParser.RulesAllowedInWorkingStorageAndLinkageSectionContext ctx) {
-        return addTreeNode(ctx, Db2WorkingAndLinkageSectionNode::new);
-    }
-
-    @Override
-    public List<Node> visitDbs_declare_variable(Db2SqlParser.Dbs_declare_variableContext ctx) {
-        return addTreeNode(ctx, Db2DeclareVariableNode::new);
-    }
-
-    @Override
-    public List<Node> visitProcedureDivisionRules(Db2SqlParser.ProcedureDivisionRulesContext ctx) {
-        return addTreeNode(ctx, Db2ProcedureDivisionNode::new);
-    }
-
-    @Override
-    public List<Node> visitDbs_whenever(Db2SqlParser.Dbs_wheneverContext ctx) {
-      ExecSqlWheneverNode.WheneverConditionType conditionType = getConditionType(ctx);
-      Pair<ExecSqlWheneverNode.WheneverType, String> result = getWheneverType(ctx);
-
-      return addTreeNode(ctx, location -> new ExecSqlWheneverNode(location,
-          conditionType,
-          result.getKey(),
-          result.getValue()));
-    }
-
-    @Override
-    public List<Node> visitRulesAllowedInDataDivisionAndProcedureDivision(
-            Db2SqlParser.RulesAllowedInDataDivisionAndProcedureDivisionContext ctx) {
-        return addTreeNode(ctx, Db2DataAndProcedureDivisionNode::new);
-    }
-
-    private Db2SqlParser.StartSqlRuleContext parseSQL(
+    private Db2SqlExecParser.StartSqlRuleContext parseSQL(
             String sqlCode, Db2SqlParser.SqlCodeContext sqlCodeContext) {
-        Db2SqlLexer lexer = new Db2SqlLexer(CharStreams.fromString(sqlCode));
+        Db2SqlExecLexer lexer = new Db2SqlExecLexer(CharStreams.fromString(sqlCode));
         CommonTokenStream tokens = new CommonTokenStream(lexer);
-        Db2SqlParser parser = new Db2SqlParser(tokens);
+        Db2SqlExecParser parser = new Db2SqlExecParser(tokens);
         Db2ErrorListener listener = new Db2ErrorListener(context.getProgramDocumentUri());
         lexer.removeErrorListeners();
         lexer.addErrorListener(listener);
@@ -443,7 +414,7 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         parser.addErrorListener(listener);
         parser.setErrorHandler(new Db2ErrorStrategy(messageService));
 
-        Db2SqlParser.StartSqlRuleContext result = parser.startSqlRule();
+        Db2SqlExecParser.StartSqlRuleContext result = parser.startSqlRule();
         for (SyntaxError err : listener.getErrors()) {
             errors.add(
                     err.toBuilder()
@@ -451,24 +422,6 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
                             .build());
         }
         return result;
-    }
-
-    @Override
-    public List<Node> visitDbs_rs_locator_variable(Db2SqlParser.Dbs_rs_locator_variableContext ctx) {
-        return addTreeNode(ctx, QualifiedReferenceNode::new);
-    }
-
-    @Override
-    public List<Node> visitDbs_host_names_var(Db2SqlParser.Dbs_host_names_varContext ctx) {
-        return addTreeNode(ctx, QualifiedReferenceNode::new);
-    }
-
-    @Override
-    public List<Node> visitDbs_host_name_container(Db2SqlParser.Dbs_host_name_containerContext ctx) {
-        if (isVariableUsage(ctx.getParent())) {
-            return addVariableUsageNodes(ctx);
-        }
-        return ImmutableList.of();
     }
 
     @Override
@@ -485,48 +438,6 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
     @Override
     protected List<Node> aggregateResult(List<Node> aggregate, List<Node> nextResult) {
         return Stream.concat(aggregate.stream(), nextResult.stream()).collect(toList());
-    }
-
-    private boolean isVariableUsage(ParserRuleContext ctx) {
-        if (hasColumn(ctx)) {
-            return true;
-        }
-
-        if (ctx instanceof Db2SqlParser.Dbs_host_names_varContext && !isSpecialName(ctx)) {
-            return true;
-        }
-
-        for (ParseTree child : ctx.children) {
-            if (child instanceof ParserRuleContext) {
-                if (isVariableUsage((ParserRuleContext) child)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean hasColumn(ParserRuleContext ctx) {
-        for (ParseTree child : ctx.children) {
-            if (child instanceof TerminalNode && child.getText().equals(":")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isSpecialName(ParserRuleContext ctx) {
-        if (ctx instanceof Db2SqlParser.Dbs_special_nameContext) {
-            return true;
-        }
-        for (ParseTree child : ctx.children) {
-            if (child instanceof ParserRuleContext) {
-                if (isSpecialName((ParserRuleContext) child)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private List<Node> addTreeNode(ParserRuleContext ctx, Function<Locality, Node> nodeConstructor) {
@@ -561,52 +472,6 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         return addTreeNode(ctx, locality -> new VariableUsageNode(finalName, locality));
     }
 
-    private ExecSqlWheneverNode.WheneverConditionType getConditionType(Db2SqlParser.Dbs_wheneverContext ctx) {
-        ParserRuleContext ruleContext = ((ParserRuleContext) ctx);
-        ExecSqlWheneverNode.WheneverConditionType conditionType = ExecSqlWheneverNode.WheneverConditionType.NOT_FOUND;
-
-
-        if (ruleContext.getChildCount() >= 3) {
-            ParseTree pt = ruleContext.getChild(1);
-            String value = pt.getText().trim().toUpperCase();
-
-            if (Objects.equals(value, "SQLERROR")) {
-                conditionType = ExecSqlWheneverNode.WheneverConditionType.SQLERROR;
-            } else if (Objects.equals(value, "SQLWARNING")) {
-                conditionType = ExecSqlWheneverNode.WheneverConditionType.SQLWARNING;
-            }
-        }
-        return conditionType;
-    }
-
-    private Pair<ExecSqlWheneverNode.WheneverType, String> getWheneverType(Db2SqlParser.Dbs_wheneverContext ctx) {
-        ParserRuleContext ruleContext = ((ParserRuleContext) ctx);
-        Pair<ExecSqlWheneverNode.WheneverType, String> result = Pair.of(ExecSqlWheneverNode.WheneverType.CONTINUE, null);
-
-        if (ruleContext.getChildCount() > 3) {
-
-            int index = 2;
-            ParseTree pt = ruleContext.getChild(index);
-            String value = pt.getText().trim().toUpperCase();
-            if (Objects.equals(value, "FOUND")) {
-                index = 3;
-                pt = ruleContext.getChild(index);
-                value = pt.getText().trim().toUpperCase();
-            }
-
-            if (Objects.equals(value, "DO")) {
-                result = Pair.of(ExecSqlWheneverNode.WheneverType.DO, ruleContext.getChild(index + 1).getText());
-            } else if (Objects.equals(value, "GO")) {
-                if (ruleContext.getChildCount() > index + 2) {
-                    result = Pair.of(ExecSqlWheneverNode.WheneverType.GOTO, ruleContext.getChild(index + 2).getText());
-                }
-            } else if (Objects.equals(value, "GOTO")) {
-                result = Pair.of(ExecSqlWheneverNode.WheneverType.GOTO, ruleContext.getChild(index + 1).getText());
-            }
-        }
-        return result;
-    }
-
     private void replaceWithMetadata(AnnotatedParserRuleContext ctx) {
         replaceWithMetadata(ctx, "");
     }
@@ -627,7 +492,7 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         String contextTextReference = PersistentData.next();
         ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
         ctx.getCustomData().put("DIALECT", "IDMS");
-        String terminator = ".".equals(ctx.stop.getText()) ? "." : "";
+        String terminator = ".".equals(ctx.stop.getText()) ? "" : ".";
         addReplacementContext(ctx, String.format("%s_DIALECT_ %s %s", staticPrefix, contextTextReference, terminator));
         extractions++;
     }

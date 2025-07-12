@@ -864,6 +864,7 @@ statement
    | mergeStatement
    | moveStatement
    | multiplyStatement
+   | nextSentenceWrapperStatement
    | openStatement
    | performStatement
    | purgeStatement
@@ -887,7 +888,8 @@ statement
    | writeStatement
    | jsonStatement
    | xmlStatement
-   | dialectStatement
+   | mapStatement
+   | genericOnClauseStatement
    ;
 
 xmlGenerate
@@ -995,7 +997,7 @@ acceptStatement
    ;
 
 dialectStatement
-   : ZERO_WIDTH_SPACE | dialectIfStatment
+   : ZERO_WIDTH_SPACE | dialectIfStatment | dialectNodeFiller
    ;
 
 acceptFromDateStatement
