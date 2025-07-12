@@ -17,7 +17,6 @@ import * as helper from "./testHelper";
 import { pos } from "./testHelper";
 import * as vscode from "vscode";
 
-const TEST_TIMEOUT = 30000;
 const WORKSPACE_FILE = "USER1.cbl";
 
 suite("Tests with USER1.cbl", function () {
@@ -25,16 +24,22 @@ suite("Tests with USER1.cbl", function () {
   suiteSetup(async function () {
     this.timeout(0);
     this.slow(2000);
-    helper.updateConfig("basic.json");
+    await helper.updateConfig("basic.json");
     await helper.activate();
   });
 
-  this.afterEach(async () => await helper.closeAllEditors()).timeout(
-    helper.TEST_TIMEOUT,
-  );
   this.beforeEach(async () => {
-    await helper.showDocument(WORKSPACE_FILE);
-    editor = helper.get_editor(WORKSPACE_FILE);
+    editor = await helper.showDocument(WORKSPACE_FILE);
+  });
+
+  this.afterEach(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    await helper.closeAllEditors();
+  });
+
+  this.afterAll(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    await helper.closeAllEditors();
   });
 
   // open 'open' file, should be recognized as COBOL
@@ -46,21 +51,52 @@ suite("Tests with USER1.cbl", function () {
 
   test("TC152046: Nominal - check syntax Ok message", async () => {
     await helper.waitFor(() => editor.document.languageId === "cobol");
-    const diagnostics = vscode.languages.getDiagnostics(
-      helper.get_active_editor().document.uri,
-    );
+    if (vscode.window.activeTextEditor === undefined) {
+      assert.fail("activeTextEditor in undefined");
+    }
+    let diagnostics: vscode.Diagnostic[] = [];
+
+    await helper.waitFor(() => {
+      diagnostics = vscode.languages.getDiagnostics(
+        vscode.window.activeTextEditor!.document.uri,
+      );
+      return diagnostics.length === 0;
+    });
+
     const expectedMsg =
       "Checks that when opening Cobol file with correct syntax there is an appropriate message is shown";
     assert.strictEqual(diagnostics.length, 0, expectedMsg);
   });
 
+  async function executeProvider(
+    provider:
+      | "vscode.executeDefinitionProvider"
+      | "vscode.executeReferenceProvider",
+    line: number,
+    char: number,
+  ) {
+    let locations: vscode.Location[] | undefined = [];
+    await helper.waitFor(async () => {
+      locations = await vscode.commands.executeCommand(
+        provider,
+        editor.document.uri,
+        pos(line, char),
+      );
+      if (locations === undefined) {
+        return false;
+      }
+      return locations.length > 0;
+    });
+    return locations;
+  }
+
   test("TC152049: Navigate through definitions", async () => {
-    await helper.sleep(10000);
-    const result: any[] = await vscode.commands.executeCommand(
+    const result = await executeProvider(
       "vscode.executeDefinitionProvider",
-      editor.document.uri,
-      pos(28, 24),
+      28,
+      24,
     );
+
     assert.strictEqual(result.length, 1);
     assert.ok(
       result[0].uri.fsPath.includes(editor.document.fileName) &&
@@ -71,27 +107,42 @@ suite("Tests with USER1.cbl", function () {
   });
 
   test("TC152080: Find all references from the word middle", async () => {
-    const result: any[] = await vscode.commands.executeCommand(
+    const result = await executeProvider(
       "vscode.executeReferenceProvider",
-      editor.document.uri,
-      pos(20, 15),
+      20,
+      15,
     );
+
+    assert.strictEqual(result.length, 3, "Check references count");
     assert.ok(
-      result.length === 3 &&
-        result[0].uri.fsPath.includes(editor.document.fileName) &&
-        result[0].range.start.line === 20 &&
-        result[1].range.start.line === 34 &&
-        result[2].range.start.line === 42,
-      "Checks that LSP can find all references and navigate by them",
+      result[0].uri.fsPath.includes(editor.document.fileName),
+      "Check references path",
+    );
+    assert.strictEqual(result[0].range.start.line, 20, "Check reference line");
+    assert.strictEqual(
+      result[0].range.start.line,
+      20,
+      "Check 1 reference line",
+    );
+    assert.strictEqual(
+      result[1].range.start.line,
+      34,
+      "Check 2 reference line",
+    );
+    assert.strictEqual(
+      result[2].range.start.line,
+      42,
+      "Check 3 reference line",
     );
   });
 
   test("TC152080: Find all references from the word begin", async () => {
-    const result: any[] = await vscode.commands.executeCommand(
+    const result = await executeProvider(
       "vscode.executeReferenceProvider",
-      editor.document.uri,
-      pos(20, 10),
+      20,
+      10,
     );
+
     assert.ok(
       result.length === 3 &&
         result[0].uri.fsPath.includes(editor.document.fileName) &&
@@ -108,18 +159,20 @@ suite("Tests with USER1.cbl", function () {
       pos(34, 57),
       "                                ",
     );
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length > 0,
-    );
-    assert.strictEqual(
-      vscode.languages.getDiagnostics(editor.document.uri).length,
+    const diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
       1,
     );
-    const result: any[] = await vscode.commands.executeCommand(
+    assert.strictEqual(diagnostics.length, 1);
+    await vscode.workspace
+      .getConfiguration()
+      .update("cobol-lsp.formatting", "None");
+    const result = await vscode.commands.executeCommand<vscode.TextEdit[]>(
       "vscode.executeFormatDocumentProvider",
       editor.document.uri,
       { tabSize: 4, insertSpaces: true },
     );
+    assert.ok(result);
     assert.strictEqual(result.length, 1);
 
     helper.assertRangeIsEqual(

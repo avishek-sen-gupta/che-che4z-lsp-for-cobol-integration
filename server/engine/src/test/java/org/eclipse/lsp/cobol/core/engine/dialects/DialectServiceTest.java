@@ -14,7 +14,11 @@
  */
 package org.eclipse.lsp.cobol.core.engine.dialects;
 
+import static org.mockito.Mockito.*;
+
 import com.google.common.collect.ImmutableList;
+import java.net.URI;
+import java.util.List;
 import org.eclipse.lsp.cobol.common.DialectRegistryItem;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
@@ -23,18 +27,12 @@ import org.eclipse.lsp.cobol.common.dialects.DialectOutcome;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
 import org.eclipse.lsp.cobol.common.mapping.ExtendedDocument;
 import org.eclipse.lsp.cobol.common.message.MessageService;
+import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
-import java.net.URI;
-import java.util.List;
-
-import static org.mockito.Mockito.*;
-
-/**
- * Test for DialectService
- */
+/** Test for DialectService */
 class DialectServiceTest {
 
   DialectService dialectService;
@@ -47,9 +45,12 @@ class DialectServiceTest {
     ddService = mock(DialectDiscoveryService.class);
     copybookService = mock(CopybookService.class);
     messageService = mock(MessageService.class);
+    ErrorFinalizerService errorFinalizerService = mock(ErrorFinalizerService.class);
+
     when(ddService.loadDialects(copybookService, messageService)).thenReturn(ImmutableList.of());
 
-    dialectService = new DialectService(ddService, copybookService, messageService);
+    dialectService =
+        new DialectService(ddService, copybookService, messageService, errorFinalizerService);
   }
 
   private CobolDialect configureDialect(DialectProcessingContext context, String name) {
@@ -74,8 +75,11 @@ class DialectServiceTest {
 
     CobolDialect dialect = configureDialect(context, "dialect");
 
-    when(ddService.loadDialects(URI.create(""), copybookService, messageService)).thenReturn(ImmutableList.of(dialect));
-    List<DialectRegistryItem> dialectRegistry = ImmutableList.of(new DialectRegistryItem(dialect.getName(), URI.create(""), "", "extensionId"));
+    when(ddService.loadDialects(URI.create(""), copybookService, messageService))
+        .thenReturn(ImmutableList.of(dialect));
+    List<DialectRegistryItem> dialectRegistry =
+        ImmutableList.of(
+            new DialectRegistryItem(dialect.getName(), URI.create(""), "", "extensionId"));
     dialectService.updateDialects(dialectRegistry);
 
     dialectService.process(ImmutableList.of("dialect"), context);
@@ -96,12 +100,13 @@ class DialectServiceTest {
 
     CobolDialect dialect1 = configureDialect(context, "1");
     CobolDialect dialect2 = configureDialect(context, "2");
-    when(ddService.loadDialects(URI.create(""), copybookService, messageService)).thenReturn(ImmutableList.of(dialect1, dialect2));
+    when(ddService.loadDialects(URI.create(""), copybookService, messageService))
+        .thenReturn(ImmutableList.of(dialect1, dialect2));
 
-    List<DialectRegistryItem> dialectRegistry = ImmutableList.of(
-        new DialectRegistryItem(dialect1.getName(), URI.create(""), "", "extensionId"),
-        new DialectRegistryItem(dialect2.getName(), URI.create(""), "", "extensionId")
-        );
+    List<DialectRegistryItem> dialectRegistry =
+        ImmutableList.of(
+            new DialectRegistryItem(dialect1.getName(), URI.create(""), "", "extensionId"),
+            new DialectRegistryItem(dialect2.getName(), URI.create(""), "", "extensionId"));
 
     InOrder inOrder = inOrder(dialect1, dialect2);
 

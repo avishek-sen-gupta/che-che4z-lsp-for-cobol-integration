@@ -30,9 +30,10 @@
     </parent>
 
     <properties>
+        <maven.compiler.release>8</maven.compiler.release>
         <antlr.version>4.13.2</antlr.version>
         <awaitility.version>3.0.0</awaitility.version>
-        <commons.io.version>2.10.0</commons.io.version>
+        <commons.io.version>2.14.0</commons.io.version>
         <commons.lang.version>3.12.0</commons.lang.version>
         <commons.text.version>1.10.0</commons.text.version>
         <concurrentunit.version>0.4.6</concurrentunit.version>
@@ -40,19 +41,19 @@
         <google.guava.version>33.2.1-jre</google.guava.version>
         <guice.version>4.2.2</guice.version>
         <java.version>8</java.version>
-        <junit-jupiter.version>5.6.0</junit-jupiter.version>
+        <junit-jupiter.version>5.11.2</junit-jupiter.version>
         <junit.platform.version>1.6.0</junit.platform.version>
         <logback.classic.version>1.5.7</logback.classic.version>
-        <lombok.version>1.18.30</lombok.version>
+        <lombok.version>1.18.36</lombok.version>
         <lsp4j.version>0.14.0</lsp4j.version>
         <picocli.version>4.7.5</picocli.version>
         <maven.antlr4.plugin.version>4.13.2</maven.antlr4.plugin.version>
         <maven.assembly.plugin.version>3.2.0</maven.assembly.plugin.version>
-        <maven.compiler.plugin.version>3.7.0</maven.compiler.plugin.version>
-        <maven.jacoco.plugin.version>0.8.11</maven.jacoco.plugin.version>
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <maven.jacoco.plugin.version>0.8.12</maven.jacoco.plugin.version>
         <maven.resources.plugin.version>3.0.2</maven.resources.plugin.version>
-        <maven.surefire.plugin.version>3.0.0-M3</maven.surefire.plugin.version>
-        <mockito.core.version>5.10.0</mockito.core.version>
+        <maven.surefire.plugin.version>3.5.2</maven.surefire.plugin.version>
+        <mockito.core.version>5.14.2</mockito.core.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <slf4j.api.version>2.0.9</slf4j.api.version>
@@ -60,6 +61,12 @@
         <filesToTestPath>${project.basedir}${file.separator}..${file.separator}..${file.separator}tests${file.separator}test_files</filesToTestPath>
     </properties>
     <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit-jupiter.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.eclipse.lsp.cobol</groupId>
             <artifactId>common</artifactId>
@@ -244,8 +251,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${maven.compiler.plugin.version}</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <proc>full</proc>
                 </configuration>
             </plugin>
             <plugin>
@@ -291,11 +297,23 @@
                             <!--suppress UnresolvedMavenProperty -->
                             <value>${listingSnap}</value>
                         </property>
+                        <property>
+                            <name>usecase.test.repo.dir</name>
+                            <value>${usecase.test.repo.dir}</value>
+                        </property>
                     </systemPropertyVariables>
-                    <excludes>
-                        <exclude>**/org/eclipse/lsp/cobol/dialects/**/*</exclude>
-                    </excludes>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
@@ -307,6 +325,8 @@
                         <exclude>**/generated-test-sources/**/*</exclude>
                         <exclude>**/org/eclipse/lsp/cobol/core/parser/**/*</exclude>
                         <exclude>**/org/eclipse/lsp/cobol/domain/modules/**/*</exclude>
+                        <exclude>**/org/eclipse/lsp/cobol/dialects/idms/**/*</exclude>
+                        <exclude>**/org/eclipse/lsp/cobol/dialects/daco/**/*</exclude>
                     </excludes>
                 </configuration>
                 <executions>
@@ -438,7 +458,7 @@
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>0.9.15</version>
+                        <version>0.10.3</version>
                         <extensions>true</extensions>
                         <executions>
                             <execution>
@@ -460,8 +480,9 @@
                             </buildArgs>
                             <agent>
                                 <options>
-                                    <option>access-filter-file=${basedir}/src/test/resources/access-filter.json</option>
-                                    <option>experimental-class-loader-support</option>
+                                    <accessFilterFiles>
+                                        <filterFile>${basedir}/src/test/resources/access-filter.json</filterFile>
+                                    </accessFilterFiles>
                                 </options>
                             </agent>
                         </configuration>
@@ -476,7 +497,7 @@
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>0.9.13</version>
+                        <version>0.10.3</version>
                         <extensions>true</extensions>
                         <executions>
                             <execution>
@@ -500,8 +521,9 @@
                             </buildArgs>
                             <agent>
                                 <options>
-                                    <option>access-filter-file=${basedir}/src/test/resources/access-filter.json</option>
-                                    <option>experimental-class-loader-support</option>
+                                    <accessFilterFiles>
+                                        <filterFile>${basedir}/src/test/resources/access-filter.json</filterFile>
+                                    </accessFilterFiles>
                                 </options>
                             </agent>
                         </configuration>

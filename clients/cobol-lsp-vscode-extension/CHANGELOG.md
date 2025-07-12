@@ -1,6 +1,47 @@
 # Changelog
 All notable changes to the COBOL Language Support extension are documented in this file.
 
+## [2.4.1](https://github.com/eclipse-che4z/che-che4z-lsp-for-cobol/compare/2.4.0...2.4.1) (2025-07-02)
+
+#### Added
+- Added more COBOL code snippets
+- Added missing keywords
+- Enable remote copybook definitions in processor groups and preprocessor definitions
+- Filter diagnostics based on settings
+
+#### Fixed
+- Code optimization
+- CICS bug fixes
+- Propagate replace to the nested copybooks
+- Find references and Go to definition from copybooks
+- Miscellaneous bug fixes
+
+#### Changed
+- Readme update
+
+## [2.4.0](https://github.com/eclipse-che4z/che-che4z-lsp-for-cobol/compare/2.3.0...2.4.0) (2025-02-25)
+
+#### Added
+- Better support for repository paragraph
+- Support for User-defined-functions
+- Support for additional CICS commands
+
+#### Fixed
+- Code optimization
+- Grammar optimization
+- CICS bug fixes
+- Miscellaneous bug fixes
+
+#### Changed
+- Readme update
+
+## [2.3.0](https://github.com/eclipse-che4z/che-che4z-lsp-for-cobol/compare/2.2.0...2.3.0) (2024-10-24)
+
+#### Fixed
+- Parser optimization
+- Grammar optimization
+- Miscellaneous bug fixes
+
 ## [2.2.0](https://github.com/eclipse-che4z/che-che4z-lsp-for-cobol/compare/2.1.2...2.2.0) (2024-08-19)
 
 #### Added

@@ -1,0 +1,571 @@
+/*
+ * Copyright (c) 2022 Broadcom.
+ * The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *    Broadcom, Inc. - initial API and implementation
+ *
+ */
+package org.eclipse.lsp.cobol.core.engine.symbols;
+
+import static org.eclipse.lsp.cobol.common.model.tree.Node.hasType;
+
+import com.google.common.collect.ImmutableList;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
+import org.eclipse.lsp.cobol.common.error.ErrorSource;
+import org.eclipse.lsp.cobol.common.error.SyntaxError;
+import org.eclipse.lsp.cobol.common.message.MessageTemplate;
+import org.eclipse.lsp.cobol.common.model.Locality;
+import org.eclipse.lsp.cobol.common.model.NodeType;
+import org.eclipse.lsp.cobol.common.model.tree.CodeBlockDefinitionNode;
+import org.eclipse.lsp.cobol.common.model.tree.CodeBlockUsageNode;
+import org.eclipse.lsp.cobol.common.model.tree.FunctionReference;
+import org.eclipse.lsp.cobol.common.model.tree.Node;
+import org.eclipse.lsp.cobol.common.model.tree.ParagraphNameNode;
+import org.eclipse.lsp.cobol.common.model.tree.ProcedureSectionNode;
+import org.eclipse.lsp.cobol.common.model.tree.ProgramIdNode;
+import org.eclipse.lsp.cobol.common.model.tree.ProgramNode;
+import org.eclipse.lsp.cobol.common.model.tree.ProgramSubtype;
+import org.eclipse.lsp.cobol.common.model.tree.SectionNameNode;
+import org.eclipse.lsp.cobol.common.model.tree.variable.VariableNode;
+import org.eclipse.lsp.cobol.common.model.tree.variable.VariableUsageNode;
+import org.eclipse.lsp.cobol.common.symbols.CodeBlockReference;
+import org.eclipse.lsp.cobol.common.symbols.ProcedureId;
+import org.eclipse.lsp.cobol.common.symbols.SymbolTable;
+import org.eclipse.lsp.cobol.common.symbols.VariableAccumulator;
+import org.eclipse.lsp.cobol.core.model.VariableUsageUtils;
+import org.eclipse.lsp4j.Location;
+
+/** Service to handle symbol information and dependencies */
+public class SymbolAccumulator implements VariableAccumulator {
+  private final Map<String, SymbolTable> programSymbols = new HashMap<>();
+
+  private final Map<String, FunctionInfo> userDefinedFunctions = new HashMap<>();
+  private final Map<String, FunctionInfo> implicitFunctions = getImplicitFunctions();
+
+  /**
+   * Add the variable definition to that program context.
+   *
+   * @param programNode the program where this variable belongs to.
+   * @param node the variable definition node
+   */
+  public void addVariableDefinition(ProgramNode programNode, VariableNode node) {
+    createOrGetSymbolTable(programNode).register(node);
+  }
+
+  /**
+   * * Register variable definitions into nearest ProgramNode
+   *
+   * @param node the node with VariableDefinitionNodes
+   */
+  public void registerVariablesInProgram(Node node) {
+    // The variable can have nested variable definitions (like IndexItemNode), we need to
+    // collect them
+    List<VariableNode> variables =
+        node.getChildren().stream()
+            .flatMap(Node::getDepthFirstStream)
+            .filter(hasType(NodeType.VARIABLE))
+            .map(VariableNode.class::cast)
+            .collect(Collectors.toList());
+    node.getProgram()
+        .ifPresent(programNode -> variables.forEach(v -> addVariableDefinition(programNode, v)));
+  }
+
+  /**
+   * Add the usage of a code block defined in this program. Returns an optional syntax error if the
+   * paragraph is not defined.
+   *
+   * @param program the program to register block usage in
+   * @param usageNode the usage node to register
+   * @return Optional error if the paragraph or section with the given name is not defined
+   */
+  public Optional<SyntaxError> registerCodeBlockUsage(
+      ProgramNode program, CodeBlockUsageNode usageNode) {
+    SymbolTable symbolTable = createOrGetSymbolTable(program);
+    List<CodeBlockReference> resolved = resolveProcedureId(usageNode, symbolTable);
+
+    if (resolved.isEmpty()) {
+      return Optional.of(
+          SyntaxError.syntaxError()
+              .errorSource(ErrorSource.PARSING)
+              .messageTemplate(
+                  MessageTemplate.of("semantics.paragraphNotDefined", usageNode.getName()))
+              .severity(ErrorSeverity.ERROR)
+              .location(usageNode.getLocality().toOriginalLocation())
+              .build());
+    }
+
+    boolean ambiguous = resolved.size() > 1;
+    for (CodeBlockReference ref : resolved) {
+      ref.getUsage().add(usageNode.getLocality().toLocation());
+      if (ref.getDefinitions().size() > 1) {
+        ambiguous = true;
+      }
+    }
+    return ambiguous
+        ? Optional.of(
+            SyntaxError.syntaxError()
+                .errorSource(ErrorSource.PARSING)
+                .messageTemplate(MessageTemplate.of("semantics.ambiguous", usageNode.getName()))
+                .severity(ErrorSeverity.ERROR)
+                .location(usageNode.getLocality().toOriginalLocation())
+                .build())
+        : Optional.empty();
+  }
+
+  private List<CodeBlockReference> resolveProcedureId(
+      CodeBlockUsageNode usageNode, SymbolTable symbolTable) {
+    Map<ProcedureId, CodeBlockReference> procedures = symbolTable.getProcedures();
+    ProcedureId paragraphId = new ProcedureId(usageNode.getOfSection(), usageNode.getName());
+    if (procedures.containsKey(paragraphId)) {
+      return Collections.singletonList(procedures.get(paragraphId));
+    }
+    if (usageNode.getOfSection() != null) {
+      return Collections.emptyList();
+    }
+    String section =
+        usageNode
+            .getNearestParentByType(NodeType.PROCEDURE_SECTION)
+            .map(n -> ((ProcedureSectionNode) n).getName())
+            .orElse(null);
+    paragraphId = new ProcedureId(section, usageNode.getName());
+    if (procedures.containsKey(paragraphId)) {
+      return Collections.singletonList(procedures.get(paragraphId));
+    }
+    // try section name
+    ProcedureId sectionId = new ProcedureId(usageNode.getName(), null);
+    if (procedures.containsKey(sectionId)) {
+      return Collections.singletonList(procedures.get(sectionId));
+    }
+    List<CodeBlockReference> resolved = new ArrayList<>();
+    for (Map.Entry<ProcedureId, CodeBlockReference> en : symbolTable.getProcedures().entrySet()) {
+      if (Objects.equals(usageNode.getName(), en.getKey().getParagraphName())) {
+        resolved.add(en.getValue());
+      }
+    }
+    return resolved;
+  }
+
+  /**
+   * Get the symbol table for the given program
+   *
+   * @param program the program
+   * @return the symbol table
+   */
+  public SymbolTable getSymbolTable(ProgramNode program) {
+    return programSymbols.get(SymbolTable.generateKey(program));
+  }
+
+  @Override
+  public void registerImplicitSection(ProgramNode programNode, CodeBlockDefinitionNode node) {
+    ProcedureId procedureId = new ProcedureId(node.getName(), null);
+    CodeBlockReference codeBlockReference = new CodeBlockReference();
+    codeBlockReference
+        .getUsage()
+        .addAll(node.getUsages().stream().map(Locality::toLocation).collect(Collectors.toList()));
+    getSymbolTable(programNode).getProcedures().put(procedureId, codeBlockReference);
+  }
+
+  private SymbolTable createOrGetSymbolTable(ProgramNode program) {
+    String key = SymbolTable.generateKey(program);
+    if (!programSymbols.containsKey(key)) {
+      programSymbols.put(
+          key,
+          new SymbolTable(program.getProgram().map(this::createOrGetSymbolTable).orElse(null)));
+    }
+    return programSymbols.get(key);
+  }
+
+  /**
+   * Add a section definition name node in the program context.
+   *
+   * @param program the program to register section in
+   * @param node - the section definition node
+   * @return syntax error if the code block duplicates
+   */
+  public Optional<SyntaxError> registerSectionNameNode(ProgramNode program, SectionNameNode node) {
+    createOrGetSymbolTable(program)
+        .getProcedures()
+        .computeIfAbsent(new ProcedureId(node.getName(), null), n -> new CodeBlockReference())
+        .addDefinition(node.getLocality().toLocation());
+    return Optional.empty();
+  }
+
+  private Map<String, FunctionInfo> getImplicitFunctions() {
+    return getAllImplicitFunctionNames()
+        .collect(Collectors.toMap(Function.identity(), this::createImplicitFunctionInfo));
+  }
+
+  public Stream<String> getAllImplicitFunctionNames() {
+    return Stream.of(
+        "ABS",
+        "ACOS",
+        "ANNUITY",
+        "ASIN",
+        "ATAN",
+        "BIT-OF",
+        "BIT-TO-CHAR",
+        "BYTE-LENGTH",
+        "CHAR",
+        "COMBINED-DATETIME",
+        "CONTENT-OF",
+        "COS",
+        "CURRENT-DATE",
+        "DATE-OF-INTEGER",
+        "DATE-TO-YYYYMMDD",
+        "DAY-OF-INTEGER",
+        "DAY-TO-YYYYDDD",
+        "DISPLAY-OF",
+        "E",
+        "EXP",
+        "EXP10",
+        "FACTORIAL",
+        "FORMATTED-CURRENT-DATE",
+        "FORMATTED-DATE",
+        "FORMATTED-DATETIME",
+        "FORMATTED-TIME",
+        "HEX-OF",
+        "HEX-TO-CHAR",
+        "INTEGER",
+        "INTEGER-OF-DATE",
+        "INTEGER-OF-DAY",
+        "INTEGER-OF-FORMATTED-DATE",
+        "INTEGER-PART",
+        "LENGTH",
+        "LOG",
+        "LOG10",
+        "LOWER-CASE",
+        "MAX",
+        "MEAN",
+        "MEDIAN",
+        "MIDRANGE",
+        "MIN",
+        "MOD",
+        "NATIONAL-OF",
+        "NUMVAL",
+        "NUMVAL-C",
+        "NUMVAL-F",
+        "ORD",
+        "ORD-MAX",
+        "ORD-MIN",
+        "PI",
+        "PRESENT-VALUE",
+        "RANDOM",
+        "RANGE",
+        "REM",
+        "REVERSE",
+        "SECONDS-FROM-FORMATTED-TIME",
+        "SECONDS-PAST-MIDNIGHT",
+        "SIGN",
+        "SIN",
+        "SQRT",
+        "STANDARD-DEVIATION",
+        "SUM",
+        "TAN",
+        "TEST-DATE-YYYYMMDD",
+        "TEST-DAY-YYYYDDD",
+        "TEST-FORMATTED-DATETIME",
+        "TEST-NUMVAL",
+        "TEST-NUMVAL-C",
+        "TEST-NUMVAL-F",
+        "TRIM",
+        "ULENGTH",
+        "UPOS",
+        "UPPER-CASE",
+        "USUBSTR",
+        "USUPPLEMENTARY",
+        "UUID4",
+        "UVALID",
+        "UWIDTH",
+        "VARIANCE",
+        "WHEN-COMPILED",
+        "YEAR-TO-YYYY");
+  }
+
+  /**
+   * Add function usage or definition to a program
+   *
+   * @param callingProgram the program to register section in
+   * @param function - the function reference node
+   * @return syntax error if the function is not available
+   */
+  public Optional<SyntaxError> registerFunctionReferenceNode(
+      ProgramNode callingProgram, FunctionReference function) {
+    String functionName = function.getName().toUpperCase();
+    Boolean isImplicit =
+        getProgramContainingFunctionDeclaration(functionName, callingProgram)
+            .map(ProgramNode::getRepository)
+            .map(repo -> repo.get(functionName))
+            .orElse(null);
+    FunctionInfo fi =
+        getFunctionInfo(functionName, isImplicit != null, isImplicit != null && isImplicit);
+    fi.getReferences().add(function.getLocality().toLocation());
+    function.setDefinitions(fi.getDefinition());
+    if (fi.getProgramNode() == null
+        || fi.getProgramNode().getOrdinal() > callingProgram.getOrdinal()) {
+      return Optional.of(
+          SyntaxError.syntaxError()
+              .errorSource(ErrorSource.PARSING)
+              .messageTemplate(MessageTemplate.of("semantics.functionExpected", functionName))
+              .severity(ErrorSeverity.ERROR)
+              .location(function.getLocality().toOriginalLocation())
+              .build());
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * Add function definition
+   *
+   * @param function - the function node
+   * @return syntax error if the function is redefined
+   */
+  public Optional<SyntaxError> registerFunctionNode(ProgramNode function) {
+    assert function.getSubtype() == ProgramSubtype.Function;
+    String functionName = function.getProgramName().toUpperCase();
+    FunctionInfo fi =
+        userDefinedFunctions.computeIfAbsent(functionName, (String) -> new FunctionInfo(function));
+    if (fi.getProgramNode() != function) {
+      return Optional.of(
+          SyntaxError.syntaxError()
+              .errorSource(ErrorSource.PARSING)
+              .messageTemplate(MessageTemplate.of("semantics.functionRedefined", functionName))
+              .severity(ErrorSeverity.WARNING)
+              .location(
+                  function
+                      .getDepthFirstStream()
+                      .filter(n -> n instanceof ProgramIdNode)
+                      .filter(n -> ((ProgramIdNode) n).getSubtype() == ProgramSubtype.Function)
+                      .findFirst()
+                      .orElse(function)
+                      .getLocality()
+                      .toOriginalLocation())
+              .build());
+    }
+
+    return Optional.empty();
+  }
+
+  /**
+   * Search for a function reference If a function is prefixed and not declared we try to look for
+   * user defined function If not found, try to resolve as intrinsic function Null if no reference
+   * is found. In case a function is declared within program, try to resolve as per declaration
+   *
+   * @param functionName the functionName of the function
+   * @param programNode the program node
+   * @param isFunctionPrefixed true if the function is prefixed
+   * @return the block reference or null if not found
+   */
+  public FunctionInfo getFunctionReference(
+      String functionName, ProgramNode programNode, boolean isFunctionPrefixed) {
+    Optional<ProgramNode> programContainingFunction =
+        getProgramContainingFunctionDeclaration(functionName, programNode);
+
+    if (!programContainingFunction.isPresent() && !isFunctionPrefixed) {
+      return null;
+    }
+
+    String upperCaseFunctionName = functionName.toUpperCase(Locale.ROOT);
+    boolean isDeclaredIntrinsic =
+        programContainingFunction
+            .map(ProgramNode::getRepository)
+            .map(repo -> repo.get(upperCaseFunctionName))
+            .orElse(false);
+
+    if (isDeclaredIntrinsic) {
+      return implicitFunctions.get(upperCaseFunctionName);
+    }
+
+    if (programContainingFunction.isPresent()) {
+      return userDefinedFunctions.get(upperCaseFunctionName);
+    }
+
+    return userDefinedFunctions.getOrDefault(
+        upperCaseFunctionName, implicitFunctions.get(upperCaseFunctionName));
+  }
+
+  /**
+   * Search for a user defined function reference within a compilation unit
+   *
+   * @param functionName the name of the function
+   * @return the block reference or null if not found
+   */
+  public FunctionInfo getUserDefinedFunctionReference(String functionName) {
+    return userDefinedFunctions.get(functionName.toUpperCase());
+  }
+
+  private static Optional<ProgramNode> getProgramContainingFunctionDeclaration(
+      String functionName, ProgramNode programNode) {
+    while (!programNode.getRepository().containsKey(functionName.toUpperCase(Locale.ROOT))) {
+      Optional<ProgramNode> nearestProgram = programNode.getProgram();
+      if (nearestProgram.isPresent()) {
+        programNode = nearestProgram.get();
+        continue;
+      }
+      return Optional.empty();
+    }
+    return Optional.of(programNode);
+  }
+
+  /**
+   * Add a paragraph definition name node in the program context.
+   *
+   * @param programNode the program to register in
+   * @param node - the section definition node
+   * @return syntax error if the code block duplicates
+   */
+  public Optional<SyntaxError> registerParagraphNameNode(
+      ProgramNode programNode, ParagraphNameNode node) {
+    String sectionName =
+        node.getNearestParentByType(NodeType.PROCEDURE_SECTION)
+            .map(n -> ((ProcedureSectionNode) n).getName())
+            .orElse(null);
+    createOrGetSymbolTable(programNode)
+        .getProcedures()
+        .computeIfAbsent(
+            new ProcedureId(sectionName, node.getName()), n -> new CodeBlockReference())
+        .addDefinition(node.getLocality().toLocation());
+    return Optional.empty();
+  }
+
+  /**
+   * Search for a block reference in a paragraph and then in a section map
+   *
+   * @param programNode the program to search block references in
+   * @param node the node of the block
+   * @return the block reference or null if not found
+   */
+  public List<CodeBlockReference> getCodeBlockReference(
+      ProgramNode programNode, CodeBlockUsageNode node) {
+    return resolveProcedureId(node, createOrGetSymbolTable(programNode));
+  }
+
+  /**
+   * Get Section locations
+   *
+   * @param node the section node
+   * @param retrieveLocations location extract function
+   * @return a list of locations
+   */
+  public List<Location> getSectionLocations(
+      SectionNameNode node, Function<CodeBlockReference, List<Location>> retrieveLocations) {
+    return node.getProgram()
+        .map(this::createOrGetSymbolTable)
+        .map(
+            symbolTable ->
+                symbolTable.getProcedures().entrySet().stream()
+                    .filter(en -> en.getKey().isSection())
+                    .collect(
+                        Collectors.toMap(en -> en.getKey().getSectionName(), Map.Entry::getValue)))
+        .map(map -> map.get(node.getName()))
+        .map(retrieveLocations)
+        .orElse(ImmutableList.of());
+  }
+
+  /**
+   * Get Paragraph locations
+   *
+   * @param node the paragraph node
+   * @param retrieveLocations location extract function
+   * @return a list of locations
+   */
+  public List<Location> getParagraphLocations(
+      ParagraphNameNode node, Function<CodeBlockReference, List<Location>> retrieveLocations) {
+    Optional<ProgramNode> programOpt = node.getProgram();
+    if (!programOpt.isPresent()) {
+      return ImmutableList.of();
+    }
+    for (Map.Entry<ProcedureId, CodeBlockReference> en :
+        createOrGetSymbolTable(programOpt.get()).getProcedures().entrySet()) {
+      if (en.getKey().isParagraph() && en.getKey().getParagraphName().equals(node.getName())) {
+        return retrieveLocations.apply(en.getValue());
+      }
+    }
+    return Collections.emptyList();
+  }
+
+  /**
+   * Extract all accumulated symbols information
+   *
+   * @return Symbol Tables
+   */
+  public Map<String, SymbolTable> getProgramSymbols() {
+    return Collections.unmodifiableMap(programSymbols);
+  }
+
+  /**
+   * Get variable definition node based on list of variable usage nodes.
+   *
+   * @param programNode the program node
+   * @param usagePath represents variable name and its parents
+   * @return the list of founded variable definitions
+   */
+  public List<VariableNode> getVariableDefinition(
+      ProgramNode programNode, List<VariableUsageNode> usagePath) {
+    SymbolTable symbolTable = createOrGetSymbolTable(programNode);
+    List<VariableNode> foundDefinitions =
+        VariableUsageUtils.findVariablesForUsage(symbolTable.getVariablesMap(), usagePath);
+    if (!foundDefinitions.isEmpty()) {
+      return foundDefinitions;
+    }
+
+    return globalVariableSearch(symbolTable, usagePath);
+  }
+
+  private List<VariableNode> globalVariableSearch(
+      SymbolTable symbolTable, List<VariableUsageNode> usagePath) {
+    List<VariableNode> result =
+        VariableUsageUtils.findVariablesForUsage(symbolTable.getVariablesGlobalsMap(), usagePath);
+    if (!result.isEmpty() || symbolTable.getParent() == null) {
+      return result;
+    }
+    return globalVariableSearch(symbolTable.getParent(), usagePath);
+  }
+
+  private FunctionInfo createImplicitFunctionInfo(String implicitFunctionName) {
+    ProgramNode implicitProgramName =
+        new ProgramNode(
+            Locality.builder().uri("implicit://" + implicitFunctionName).build(),
+            ProgramSubtype.Function,
+            0);
+    implicitProgramName.setProgramName(implicitFunctionName.toUpperCase());
+    return new FunctionInfo(implicitProgramName, true);
+  }
+
+  private FunctionInfo getFunctionInfo(
+      String functionName, boolean isDeclared, boolean isImplicit) {
+    if (isDeclared) {
+      return getDeclaredFunctionInfo(functionName, isImplicit);
+    } else {
+      return getUndeclaredFunctionInfo(functionName);
+    }
+  }
+
+  private FunctionInfo getDeclaredFunctionInfo(String functionName, boolean isImplicit) {
+    if (isImplicit) {
+      return implicitFunctions.getOrDefault(functionName, new FunctionInfo());
+    } else {
+      return userDefinedFunctions.computeIfAbsent(functionName, k -> new FunctionInfo());
+    }
+  }
+
+  private FunctionInfo getUndeclaredFunctionInfo(String functionName) {
+    if (userDefinedFunctions.containsKey(functionName)) {
+      return userDefinedFunctions.get(functionName);
+    } else if (implicitFunctions.containsKey(functionName)) {
+      return implicitFunctions.get(functionName);
+    } else {
+      return userDefinedFunctions.computeIfAbsent(functionName, k -> new FunctionInfo());
+    }
+  }
+}

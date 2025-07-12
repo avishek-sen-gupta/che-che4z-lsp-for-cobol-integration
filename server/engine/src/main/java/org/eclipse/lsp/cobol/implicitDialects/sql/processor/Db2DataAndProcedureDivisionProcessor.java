@@ -14,11 +14,13 @@
  */
 package org.eclipse.lsp.cobol.implicitDialects.sql.processor;
 
+import java.util.Optional;
 import lombok.AllArgsConstructor;
 import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
 import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.message.MessageService;
+import org.eclipse.lsp.cobol.common.message.MessageTemplate;
 import org.eclipse.lsp.cobol.common.model.NodeType;
 import org.eclipse.lsp.cobol.common.model.tree.DivisionNode;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
@@ -27,11 +29,7 @@ import org.eclipse.lsp.cobol.common.processor.ProcessingContext;
 import org.eclipse.lsp.cobol.common.processor.Processor;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2DataAndProcedureDivisionNode;
 
-import java.util.Optional;
-
-/**
- * Validate Db2DataAndProcedureDivisionNode
- */
+/** Validate Db2DataAndProcedureDivisionNode */
 @AllArgsConstructor
 public class Db2DataAndProcedureDivisionProcessor
     implements Processor<Db2DataAndProcedureDivisionNode> {
@@ -60,7 +58,7 @@ public class Db2DataAndProcedureDivisionProcessor
                 .location(node.getLocality().toOriginalLocation())
                 .severity(ErrorSeverity.ERROR)
                 .errorSource(ErrorSource.DIALECT)
-                .suggestion(messageService.getMessage("db2Parser.validation.allStatement"))
+                .messageTemplate(MessageTemplate.of("db2Parser.validation.allStatement"))
                 .build());
   }
 }

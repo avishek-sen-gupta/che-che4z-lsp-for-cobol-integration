@@ -41,7 +41,6 @@ import org.eclipse.lsp.cobol.core.engine.dialects.DialectDiscoveryFolderService;
 import org.eclipse.lsp.cobol.core.engine.dialects.DialectDiscoveryService;
 import org.eclipse.lsp.cobol.core.messages.LocaleStoreImpl;
 import org.eclipse.lsp.cobol.core.messages.PropertiesMessageService;
-import org.eclipse.lsp.cobol.dialects.TrueDialectServiceImpl;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.GrammarPreprocessor;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.GrammarPreprocessorImpl;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.copybooks.GrammarPreprocessorListenerFactory;
@@ -49,6 +48,7 @@ import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacePrep
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacingService;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacingServiceImpl;
 import org.eclipse.lsp.cobol.core.visitor.InterruptingTreeListener;
+import org.eclipse.lsp.cobol.dialects.TrueDialectServiceImpl;
 import org.eclipse.lsp.cobol.lsp.DisposableLSPStateService;
 import org.eclipse.lsp.cobol.lsp.jrpc.CobolLanguageClient;
 import org.eclipse.lsp.cobol.service.CobolLSPServerStateService;
@@ -61,6 +61,7 @@ import org.eclipse.lsp.cobol.service.delegates.actions.FindCopybookCommand;
 import org.eclipse.lsp.cobol.service.delegates.communications.Communications;
 import org.eclipse.lsp.cobol.service.delegates.communications.ServerCommunications;
 import org.eclipse.lsp.cobol.service.delegates.completions.*;
+import org.eclipse.lsp.cobol.service.delegates.formations.CapitalFormation;
 import org.eclipse.lsp.cobol.service.delegates.formations.Formation;
 import org.eclipse.lsp.cobol.service.delegates.formations.Formations;
 import org.eclipse.lsp.cobol.service.delegates.formations.TrimFormation;
@@ -107,14 +108,14 @@ public class CliModule extends AbstractModule {
     bind(HoverProvider.class).to(VariableHover.class);
     bind(CFASTBuilder.class).to(CFASTBuilderImpl.class);
     bind(CopybookIdentificationService.class)
-            .annotatedWith(Names.named("contentStrategy"))
-            .to(CopybookIdentificationServiceBasedOnContent.class);
+        .annotatedWith(Names.named("contentStrategy"))
+        .to(CopybookIdentificationServiceBasedOnContent.class);
     bind(CopybookIdentificationService.class)
-            .annotatedWith(Names.named("suffixStrategy"))
-            .to(CopybookIdentificationBasedOnExtension.class);
+        .annotatedWith(Names.named("suffixStrategy"))
+        .to(CopybookIdentificationBasedOnExtension.class);
     bind(CopybookIdentificationService.class)
-            .annotatedWith(Names.named("combinedStrategy"))
-            .to(CopybookIdentificationCombinedStrategy.class);
+        .annotatedWith(Names.named("combinedStrategy"))
+        .to(CopybookIdentificationCombinedStrategy.class);
     bind(DialectDiscoveryService.class).to(DialectDiscoveryFolderService.class);
 
     bindConstant().annotatedWith(Names.named("CACHE-MAX-SIZE")).to(1500);
@@ -125,15 +126,16 @@ public class CliModule extends AbstractModule {
     bindConstant().annotatedWith(Names.named("KEEP-ALIVE-TIME-IN-SECONDS")).to(60);
     bindConstant().annotatedWith(Names.named("CORE-POOL-SIZE-FOR-SCHEDULED-POOL")).to(5);
 
-
     bindFormations();
     bindCompletions();
     bindCodeActions();
   }
+
   private void bindFormations() {
     bind(Formations.class);
     Multibinder<Formation> formationBinding = newSetBinder(binder(), Formation.class);
     formationBinding.addBinding().to(TrimFormation.class);
+    formationBinding.addBinding().to(CapitalFormation.class);
   }
 
   private void bindCompletions() {
@@ -143,9 +145,6 @@ public class CliModule extends AbstractModule {
     completionBinding.addBinding().to(ParagraphCompletion.class);
     completionBinding.addBinding().to(SectionCompletion.class);
     completionBinding.addBinding().to(KeywordCompletion.class);
-    completionBinding.addBinding().to(CopybookCompletion.class);
-    completionBinding.addBinding().to(SubroutineCompletion.class);
-    completionBinding.addBinding().to(CopybookNameCompletion.class);
 
     bind(CompletionStorage.class).annotatedWith(named("Keywords")).to(Keywords.class);
   }
@@ -153,7 +152,7 @@ public class CliModule extends AbstractModule {
   private void bindCodeActions() {
     bind(CodeActions.class);
     Multibinder<CodeActionProvider> codeActionBinding =
-            newSetBinder(binder(), CodeActionProvider.class);
+        newSetBinder(binder(), CodeActionProvider.class);
     codeActionBinding.addBinding().to(FindCopybookCommand.class);
   }
 }

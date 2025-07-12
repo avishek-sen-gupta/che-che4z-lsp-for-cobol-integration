@@ -16,20 +16,21 @@ package org.eclipse.lsp.cobol.common.benchmark;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.text.DecimalFormat;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BenchmarkServiceImpl implements BenchmarkService {
-  private final static Logger LOG = LoggerFactory.getLogger(BenchmarkServiceImpl.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BenchmarkServiceImpl.class);
   private static final String PERFORMANCE_LOG_PATH = "performance.log.path";
-  private final List<BenchmarkSession> benchmarkSessions = new ArrayList<>();
+  private final List<BenchmarkSession> benchmarkSessions = new CopyOnWriteArrayList<>();
 
   @Override
   public BenchmarkSession startSession() {
@@ -41,17 +42,17 @@ public class BenchmarkServiceImpl implements BenchmarkService {
   @Override
   public List<Measurement> getMeasurements() {
     return benchmarkSessions.stream()
-            .flatMap(s -> s.getMeasurements().stream())
-            .collect(Collectors.toList());
+        .flatMap(s -> s.getMeasurements().stream())
+        .collect(Collectors.toList());
   }
 
   @Override
   public List<JsonElement> toJsons() {
     Gson gson = new Gson();
     return benchmarkSessions.stream()
-            .flatMap(s -> s.getMeasurements().stream())
-            .map(gson::toJsonTree)
-            .collect(Collectors.toList());
+        .flatMap(s -> s.getMeasurements().stream())
+        .map(gson::toJsonTree)
+        .collect(Collectors.toList());
   }
 
   @Override
@@ -59,20 +60,38 @@ public class BenchmarkServiceImpl implements BenchmarkService {
     benchmarkSessions.forEach(this::logTiming);
   }
 
+  @Override
+  public void endSession(String programUri) {
+    benchmarkSessions.removeIf(
+        benchmarkSession -> {
+          String benchmarkUri = benchmarkSession.attr("uri");
+          return Objects.nonNull(benchmarkUri) && benchmarkUri.equals(programUri);
+        });
+  }
+
   public void logTiming(BenchmarkSession benchmarkSession) {
-    Collection<Measurement> measurements = benchmarkSession
-            .getMeasurements();
-    measurements
-            .forEach(m -> LOG.debug("Timing for {}: {}", m.getId(), m.getTime()));
+    LOG.debug("---- Benchmark for uri : {}", benchmarkSession.attr("uri"));
+    Collection<Measurement> measurements = benchmarkSession.getMeasurements();
+
+    measurements.forEach(
+        m ->
+            LOG.debug(
+                "Timing for {}: {} ns", m.getId(), new DecimalFormat("#,###").format(m.getTime())));
     Optional.ofNullable(System.getProperty(PERFORMANCE_LOG_PATH))
-            .map(Paths::get)
-            .ifPresent(path -> {
+        .map(Paths::get)
+        .ifPresent(
+            path -> {
               try {
                 if (!Files.exists(path)) {
                   LOG.info("Write performance data into: " + path);
-                  Files.write(path, Collections.singleton(createHeaderLine(measurements)), StandardOpenOption.CREATE);
+                  Files.write(
+                      path,
+                      Collections.singleton(createHeaderLine(measurements)),
+                      StandardOpenOption.CREATE);
                 }
-                String timingLine = createTimingLine(measurements,
+                String timingLine =
+                    createTimingLine(
+                        measurements,
                         benchmarkSession.attr("uri"),
                         benchmarkSession.attr("language"),
                         Integer.parseInt(benchmarkSession.attr("lines")),
@@ -86,10 +105,14 @@ public class BenchmarkServiceImpl implements BenchmarkService {
 
   private String createHeaderLine(Collection<Measurement> measurements) {
     StringBuilder line = new StringBuilder("url");
-    measurements.stream().map(Measurement::getId).sorted().forEach(stageName -> {
-      line.append(",");
-      line.append(stageName);
-    });
+    measurements.stream()
+        .map(Measurement::getId)
+        .sorted()
+        .forEach(
+            stageName -> {
+              line.append(",");
+              line.append(stageName);
+            });
     line.append(",");
     line.append("Total time");
     line.append(",");
@@ -101,10 +124,13 @@ public class BenchmarkServiceImpl implements BenchmarkService {
     return line.toString();
   }
 
-  private String createTimingLine(Collection<Measurement> measurements, String url, String languageId, int lines, int size) {
+  private String createTimingLine(
+      Collection<Measurement> measurements, String url, String languageId, int lines, int size) {
     StringBuilder line = new StringBuilder(url);
     long total = 0;
-    for (Measurement m : measurements.stream().sorted(Comparator.comparing(Measurement::getId))
+    for (Measurement m :
+        measurements.stream()
+            .sorted(Comparator.comparing(Measurement::getId))
             .collect(Collectors.toList())) {
       line.append(",");
       line.append(m.getTime());

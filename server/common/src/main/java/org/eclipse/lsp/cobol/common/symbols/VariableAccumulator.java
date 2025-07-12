@@ -38,10 +38,18 @@ public interface VariableAccumulator {
   void addVariableDefinition(ProgramNode programNode, VariableNode node);
 
   /**
-   * Add a paragraph defined in the program context.
+   * Get the symbol table for the given program
    *
-   * @param program - the program to register code block in
-   * @param node - the paragraph node
+   * @param program the program
+   * @return the symbol table
    */
-  void registerCodeBlock(ProgramNode program, CodeBlockDefinitionNode node);
+  SymbolTable getSymbolTable(ProgramNode program);
+
+  /**
+   * Register implicit section
+   *
+   * @param programNode the program
+   * @param node the section definition
+   */
+  void registerImplicitSection(ProgramNode programNode, CodeBlockDefinitionNode node);
 }

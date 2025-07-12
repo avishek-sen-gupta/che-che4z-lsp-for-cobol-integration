@@ -393,12 +393,14 @@ ZONEDATA: Z O N E D A T A;
 ZD: Z D;
 ZWB: Z W B;
 NOZWB: N O Z W B;
-
+XOPT: X O P T;
 XOPTS: X O P T S;
 APOST: A P O S T;
 CBLCARD: C B L C A R D;
 CICS: C I C S;
+CO2: C O '2';
 COBOL2: C O B O L '2';
+CO3: C O '3';
 COBOL3: C O B O L '3';
 CPSM: C P S M;
 DEBUG: D E B U G;

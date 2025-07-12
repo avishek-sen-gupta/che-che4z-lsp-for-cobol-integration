@@ -22,10 +22,13 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.eclipse.lsp.cobol.AntlrRangeUtils;
 import org.eclipse.lsp.cobol.common.CleanerPreprocessor;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
 import org.eclipse.lsp.cobol.common.copybook.*;
+import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.mapping.ExtendedDocument;
 import org.eclipse.lsp.cobol.common.message.MessageService;
@@ -37,19 +40,14 @@ import org.eclipse.lsp.cobol.core.model.CopybookUsage;
 import org.eclipse.lsp.cobol.core.preprocessor.CopybookHierarchy;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.GrammarPreprocessor;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.PreprocessorContext;
-import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacementContext;
-import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacementHelper;
-import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacingService;
+import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.*;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.util.LocalityUtils;
 import org.eclipse.lsp.cobol.core.semantics.CopybooksRepository;
-import org.eclipse.lsp.cobol.core.visitor.VisitorHelper;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
-/**
- * Provides managing copybook mapping functionality
- */
+/** Provides managing copybook mapping functionality */
 @Slf4j
 @RequiredArgsConstructor
 class CopybookPreprocessorService {
@@ -60,29 +58,30 @@ class CopybookPreprocessorService {
   private final CopybookService copybookService;
   private final CopybookProcessingMode copybookConfig;
 
-  @Getter
-  private final CopybooksRepository copybooks;
-  @Getter
-  private final List<SyntaxError> errors = new ArrayList<>();
+  @Getter private final CopybooksRepository copybooks;
+  @Getter private final List<SyntaxError> errors = new ArrayList<>();
 
   private final CopybookHierarchy hierarchy;
   private final ReplacingService replacingService;
   private final CopybookErrorService copybookErrorService;
   private final CleanerPreprocessor preprocessor;
+  private final CobolLanguageId languageId;
 
   private static final String HYPHEN = "-";
   private static final String UNDERSCORE = "_";
 
-  CopybookPreprocessorService(String programDocumentUri,
-                              GrammarPreprocessor grammarPreprocessor,
-                              ExtendedDocument currentDocument,
-                              CopybookService copybookService,
-                              CopybookProcessingMode copybookConfig,
-                              CopybooksRepository copybooks,
-                              CopybookHierarchy hierarchy,
-                              MessageService messageService,
-                              ReplacingService replacingService,
-                              CleanerPreprocessor preprocessor) {
+  CopybookPreprocessorService(
+      String programDocumentUri,
+      GrammarPreprocessor grammarPreprocessor,
+      ExtendedDocument currentDocument,
+      CopybookService copybookService,
+      CopybookProcessingMode copybookConfig,
+      CopybooksRepository copybooks,
+      CopybookHierarchy hierarchy,
+      MessageService messageService,
+      ReplacingService replacingService,
+      CleanerPreprocessor preprocessor,
+      CobolLanguageId languageId) {
     this.programDocumentUri = programDocumentUri;
     this.grammarPreprocessor = grammarPreprocessor;
     this.currentDocument = currentDocument;
@@ -93,15 +92,14 @@ class CopybookPreprocessorService {
     this.replacingService = replacingService;
     this.copybookErrorService = new CopybookErrorService(messageService);
     this.preprocessor = preprocessor;
+    this.languageId = languageId;
   }
 
-  void addCopybook(ParserRuleContext ctx, CobolPreprocessor.CopySourceContext copySource,
-                          int maxCopybookLen, List<ReplacementContext> replacementContext) {
+  void addCopybook(
+      ParserRuleContext ctx, CobolPreprocessor.CopySourceContext copySource, int maxCopybookLen) {
     CopybookName name = getCopybookName(copySource);
     String copybookName = name.getQualifiedName();
-    String copybookId = name.toCopybookId(programDocumentUri).toString();
 
-    Range range = VisitorHelper.constructRange(ctx);
     Locality nameLocality = mapLocality(retrieveLocality(copySource));
     Locality statementLocality = mapLocality(retrieveLocality(ctx));
 
@@ -112,18 +110,24 @@ class CopybookPreprocessorService {
 
     if (copybook != null) {
       if (hierarchy.hasRecursion(name)) {
-        List<SyntaxError> hierarchyErrors = hierarchy.mapCopybooks(cu -> copybookErrorService.addRecursionError(name.getQualifiedName(), cu.getLocality()));
-        hierarchyErrors.add(copybookErrorService.addRecursionError(name.getQualifiedName(), statementLocality));
+        List<SyntaxError> hierarchyErrors =
+            hierarchy.mapCopybooks(
+                cu ->
+                    copybookErrorService.addRecursionError(
+                        name.getQualifiedName(), cu.getLocality()));
+        hierarchyErrors.add(
+            copybookErrorService.addRecursionError(name.getQualifiedName(), statementLocality));
         errors.addAll(hierarchyErrors);
-        currentDocument.clear(VisitorHelper.constructRange(ctx));
+        currentDocument.clear(AntlrRangeUtils.constructRange(ctx));
         copybooks.define(copybookName, null, currentDocument.getUri(), copybook.getUri());
         return;
       }
       copybooks.addStatement(copybookName, null, statementLocality);
 
       prepareReplacements(ctx);
-      ExtendedDocument copybookDocument = processCopybookWithReplacement(replacementContext, copybook, nameLocality);
+      ExtendedDocument copybookDocument = processCopybookWithReplacement(copybook, nameLocality);
 
+      Range range = AntlrRangeUtils.constructRange(ctx);
       if (firstInstruction(currentDocument, range.getStart())) {
         currentDocument.insertCopybook(range, copybookDocument.getCurrentText());
       } else {
@@ -131,41 +135,108 @@ class CopybookPreprocessorService {
       }
       copybooks.define(copybookName, null, currentDocument.getUri(), copybook.getUri());
     } else {
-      currentDocument.clear(VisitorHelper.constructRange(ctx));
+      currentDocument.clear(AntlrRangeUtils.constructRange(ctx));
       errors.add(copybookErrorService.addMissingCopybook(name.getQualifiedName(), nameLocality));
     }
   }
 
   private void prepareReplacements(ParserRuleContext ctx) {
-    ReplacementHelper.createClause(ctx.children).forEach(c -> {
-      Pair<String, String> replacing;
-      if (c.getKey().contains("==")) {
-        replacing = replacingService.retrievePseudoTextReplacingPattern(c.getKey(), mapLocality(c.getValue()))
-            .unwrap(errors::addAll);
+    if (!(ctx instanceof CobolPreprocessor.CopyStatementContext)) {
+      return;
+    }
+    CobolPreprocessor.CopyStatementContext copyCtx = (CobolPreprocessor.CopyStatementContext) ctx;
+    CobolPreprocessor.ReplacingPhraseContext replacingPhraseContext = copyCtx.replacingPhrase();
+    if (replacingPhraseContext == null) {
+      return;
+    }
+    List<CobolPreprocessor.ReplaceClauseContext> replaceClauseContexts =
+        replacingPhraseContext.replaceClause();
+    for (CobolPreprocessor.ReplaceClauseContext replaceClauseContext : replaceClauseContexts) {
+      boolean isPseudoTextReplacement = false;
+      Pair<String, String> pattern;
+      SearchPattern searchPattern = SearchPattern.EXACT;
+      CobolPreprocessor.ReplacePseudoTextContext replacePseudoTextContext =
+          replaceClauseContext.replacePseudoText();
+      if (replacePseudoTextContext != null) {
+        isPseudoTextReplacement = true;
+        boolean isLeading = replacePseudoTextContext.LEADING() != null;
+        boolean isTrailing = replacePseudoTextContext.TRAILING() != null;
+
+        if (isLeading) {
+          searchPattern = SearchPattern.STARTS_WITH;
+        } else if (isTrailing) {
+          searchPattern = SearchPattern.ENDS_WITH;
+        }
+        pattern =
+            new ImmutablePair<>(
+                ReplacementHelper.getPseudoText(replacePseudoTextContext.pseudoReplaceable()),
+                ReplacementHelper.getPseudoText(replacePseudoTextContext.pseudoReplacement()));
       } else {
-        replacing = replacingService.retrieveTokenReplacingPattern(c.getKey());
+        CobolPreprocessor.ReplaceLiteralContext replaceLiteralContext =
+            replaceClauseContext.replaceLiteral();
+        CobolPreprocessor.ReplaceableContext replaceable = replaceLiteralContext.replaceable();
+        CobolPreprocessor.ReplacementContext replacement = replaceLiteralContext.replacement();
+
+        String left;
+        CobolPreprocessor.PseudoReplaceableContext pseudoReplaceableContext =
+            replaceable.pseudoReplaceable();
+        if (pseudoReplaceableContext != null) {
+          isPseudoTextReplacement = true;
+          left = ReplacementHelper.getPseudoText(pseudoReplaceableContext);
+        } else {
+          left = ReplacementHelper.createClause(replaceable);
+        }
+        String right;
+        CobolPreprocessor.PseudoReplacementContext pseudoReplacementContext =
+            replacement.pseudoReplacement();
+        if (pseudoReplacementContext != null) {
+          isPseudoTextReplacement = true;
+          right = ReplacementHelper.getPseudoText(pseudoReplacementContext);
+        } else {
+          right = ReplacementHelper.createClause(replacement);
+        }
+        pattern = new ImmutablePair<>(left, right);
       }
-      hierarchy.addCopyReplacing(replacing);
-    });
+      if (!isPseudoTextReplacement) {
+        hierarchy.addCopyReplacing(
+            replacingService.retrieveTokenReplacingPattern(pattern, languageId));
+      } else {
+        ResultWithErrors<Pair<String, String>> pairResultWithErrors =
+            replacingService.retrievePseudoTextReplacingPattern(
+                pattern,
+                mapLocality(AntlrRangeUtils.constructRange(replaceClauseContext)),
+                languageId,
+                searchPattern);
+        errors.addAll(pairResultWithErrors.getErrors());
+        hierarchy.addCopyReplacing(pairResultWithErrors.getResult());
+      }
+    }
   }
 
-  private ExtendedDocument processCopybookWithReplacement(List<ReplacementContext> replacementContext, CopybookModel copybook,
-                                                        Locality nameLocality) {
-    hierarchy.push(new CopybookUsage(copybook.getCopybookName(), CopybooksRepository.toId(copybook.getCopybookName().getQualifiedName(), null, nameLocality.getUri()), nameLocality));
-    if (replacementContext != null) {
-      replacementContext.forEach(h -> hierarchy.addTextReplacing(h.getReplacement(), h.getLocality().getUri(), h.getLocality().getRange()));
-    }
+  private ExtendedDocument processCopybookWithReplacement(
+      CopybookModel copybook, Locality nameLocality) {
+    hierarchy.push(
+        new CopybookUsage(
+            copybook.getCopybookName(),
+            CopybooksRepository.toId(
+                copybook.getCopybookName().getQualifiedName(), null, nameLocality.getUri()),
+            nameLocality));
 
-    ExtendedDocument copybookDocument = new ExtendedDocument(copybook.getContent(), copybook.getUri());
+    ExtendedDocument copybookDocument =
+        new ExtendedDocument(copybook.getContent(), copybook.getUri());
     hierarchy.prepareCopybookReplacement(copybook.getUri());
 
     if (hierarchy.containsRecursiveReplacement()) {
-      errors.add(copybookErrorService.addRecursiveReplacementError(copybook.getCopybookName(), nameLocality));
+      errors.add(
+          copybookErrorService.addRecursiveReplacementError(
+              copybook.getCopybookName(), nameLocality));
     }
 
     hierarchy.replaceCopybook(copybookDocument, replacingService::applyReplacing, errors);
 
-    PreprocessorContext copybookContext = new PreprocessorContext(programDocumentUri, copybookDocument, copybookConfig, hierarchy, copybooks);
+    PreprocessorContext copybookContext =
+        new PreprocessorContext(
+            programDocumentUri, copybookDocument, copybookConfig, hierarchy, copybooks, languageId);
     List<SyntaxError> copybookErrors = new LinkedList<>();
     grammarPreprocessor.preprocess(copybookContext, preprocessor).unwrap(copybookErrors::addAll);
 
@@ -190,10 +261,7 @@ class CopybookPreprocessorService {
 
   private Locality mapLocality(Range range) {
     Location location = currentDocument.mapLocation(range);
-    return Locality.builder()
-        .uri(location.getUri())
-        .range(location.getRange())
-        .build();
+    return Locality.builder().uri(location.getUri()).range(location.getRange()).build();
   }
 
   void reportInvalidArgument(CobolPreprocessor.ControlCblContext ctx) {
@@ -201,7 +269,8 @@ class CopybookPreprocessorService {
   }
 
   private void validateCopybookName(CopybookName name, Locality locality, int maxLen) {
-    if (name.getQualifiedName().length() > maxLen && !ImplicitCodeUtils.isImplicit(locality.getUri())) {
+    if (name.getQualifiedName().length() > maxLen
+        && !ImplicitCodeUtils.isImplicit(locality.getUri())) {
       errors.add(copybookErrorService.addCopybookNameError(name, locality, maxLen));
     }
     // The first or last character must not be a hyphen.
@@ -218,17 +287,7 @@ class CopybookPreprocessorService {
     if (start.getCharacter() < 7) {
       return true;
     }
-    String text = extendedDocument.toString();
-    String[] lines = text.split("\\r?\\n");
-    if (lines.length <= start.getLine()) {
-      return true;
-    }
-    String line = lines[start.getLine()];
-    if (line.length() < 7) {
-      return true;
-    }
-    line = line.substring(7, Math.min(start.getCharacter(), line.length()));
-    return line.trim().isEmpty();
+    return extendedDocument.isLineEmptyBetweenColumns(start.getLine(), 7, start.getCharacter());
   }
 
   private CopybookName getCopybookName(CobolPreprocessor.CopySourceContext ctx) {
@@ -236,7 +295,8 @@ class CopybookPreprocessorService {
   }
 
   private CopybookModel read(CopybookName copybookName, String documentUri) {
-    ResultWithErrors<CopybookModel> resolvedCopybook = copybookService.resolve(
+    ResultWithErrors<CopybookModel> resolvedCopybook =
+        copybookService.resolve(
             copybookName.toCopybookId(programDocumentUri),
             copybookName,
             programDocumentUri,
@@ -251,11 +311,13 @@ class CopybookPreprocessorService {
   }
 
   Locality retrieveLocality(ParserRuleContext ctx) {
-    return LocalityUtils.buildLocality(ctx, currentDocument.getUri(), hierarchy.getCurrentCopybookId());
+    return LocalityUtils.buildLocality(
+        ctx, currentDocument.getUri(), hierarchy.getCurrentCopybookId());
   }
 
   void replaceWithSpaces(ParserRuleContext ctx) {
-    Range range = VisitorHelper.constructRange(ctx);
-    currentDocument.replace(range, org.apache.commons.lang3.StringUtils.rightPad(" ", range.getEnd().getCharacter() - range.getStart().getCharacter()));
+    Range range = AntlrRangeUtils.constructRange(ctx);
+    int size = ctx.getStop().getStopIndex() - ctx.getStart().getStartIndex() + 1;
+    currentDocument.replace(range, org.apache.commons.lang3.StringUtils.rightPad(" ", size));
   }
 }

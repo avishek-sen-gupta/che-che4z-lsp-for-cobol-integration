@@ -14,11 +14,10 @@
  */
 package org.eclipse.lsp.cobol.service.delegates.formations;
 
+import java.util.List;
 import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 import org.eclipse.lsp4j.TextEdit;
 
-import java.util.List;
-
 public interface Formation {
-  List<TextEdit> format(List<CobolDocumentModel.Line> lines);
+  List<TextEdit> format(List<CobolDocumentModel.Line> lines, List<String> settings);
 }

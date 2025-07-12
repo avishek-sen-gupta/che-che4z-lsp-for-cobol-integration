@@ -16,27 +16,31 @@ package org.eclipse.lsp.cobol.lsp.handlers.text;
 
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import org.eclipse.lsp.cobol.lsp.LspEventDependency;
 import org.eclipse.lsp.cobol.lsp.LspQuery;
 import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.lsp.events.queries.ReferenceQuery;
+import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 import org.eclipse.lsp.cobol.service.DocumentModelService;
 import org.eclipse.lsp.cobol.service.delegates.references.Occurrences;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.ReferenceParams;
 
-/**
- * LSP References Handler
- */
+/** LSP References Handler */
 public class ReferencesHandler {
   private final AsyncAnalysisService asyncAnalysisService;
   private final Occurrences occurrences;
   private final DocumentModelService documentModelService;
 
   @Inject
-  public ReferencesHandler(AsyncAnalysisService asyncAnalysisService, Occurrences occurrences, DocumentModelService documentModelService) {
+  public ReferencesHandler(
+      AsyncAnalysisService asyncAnalysisService,
+      Occurrences occurrences,
+      DocumentModelService documentModelService) {
     this.asyncAnalysisService = asyncAnalysisService;
     this.occurrences = occurrences;
     this.documentModelService = documentModelService;
@@ -47,12 +51,18 @@ public class ReferencesHandler {
    *
    * @param params LSP ReferenceParams object.
    * @return List of references.
-   * @throws ExecutionException   forward exception
+   * @throws ExecutionException forward exception
    * @throws InterruptedException forward exception
    */
-  public List<? extends Location> references(ReferenceParams params) throws ExecutionException, InterruptedException {
+  public List<? extends Location> references(ReferenceParams params)
+      throws ExecutionException, InterruptedException {
     String uri = params.getTextDocument().getUri();
-      return occurrences.findReferences(documentModelService.get(uri), params, params.getContext());
+    Collection<CobolDocumentModel> models = documentModelService.findMainSource(uri);
+    List<Location> locations = new ArrayList<>();
+    for (CobolDocumentModel model : models) {
+      locations.addAll(occurrences.findReferences(model, params, params.getContext()));
+    }
+    return locations;
   }
 
   /**
@@ -72,6 +82,6 @@ public class ReferencesHandler {
    */
   public List<LspEventDependency> getReferenceDependency(ReferenceParams params) {
     return ImmutableList.of(
-            asyncAnalysisService.createDependencyOn(params.getTextDocument().getUri()));
+        asyncAnalysisService.createDependencyOn(params.getTextDocument().getUri()));
   }
 }

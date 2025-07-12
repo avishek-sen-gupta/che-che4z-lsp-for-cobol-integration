@@ -16,6 +16,7 @@ package org.eclipse.lsp.cobol.usecases;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.stream.Stream;
 import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
 import org.eclipse.lsp4j.Diagnostic;
@@ -24,8 +25,6 @@ import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.util.stream.Stream;
 
 /** UseCase test example without errors */
 class TestProcessCbl {
@@ -326,7 +325,7 @@ class TestProcessCbl {
         "SQLIMS",
         "SQLIMS(\"IMS-suboption-string\")",
         "NOSSRANGE",
-        "SSRANGE()",
+        "SSRANGE",
         "SSRANGE(ZLEN)",
         "SSRANGE(NOZLEN,ABD)",
         "SSR(MSG)",
@@ -400,32 +399,20 @@ class TestProcessCbl {
   private static Stream<String> getDeprecatedOptions() {
     return Stream.of(
         "CPP",
-        "DATEPROC(FLAG ,TRIG)",
-        "DATEPROC(NOFLAG ,NOTRIG)",
-        "DATEPROC(FLAG ,TRIG)",
-        "DP(NOFLAG ,NOTRIG)",
         "EPILOG",
         "GDS",
         "GRAPHIC",
         "LEASM",
-        "LIB",
         "LIN",
         "MARGINS('test','test2')",
         "NATLANG(CS)",
         "NATLANG(EN)",
         "NATLANG(KA)",
-        "NUMPROC(MIG)",
         "NOCMPR2",
-        "NODATEPROC",
-        "NODP",
         "NODE",
         "NOEPILOG",
-        "NOFLAGMIG",
         "NOGRAPHIC",
-        "NOLIB",
         "NOOPSEQUENCE",
-        "NOOPTIMIZE",
-        "NOOPT",
         "NOP",
         "NOPROLOG",
         "NOSTDTRUNC",
@@ -434,13 +421,26 @@ class TestProcessCbl {
         "OPSEQUENCE('we','er')",
         "OP",
         "PROLOG",
-        "RES",
-        "SIZE(MAX)",
-        "SIZE('8')",
-        "SZ(MAX)",
-        "SZ('8')",
+        "RES");
+  }
+
+  private static Stream<String> getWarningDeprecatedOptions() {
+    return Stream.of(
+        "DP(NOFLAG ,NOTRIG)",
+        "DATEPROC(FLAG ,TRIG)",
+        "DATEPROC(NOFLAG ,NOTRIG)",
+        "DATEPROC(FLAG ,TRIG)",
+        "NUMPROC(MIG)",
+        "NODATEPROC",
+        "NODP",
+        "NOLIB",
         "YEARWINDOW('9999')",
         "YW('9999')");
+  }
+
+  private static Stream<String> getInfoDeprecatedOptions() {
+    return Stream.of(
+        "LIB", "NOFLAGMIG", "NOOPTIMIZE", "NOOPT", "SIZE(MAX)", "SIZE('8')", "SZ(MAX)", "SZ('8')");
   }
 
   @Test
@@ -468,6 +468,41 @@ class TestProcessCbl {
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText(),
                 "IGYOS4003-E")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("getWarningDeprecatedOptions")
+  void testDeprecatedWarningOption(String cblOption) {
+    UseCaseEngine.runTest(
+        PREFIX + "{" + cblOption + "|1}" + SUFFIX,
+        ImmutableList.of(),
+        ImmutableMap.of(
+            "1",
+            new Diagnostic(
+                new Range(),
+                String.format(
+                    "The \"%s\" compiler option is not supported. The option was ignored.",
+                    cblOption.replace(" ", "")),
+                DiagnosticSeverity.Warning,
+                ErrorSource.PARSING.getText(),
+                "IGYOS4008-W")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("getInfoDeprecatedOptions")
+  void testDeprecatedInfoOption(String cblOption) {
+    UseCaseEngine.runTest(
+        PREFIX + "{" + cblOption + "|1}" + SUFFIX,
+        ImmutableList.of(),
+        ImmutableMap.of(
+            "1",
+            new Diagnostic(
+                new Range(),
+                String.format(
+                    "The \"%s\" option is no longer supported.", cblOption.replace(" ", "")),
+                DiagnosticSeverity.Information,
+                ErrorSource.PARSING.getText(),
+                "IGYOS4013-I")));
   }
 
   @Test

@@ -17,6 +17,7 @@ package org.eclipse.lsp.cobol.dialects.ibm;
 import com.google.common.collect.ImmutableList;
 import lombok.RequiredArgsConstructor;
 import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.DefaultErrorStrategy;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.eclipse.lsp.cobol.common.dialects.DialectOutcome;
 import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
@@ -25,10 +26,9 @@ import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.mapping.OriginalLocation;
 import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
-import org.eclipse.lsp.cobol.core.*;
-import org.eclipse.lsp.cobol.core.engine.analysis.AnalysisContext;
-import org.eclipse.lsp.cobol.common.pipeline.StageResult;
 import org.eclipse.lsp.cobol.common.pipeline.Stage;
+import org.eclipse.lsp.cobol.common.pipeline.StageResult;
+import org.eclipse.lsp.cobol.core.engine.analysis.AnalysisContext;
 import org.eclipse.lsp.cobol.core.strategy.CobolErrorStrategy;
 import org.eclipse.lsp.cobol.core.visitor.ParserListener;
 import org.eclipse.lsp.cobol.parser.AntlrCobolParser;
@@ -39,18 +39,18 @@ import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-/**
- * Parser stage
- */
+/** Parser stage */
 @RequiredArgsConstructor
 public class ParserStage implements Stage<AnalysisContext, ParserStageResult, DialectOutcome> {
   private final MessageService messageService;
   private final ParseTreeListener treeListener;
 
   @Override
-  public StageResult<ParserStageResult> run(AnalysisContext context, StageResult<DialectOutcome> prevStageResult) {
+  public StageResult<ParserStageResult> run(
+      AnalysisContext context, StageResult<DialectOutcome> prevStageResult) {
     // Run parser;
-    context.setDialectNodes(ImmutableList.<Node>builder()
+    context.setDialectNodes(
+        ImmutableList.<Node>builder()
             .addAll(context.getDialectNodes())
             .addAll(prevStageResult.getData().getDialectNodes())
             .build());
@@ -67,16 +67,20 @@ public class ParserStage implements Stage<AnalysisContext, ParserStageResult, Di
   }
 
   private List<SyntaxError> getParsingError(AnalysisContext context, AstBuilder parser) {
-    return parser.diagnostics().stream().map(diagnostic -> {
-      Location location = context.getExtendedDocument().mapLocation(diagnostic.getRange());
-      String copybookId = context.getCopybooksRepository().getCopybookIdByUri(location.getUri());
-      return SyntaxError.syntaxError()
-              .errorSource(ErrorSource.PARSING)
-              .severity(ErrorSeverity.ERROR)
-              .location(new OriginalLocation(location, copybookId))
-              .suggestion(diagnostic.getMessage())
-              .build();
-    }).collect(Collectors.toList());
+    return parser.diagnostics().stream()
+        .map(
+            diagnostic -> {
+              Location location = context.getExtendedDocument().mapLocation(diagnostic.getRange());
+              String copybookId =
+                  context.getCopybooksRepository().getCopybookIdByUri(location.getUri());
+              return SyntaxError.syntaxError()
+                  .errorSource(ErrorSource.PARSING)
+                  .severity(ErrorSeverity.ERROR)
+                  .location(new OriginalLocation(location, copybookId))
+                  .suggestion(diagnostic.getMessage())
+                  .build();
+            })
+        .collect(Collectors.toList());
   }
 
   @Override

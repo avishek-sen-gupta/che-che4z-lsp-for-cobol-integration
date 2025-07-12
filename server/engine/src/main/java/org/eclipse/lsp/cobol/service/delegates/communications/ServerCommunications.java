@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,21 +57,20 @@ import org.eclipse.lsp4j.jsonrpc.messages.Either;
 @Slf4j
 public class ServerCommunications implements Communications {
 
-  private final Set<String> uriInProgress = new HashSet<>();
+  private final Set<String> uriInProgress = Collections.synchronizedSet(new HashSet<>());
   private final MessageService messageService;
   private final Provider<CobolLanguageClient> provider;
   private final FileSystemService files;
 
   @Inject
   public ServerCommunications(
-          Provider<CobolLanguageClient> provider,
-          FileSystemService files,
-          MessageService messageService) {
+      Provider<CobolLanguageClient> provider,
+      FileSystemService files,
+      MessageService messageService) {
     this.provider = provider;
     this.files = files;
     this.messageService = messageService;
   }
-
 
   /**
    * Show a message that analysis finished if there were no errors found
@@ -80,19 +80,18 @@ public class ServerCommunications implements Communications {
   @Override
   public void notifyThatDocumentAnalysed(String uri) {
     runAsync(
-            () ->
-                    logMessage(
-                            Info,
-                            messageService.getMessage(
-                                    "Communications.noSyntaxError",
-                                    files.getNameFromURI(files.decodeURI(uri)))));
+        () ->
+            logMessage(
+                Info,
+                messageService.getMessage(
+                    "Communications.noSyntaxError", files.getNameFromURI(files.decodeURI(uri)))));
   }
 
   /**
    * show a supplied message to the client with the supplied {@link MessageType}
    *
    * @param messageType {@link MessageType}
-   * @param message     to be displayed at client end.
+   * @param message to be displayed at client end.
    */
   @Override
   public void notifyGeneralMessage(MessageType messageType, String message) {
@@ -107,14 +106,13 @@ public class ServerCommunications implements Communications {
    */
   public void publishDiagnostics(Map<String, List<Diagnostic>> diagnostics) {
     diagnostics.forEach(
-            (uri, diagnostic) -> {
-              PublishDiagnosticsParams diagnostics1 = new PublishDiagnosticsParams(uri, clean(diagnostic));
-              LOG.debug("publishDiagnostics " + diagnostics1);
-              getClient().publishDiagnostics(diagnostics1);
-            }
-    );
+        (uri, diagnostic) -> {
+          PublishDiagnosticsParams diagnostics1 =
+              new PublishDiagnosticsParams(uri, clean(diagnostic));
+          LOG.debug("publishDiagnostics " + diagnostics1);
+          getClient().publishDiagnostics(diagnostics1);
+        });
   }
-
 
   @Override
   public void notifyProgressBegin(String uri) {
@@ -137,7 +135,8 @@ public class ServerCommunications implements Communications {
   private void notifyWorkProgress(String uri) {
     WorkDoneProgressReport workDoneProgressReport = new WorkDoneProgressReport();
     workDoneProgressReport.setCancellable(true);
-    ProgressParams params = new ProgressParams(Either.forLeft(uri), Either.forLeft(workDoneProgressReport));
+    ProgressParams params =
+        new ProgressParams(Either.forLeft(uri), Either.forLeft(workDoneProgressReport));
     getClient().notifyProgress(params);
   }
 
@@ -149,9 +148,10 @@ public class ServerCommunications implements Communications {
     ProgressParams params = new ProgressParams();
     params.setToken(uri);
     WorkDoneProgressBegin workDoneProgressBegin = new WorkDoneProgressBegin();
-    workDoneProgressBegin.setTitle(messageService.getMessage(
+    workDoneProgressBegin.setTitle(
+        messageService.getMessage(
             "Communications.syntaxAnalysisInProgressTitle",
-            files.getNameFromURI(uri)));
+            files.getNameFromURI(files.decodeURI(uri))));
     workDoneProgressBegin.setCancellable(true);
     params.setValue(Either.forLeft(workDoneProgressBegin));
     getClient().notifyProgress(params);
@@ -160,7 +160,7 @@ public class ServerCommunications implements Communications {
   @Override
   public void notifyProgressReport(String uri) {
     ProgressParams params =
-            new ProgressParams(Either.forLeft(uri), Either.forLeft(new WorkDoneProgressReport()));
+        new ProgressParams(Either.forLeft(uri), Either.forLeft(new WorkDoneProgressReport()));
     getClient().notifyProgress(params);
   }
 
@@ -169,7 +169,7 @@ public class ServerCommunications implements Communications {
     synchronized (uriInProgress) {
       if (uriInProgress.contains(uri)) {
         ProgressParams params =
-                new ProgressParams(Either.forLeft(uri), Either.forLeft(new WorkDoneProgressEnd()));
+            new ProgressParams(Either.forLeft(uri), Either.forLeft(new WorkDoneProgressEnd()));
         getClient().notifyProgress(params);
         uriInProgress.remove(uri);
       }
@@ -179,7 +179,7 @@ public class ServerCommunications implements Communications {
   @Override
   public void registerExecuteCommandCapability(List<String> capabilities, String id) {
     Registration registrations =
-            new Registration(id, "workspace/executeCommand", new ExecuteCommandOptions(capabilities));
+        new Registration(id, "workspace/executeCommand", new ExecuteCommandOptions(capabilities));
     RegistrationParams params = new RegistrationParams(ImmutableList.of(registrations));
     // Disabled because we are not interested in using the LSP, and the default throws an exception
 //    getClient().registerCapability(params);
@@ -188,8 +188,8 @@ public class ServerCommunications implements Communications {
   @Override
   public void unregisterExecuteCommandCapability(String id) {
     UnregistrationParams unregistrationParams =
-            new UnregistrationParams(
-                    ImmutableList.of(new Unregistration(id, "workspace/executeCommand")));
+        new UnregistrationParams(
+            ImmutableList.of(new Unregistration(id, "workspace/executeCommand")));
     getClient().unregisterCapability(unregistrationParams);
   }
 

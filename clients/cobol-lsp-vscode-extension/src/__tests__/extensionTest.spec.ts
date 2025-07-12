@@ -19,9 +19,9 @@ import { initSmartTab } from "../commands/SmartTabCommand";
 import { activate } from "../extension";
 import { CopybooksCodeActionProvider } from "../services/copybook/CopybooksCodeActionProvider";
 import { LanguageClientService } from "../services/LanguageClientService";
-import { TelemetryService } from "../services/reporter/TelemetryService";
 import { SnippetCompletionProvider } from "../services/snippetcompletion/SnippetCompletionProvider";
 import { Utils } from "../services/util/Utils";
+import { registerEvent } from "../services/reporter";
 
 jest.mock("../commands/SmartTabCommand");
 jest.mock("../commands/FetchCopybookCommand");
@@ -37,8 +37,9 @@ jest.mock("../services/Settings", () => ({
       .fn()
       .mockReturnValueOnce(undefined)
       .mockReturnValue("JAVA"),
-    getSnippetsForCobol: jest.fn().mockReturnValue([]),
+    getSnippetsForCobol: jest.fn().mockReturnValue(Promise.resolve([])),
     getDialects: jest.fn().mockReturnValue([]),
+    getMaxVMCount: jest.fn().mockReturnValue(-1),
   },
 }));
 
@@ -46,94 +47,42 @@ Utils.getZoweExplorerAPI = jest.fn();
 jest.mock("../services/copybook/E4ECopybookService", () => ({
   getE4EAPI: jest.fn(),
 }));
-jest.mock("vscode", () => ({
-  commands: {
-    registerCommand: jest
-      .fn()
-      .mockImplementation((command, callback) => callback()),
-    executeCommand: jest.fn(),
-  },
-  extensions: {
-    getExtension: jest.fn().mockReturnValue({ extensionPath: "/test" }),
-  },
-  languages: {
-    registerCodeActionsProvider: jest.fn(),
-    registerCompletionItemProvider: jest.fn(),
-  },
-  window: {
-    setStatusBarMessage: jest
-      .fn()
-      .mockImplementation(
-        async (_text: string, _hideWhenDone: Thenable<any>) => {
-          return Promise.resolve(true);
-        },
-      ),
-    showErrorMessage: jest.fn().mockReturnValue("test"),
-    showInformationMessage: jest
-      .fn()
-      .mockImplementation((message: string) => Promise.resolve(message)),
-    onDidChangeActiveTextEditor: jest.fn(),
-    createQuickPick: jest
-      .fn()
-      .mockReturnValue({ onDidChangeSelection: jest.fn(), show: jest.fn() }),
-    createOutputChannel: jest.fn().mockReturnValue({
-      appendLine: jest.fn(),
-    }),
-  },
-  workspace: {
-    getConfiguration: jest.fn().mockReturnValue({
-      get: jest.fn().mockReturnValue(9),
-    }),
-    getWorkspaceFolder: jest.fn().mockReturnValue({ name: "workspaceFolder1" }),
-    onDidChangeConfiguration: jest
-      .fn()
-      .mockReturnValue("onDidChangeConfiguration"),
-    workspaceFolders: [{ uri: { fsPath: "ws-path" } } as any],
-    fs: {
-      createDirectory: jest.fn(),
-    },
-  },
-  Uri: {
-    file: jest.fn().mockReturnValue("workspaceFolder2"),
-  },
-}));
 
-jest.mock("vscode-languageclient", () => ({
-  LanguageClient: jest.fn(),
-}));
-jest.mock("../services/reporter/TelemetryService");
+jest.mock("../services/reporter");
 
-const context: any = {
+const context = {
   subscriptions: [],
   globalStorageUri: { fsPath: "/storagePath" },
-};
+} as unknown as vscode.ExtensionContext;
 
 beforeEach(() => {
   jest.clearAllMocks();
-  context.subscriptions = [];
+  vscode.window.activeTextEditor = undefined;
 });
 
 describe("Check plugin extension for cobol starts successfully.", () => {
   test("start extension", async () => {
     await activate(context);
-    expect(TelemetryService.registerEvent).toHaveBeenCalledWith(
+    expect(registerEvent).toHaveBeenCalledWith(
       "log",
       ["bootstrap", "experiment-tag"],
       "Extension activation event was triggered",
     );
 
-    expect(vscode.commands.registerCommand).toBeCalledTimes(11);
+    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(12);
 
     expect(fetchCopybookCommand).toHaveBeenCalled();
     expect(gotoCopybookSettings).toHaveBeenCalled();
     expect(initSmartTab).toHaveBeenCalled();
 
-    expect(vscode.languages.registerCodeActionsProvider).toBeCalledWith(
+    expect(vscode.languages.registerCodeActionsProvider).toHaveBeenCalledWith(
       { language: "cobol" },
       expect.any(CopybooksCodeActionProvider),
     );
 
-    expect(vscode.languages.registerCompletionItemProvider).toBeCalledWith(
+    expect(
+      vscode.languages.registerCompletionItemProvider,
+    ).toHaveBeenCalledWith(
       { language: "cobol" },
       expect.any(SnippetCompletionProvider),
     );
@@ -154,7 +103,7 @@ describe("check exposed API's by the COBOL LS extension", () => {
 
 describe("Check plugin extension for cobol fails.", () => {
   beforeEach(() => {
-    (LanguageClientService as any).mockImplementation(() => {
+    jest.mock("../services/LanguageClientService", () => {
       return {
         checkPrerequisites: () => {
           throw new Error("The error");
@@ -169,7 +118,7 @@ describe("Check plugin extension for cobol fails.", () => {
 
   test("start fails.", async () => {
     await activate(context);
-    expect(TelemetryService.registerEvent).toHaveBeenCalledWith(
+    expect(registerEvent).toHaveBeenCalledWith(
       "log",
       ["bootstrap", "experiment-tag"],
       "Extension activation event was triggered",
@@ -178,9 +127,17 @@ describe("Check plugin extension for cobol fails.", () => {
 });
 
 describe("Check recognition of COBOL from first line", () => {
-  const manifest = require("../../package.json");
-  const firstLine = manifest.contributes.languages[0].firstLine;
-  const cobol = expect.stringMatching(firstLine);
+  let cobol: unknown;
+  beforeAll(() => {
+    // Let's use `require` here as using `import` for package.json
+    // makes TS change rootDir of the project, which causes other issues.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const manifest = require("../../package.json") as {
+      contributes: { languages: [{ firstLine: string | undefined }] };
+    };
+    const firstLine = manifest.contributes.languages[0].firstLine;
+    cobol = expect.stringMatching(firstLine!);
+  });
 
   test("Comment Line SEQ", () => {
     const pgm = `000010*REALLY ANYTHING`;
@@ -217,7 +174,7 @@ describe("Check recognition of COBOL from first line", () => {
     expect(pgm).toEqual(cobol);
   });
 
-  test("Compiler Directive at the beginnig of a line", () => {
+  test("Compiler Directive at the beginning of a line", () => {
     const pgm = `CBL `;
     expect(pgm).toEqual(cobol);
   });

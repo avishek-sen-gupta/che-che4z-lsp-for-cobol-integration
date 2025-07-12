@@ -20,6 +20,8 @@ import static com.google.inject.name.Names.named;
 import com.google.inject.AbstractModule;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
+import org.eclipse.lsp.cobol.cfg.CFASTBuilder;
+import org.eclipse.lsp.cobol.cfg.CFASTBuilderImpl;
 import org.eclipse.lsp.cobol.common.benchmark.BenchmarkService;
 import org.eclipse.lsp.cobol.common.benchmark.BenchmarkServiceImpl;
 import org.eclipse.lsp.cobol.common.dialects.TrueDialectService;
@@ -28,7 +30,6 @@ import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.core.engine.CobolLanguageEngine;
 import org.eclipse.lsp.cobol.core.messages.LocaleStoreImpl;
 import org.eclipse.lsp.cobol.core.messages.PropertiesMessageService;
-import org.eclipse.lsp.cobol.dialects.TrueDialectServiceImpl;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.GrammarPreprocessor;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.GrammarPreprocessorImpl;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.copybooks.GrammarPreprocessorListenerFactory;
@@ -36,6 +37,7 @@ import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacePrep
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacingService;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.replacement.ReplacingServiceImpl;
 import org.eclipse.lsp.cobol.core.visitor.InterruptingTreeListener;
+import org.eclipse.lsp.cobol.dialects.TrueDialectServiceImpl;
 import org.eclipse.lsp.cobol.lsp.CobolWorkspaceServiceImpl;
 import org.eclipse.lsp.cobol.lsp.LspEventConsumer;
 import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
@@ -65,6 +67,7 @@ public class EngineModule extends AbstractModule {
     bind(ConfigurationService.class).to(CachingConfigurationService.class);
     bind(CopybookNameService.class).to(CopybookNameServiceImpl.class);
     bind(LspEventConsumer.class).to(CobolWorkspaceServiceImpl.class);
+    bind(CFASTBuilder.class).to(CFASTBuilderImpl.class);
 
     bind(String.class)
         .annotatedWith(named("resourceFileLocation"))

@@ -15,15 +15,12 @@
 package org.eclipse.lsp.cobol.common.dialects;
 
 import com.google.common.collect.ImmutableList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 
-import java.util.List;
-
-/**
- * The result of dialect processing
- */
+/** The result of dialect processing */
 @Value
 @AllArgsConstructor
 public class DialectOutcome {
@@ -48,5 +45,4 @@ public class DialectOutcome {
     this.dialectNodes = ImmutableList.of();
     this.dialectMissed = hasMissedDialect;
   }
-
 }

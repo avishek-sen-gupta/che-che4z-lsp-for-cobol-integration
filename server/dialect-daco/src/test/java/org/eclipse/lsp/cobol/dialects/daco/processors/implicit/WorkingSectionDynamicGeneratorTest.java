@@ -14,24 +14,22 @@
  */
 package org.eclipse.lsp.cobol.dialects.daco.processors.implicit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.List;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.ProgramNode;
+import org.eclipse.lsp.cobol.common.model.tree.ProgramSubtype;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableDefinitionNameNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableNode;
 import org.junit.jupiter.api.Test;
 
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-/**
- * Test for {@link WorkingSectionDynamicGenerator}
- */
+/** Test for {@link WorkingSectionDynamicGenerator} */
 public class WorkingSectionDynamicGeneratorTest {
   @Test
   void testGenerate() {
     Locality locality = Locality.builder().build();
-    ProgramNode programNode = new ProgramNode(locality);
+    ProgramNode programNode = new ProgramNode(locality, ProgramSubtype.Program, 0);
 
     programNode.addChild(new VariableDefinitionNameNode(locality, "TBF123-XAB"));
     programNode.addChild(new VariableDefinitionNameNode(locality, "TBL456-XCD"));

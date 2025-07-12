@@ -11,3 +11,31 @@ fileignoreconfig:
   checksum: 97f6aba10244cabe04ef6e89f0d681f02cd35742f4ba9e91ca29cb494ccbf225
 - filename: server/parser/src/main/antlr4/org/eclipse/lsp/cobol/core/CobolLexer.g4
   checksum: 7805fc1f54c511671c5ed63980683080d3edb9fd32bc8f1aabdf9eb01bb8387d
+- filename: server/engine/src/main/resources/LanguageKeywords_sql.txt
+  checksum: 8b72a3222e5440db942ee65923cafb443f748dce0d1bb85a1b70a2ba0b874cff
+- filename: .git-blame-ignore-revs
+  checksum: 4cf9de678082ce77e67fbbe0983e1e47f19bfeb2bd9c74f37da66ecede7623e5
+- filename: CHANGELOG.md
+  checksum: 8d39fb617a8d957586bc21f942f8c50604ac998172b9deb3316c19c7f89163f6
+- filename: clients/daco-dialect-support/package-lock.json
+  checksum: 1bd6e6e789a5bde599dd4b3cd7b87dc76f353a66ca36a2709f9d0b73beae1c89
+- filename: server/engine/src/test/java/org/eclipse/lsp/cobol/usecases/hpcobol/TestHPCobol.java
+  checksum: 45438f565cf3139029b1a102f0d833d68ef0319ef3b71d7e419e25fb0e35c596
+- filename: server/engine/src/test/java/org/eclipse/lsp/cobol/usecases/TestLineContinuationForVariable.java
+  checksum: 46395d0feedc51f1d98fce3dd21e32ba9d00aeec8f533c1823fee69b84adaf7f
+- filename: clients/analysis/yarn.lock
+  checksum: 68f5f19aae75e7c9d188ec6fb1418b5adf97485cbf111452996ff2446e5983c2
+- filename: clients/analysis/package-lock.json
+  checksum: 63fca2863896d3581d8b0bcf6826444f790fc202c37d18091a1d04a4f9fcf4c9
+- filename: clients/cobol-lsp-vscode-extension/package-lock.json
+  checksum: 89e60faa65ffcc9adef5b50d59f882a33891ab8ea9fd6b687936e344ac244418
+- filename: server/engine/src/test/java/org/eclipse/lsp/cobol/usecases/TestSqlAllSetStatements.java
+  checksum: 0583009473a177fd843c6f23ade6c3729540f97f54acbf1775b9fdc68db7627c
+- filename: server/parser/src/main/antlr4/org/eclipse/lsp/cobol/core/CobolLexer.g4
+  checksum: 62c0778b4ffc5196f1f991ec72089545c0f3e1050afc0e61ba647ad06405b15d
+- filename: server/engine/src/main/antlr4/org/eclipse/lsp/cobol/implicitDialects/cics/CICSParser.g4
+  checksum: 880db33332187db5f48fbf8866f83ac0153da66543f5d8b74436f83979b52d91
+- filename: server/engine/src/main/antlr4/org/eclipse/lsp/cobol/implicitDialects/sql/Db2SqlExecLexer.g4
+  checksum: 0eaed8e3ed15665d3716398fd257b4e83819632765d8d5ae53309b10f021b64e
+- filename: server/engine/src/main/antlr4/org/eclipse/lsp/cobol/implicitDialects/sql/Db2SqlExecParser.g4
+  checksum: 62406f986c83d98da66c460ec3f067d983dd85aa8cb8bd628c0f2b0ec228ca73

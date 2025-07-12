@@ -21,6 +21,7 @@
 !LICENSE
 !README.md
 !CHANGELOG.md
+!telemetry.key
 !resources/logo.png
 !resources/TELEMETRY_KEY
 !package.json
@@ -34,11 +35,13 @@
 !schema/preprocessor_entry.schema.json
 !schema/proc_grps.schema.json
 !schema/compiler_options.schema.json
+!schema/libs_config.schema.json
 # * bundled extension code
 !dist/extension.js
 !dist/extension.js.map
 !dist/web/extension.js
 !dist/web/extension.js.map
+!dist/Worker.js
 # ** server implementation 
 !server/native/*
 !server/jar/server.jar

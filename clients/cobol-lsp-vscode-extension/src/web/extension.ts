@@ -1,10 +1,81 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from "vscode";
+/*
+ * Copyright (c) 2024 Broadcom.
+ * The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *   Broadcom, Inc. - initial API and implementation
+ */
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {}
+import * as vscode from "vscode";
+import { ExtensionContext } from "vscode";
+import {
+  pickSnippet,
+  SnippetCompletionProvider,
+} from "../services/snippetcompletion/SnippetCompletionProvider";
+import { LANGUAGE_ID } from "../constants";
+import { initSmartTab, RangeTabShiftStore } from "../commands/SmartTabCommand";
+import { initTelemetry, registerEvent } from "../services/reporter";
+import { SubroutinesCompletionsProvider } from "../services/subroutines/SubroutinesCompletionsProvider";
+import { CopybooksCompletionProvider } from "../services/copybook/CopybooksCompletionProvider";
+
+let outputChannel: vscode.OutputChannel;
+
+export async function activate(context: ExtensionContext) {
+  await initTelemetry(context);
+  registerEvent(
+    "log",
+    ["bootstrap", "experiment-tag"],
+    "Web extension activation event was triggered",
+  );
+
+  outputChannel = vscode.window.createOutputChannel("COBOL Language Support");
+  outputChannel.appendLine("Activating COBOL Language Support Web Extension");
+
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      { language: LANGUAGE_ID },
+      new SnippetCompletionProvider(context),
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "cobol-lsp.snippets.insertSnippets",
+      async () => {
+        outputChannel.appendLine("Executing Insert Cobol Snippet command");
+        await pickSnippet();
+      },
+    ),
+  );
+
+  initSmartTab(context);
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((_e) =>
+      RangeTabShiftStore.reset(),
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      { language: LANGUAGE_ID },
+      new SubroutinesCompletionsProvider(),
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      { language: LANGUAGE_ID },
+      new CopybooksCompletionProvider(undefined, outputChannel),
+    ),
+  );
+}
 
 // This method is called when your extension is deactivated
 export function deactivate() {}

@@ -16,16 +16,16 @@ package org.eclipse.lsp.cobol.usecases;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.stream.Stream;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.stream.Stream;
-
 /** Test the allowed variable usage */
 public class TestCicsAllowedVariableUsage {
   public static final String TEXT =
-      "       Identification Division.\n"
+      ""
+          + "       Identification Division.\n"
           + "       Program-id. HELLOT.\n"
           + "\n"
           + "       Data Division.\n"
@@ -144,6 +144,7 @@ public class TestCicsAllowedVariableUsage {
             "COMMAREA",
             "COMMONNAME",
             "COMMONNAMLEN",
+            "COMPAT",
             "COMPAREMAX",
             "COMPAREMIN",
             "COMPLETE",
@@ -207,11 +208,10 @@ public class TestCicsAllowedVariableUsage {
             "DESTID",
             "DESTIDLENG",
             "DETAILLENGTH",
-            "DFHRESP",
-            "DFHVALUE",
             "DIGEST",
             "DIGESTTYPE",
             "DISCONNECT",
+            "DLL",
             "DOCDELETE",
             "DOCSIZE",
             "DOCSTATUS",
@@ -237,6 +237,8 @@ public class TestCicsAllowedVariableUsage {
             "ENDOUTPUT",
             "ENQ",
             "ENTRYNAME",
+            "ENTRY-NAME",
+            "ENTRY-INTERFACE",
             "EOC",
             "EODS",
             "EPRFIELD",
@@ -380,6 +382,8 @@ public class TestCicsAllowedVariableUsage {
             "LOGMODE",
             "LOGONLOGMODE",
             "LOGONMSG",
+            "LONGUPPER",
+            "LONGMIXED",
             "LOW_VALUE",
             "LOW_VALUES",
             "LUNAME",
@@ -442,7 +446,7 @@ public class TestCicsAllowedVariableUsage {
             "NOHANDLE",
             "NOINCONVERT",
             "NONE",
-            "NOOUTCONERT",
+            "NOOUTCONVERT",
             "NOQUEUE",
             "NOQUIESCE",
             "NOSRVCONVERT",
@@ -650,6 +654,7 @@ public class TestCicsAllowedVariableUsage {
             "STARTCODE",
             "STATE",
             "STATELEN",
+            "STATIC",
             "STATIONID",
             "STATUSCODE",
             "STATUSLEN",

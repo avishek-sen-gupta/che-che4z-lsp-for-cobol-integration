@@ -21,6 +21,7 @@ import javax.annotation.Nullable;
 import org.eclipse.lsp.cobol.common.message.LocaleStore;
 import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.utils.LogLevelUtils;
+import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
 import org.eclipse.lsp.cobol.service.AnalysisService;
 import org.eclipse.lsp.cobol.service.WatcherService;
 import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
@@ -29,9 +30,7 @@ import org.eclipse.lsp.cobol.service.settings.SettingsService;
 import org.eclipse.lsp.cobol.service.settings.layout.CodeLayoutStore;
 import org.eclipse.lsp4j.InitializedParams;
 
-/**
- * LSP Initialized Handler
- */
+/** LSP Initialized Handler */
 public class InitializedHandler {
   private final WatcherService watchingService;
   private final CopybookNameService copybookNameService;
@@ -41,16 +40,19 @@ public class InitializedHandler {
   private final CodeLayoutStore codeLayoutStore;
   private final AnalysisService analysisService;
   private final MessageService messageService;
+  private final ErrorFinalizerService errorFinalizerService;
 
   @Inject
-  public InitializedHandler(WatcherService watchingService,
-                            CopybookNameService copybookNameService,
-                            Keywords keywords,
-                            SettingsService settingsService,
-                            LocaleStore localeStore,
-                            AnalysisService analysisService,
-                            MessageService messageService,
-                            CodeLayoutStore codeLayoutStore) {
+  public InitializedHandler(
+      WatcherService watchingService,
+      CopybookNameService copybookNameService,
+      Keywords keywords,
+      SettingsService settingsService,
+      LocaleStore localeStore,
+      AnalysisService analysisService,
+      MessageService messageService,
+      CodeLayoutStore codeLayoutStore,
+      ErrorFinalizerService errorFinalizerService) {
     this.watchingService = watchingService;
     this.copybookNameService = copybookNameService;
     this.keywords = keywords;
@@ -59,10 +61,12 @@ public class InitializedHandler {
     this.analysisService = analysisService;
     this.messageService = messageService;
     this.codeLayoutStore = codeLayoutStore;
+    this.errorFinalizerService = errorFinalizerService;
   }
 
   /**
    * Handle LSP initialized request.
+   *
    * @param params InitializedParams.
    */
   public void initialized(@Nullable InitializedParams params) {
@@ -74,10 +78,13 @@ public class InitializedHandler {
     keywords.updateStorage();
     messageService.reloadMessages();
     notifyConfiguredCopybookExtensions();
+    getDiagnosticsLevel();
   }
 
   private void getCobolProgramLayout() {
-    settingsService.fetchConfiguration(COBOL_PROGRAM_LAYOUT.label).thenAccept(codeLayoutStore.updateCodeLayout());
+    settingsService
+        .fetchConfiguration(COBOL_PROGRAM_LAYOUT.label)
+        .thenAccept(codeLayoutStore.updateCodeLayout());
   }
 
   private void getLocaleFromClient() {
@@ -86,13 +93,19 @@ public class InitializedHandler {
 
   private void notifyConfiguredCopybookExtensions() {
     settingsService
-            .fetchTextConfiguration(CPY_EXTENSIONS.label)
-            .thenAccept(analysisService::setExtensionConfig);
+        .fetchTextConfiguration(CPY_EXTENSIONS.label)
+        .thenAccept(analysisService::setExtensionConfig);
+  }
+
+  private void getDiagnosticsLevel() {
+    settingsService
+        .fetchConfiguration(ANALYSIS_MODE.label)
+        .thenAccept(errorFinalizerService::updateDiagnosticsLevel);
   }
 
   private void getLogLevelFromClient() {
     settingsService
-            .fetchConfiguration(LOGGING_LEVEL.label)
-            .thenAccept(LogLevelUtils.updateLogLevel());
+        .fetchConfiguration(LOGGING_LEVEL.label)
+        .thenAccept(LogLevelUtils.updateLogLevel());
   }
 }

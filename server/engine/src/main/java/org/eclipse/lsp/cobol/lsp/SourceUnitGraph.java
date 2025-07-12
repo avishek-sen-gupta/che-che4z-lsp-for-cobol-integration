@@ -14,7 +14,6 @@
  */
 package org.eclipse.lsp.cobol.lsp;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
@@ -38,10 +37,10 @@ import org.eclipse.lsp.cobol.common.utils.ImplicitCodeUtils;
 import org.eclipse.lsp.cobol.common.utils.RangeUtils;
 import org.eclipse.lsp.cobol.lsp.analysis.AnalysisState;
 import org.eclipse.lsp.cobol.lsp.analysis.AnalysisStateListener;
-import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 
 /** Workspace document graph object */
 @Singleton
@@ -62,11 +61,8 @@ public class SourceUnitGraph implements AnalysisStateListener {
       new ConcurrentHashMap<>();
 
   @Inject
-  public SourceUnitGraph(
-      WorkspaceFileService fileService,
-      AsyncAnalysisService asyncAnalysisService) {
+  public SourceUnitGraph(WorkspaceFileService fileService) {
     this.fileService = fileService;
-    asyncAnalysisService.register(ImmutableList.of(this));
   }
 
   @Override
@@ -384,15 +380,17 @@ public class SourceUnitGraph implements AnalysisStateListener {
   }
 
   private static boolean isContainedInside(Position usage, NodeV nodeV) {
-    boolean isContained;
-    Set<Location> referencedLocations = nodeV.referencedLocation;
-    for (Location referencedLocation : referencedLocations) {
-      Position start = referencedLocation.getRange().getStart();
-      Position end = referencedLocation.getRange().getEnd();
-      isContained =
-          (RangeUtils.isAfter(usage, start) || usage.equals(start))
-              && (RangeUtils.isBefore(usage, end) || usage.equals(end));
-      if (isContained) return true;
+    for (Location location : nodeV.referencedLocation) {
+      Range range = location.getRange();
+      if (range == null || range.getStart() == null || range.getEnd() == null) {
+        continue;
+      }
+      Position start = range.getStart();
+      Position end = range.getEnd();
+      if ((RangeUtils.isAfter(usage, start) || usage.equals(start))
+          && (RangeUtils.isBefore(usage, end) || usage.equals(end))) {
+        return true;
+      }
     }
     return false;
   }

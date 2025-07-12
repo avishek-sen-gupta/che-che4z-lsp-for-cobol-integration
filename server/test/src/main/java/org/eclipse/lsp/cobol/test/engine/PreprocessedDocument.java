@@ -15,17 +15,16 @@
 
 package org.eclipse.lsp.cobol.test.engine;
 
+import java.util.List;
 import lombok.Value;
 import org.eclipse.lsp.cobol.test.CobolText;
-
-import java.util.List;
 
 /**
  * This class contains the result of the use-case preprocessing. Text and copybooks will be passed
  * to the actual Language Engine, and the testDAta will be used to assert the result.
  */
 @Value
-class PreprocessedDocument {
+public class PreprocessedDocument {
   String text;
   List<CobolText> copybooks;
   TestData testData;

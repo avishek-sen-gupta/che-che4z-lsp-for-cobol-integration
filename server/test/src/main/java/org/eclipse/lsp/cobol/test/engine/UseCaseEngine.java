@@ -25,7 +25,7 @@ import static org.eclipse.lsp.cobol.test.engine.UseCaseUtils.analyze;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Multimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonElement;
 import java.util.*;
 import java.util.function.Function;
@@ -42,15 +42,16 @@ import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.common.model.DefinedAndUsedStructure;
 import org.eclipse.lsp.cobol.common.model.NodeType;
 import org.eclipse.lsp.cobol.common.model.tree.CopyNode;
+import org.eclipse.lsp.cobol.common.model.tree.FunctionReference;
 import org.eclipse.lsp.cobol.common.model.tree.ProgramNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableNode;
+import org.eclipse.lsp.cobol.common.symbols.CodeBlockReference;
+import org.eclipse.lsp.cobol.common.symbols.ProcedureId;
 import org.eclipse.lsp.cobol.common.symbols.SymbolTable;
 import org.eclipse.lsp.cobol.common.utils.ImplicitCodeUtils;
 import org.eclipse.lsp.cobol.test.CobolText;
-import org.eclipse.lsp4j.Diagnostic;
-import org.eclipse.lsp4j.Location;
-import org.eclipse.lsp4j.Position;
-import org.eclipse.lsp4j.Range;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.validation.NonNull;
 
 /**
  * This class applies syntax and semantic analysis for COBOL texts using the actual Language Engine.
@@ -144,10 +145,10 @@ public class UseCaseEngine {
   }
 
   /**
-   * Check if the language engine applies required syntax and semantic checks for "cobol"
-   * language id. All the semantic elements in the given text, as well as
-   * syntax errors, should be wrapped with according tags. The same extraction operation applied
-   * also for the given copybooks. Copybooks processing enabled.
+   * Check if the language engine applies required syntax and semantic checks for "cobol" language
+   * id. All the semantic elements in the given text, as well as syntax errors, should be wrapped
+   * with according tags. The same extraction operation applied also for the given copybooks.
+   * Copybooks processing enabled.
    *
    * <p>Expected diagnostics should contain the full of list of syntax and semantic
    * errors/warnings/info messages for the document and copybooks. Existing positions, if they are,
@@ -163,6 +164,30 @@ public class UseCaseEngine {
   public AnalysisResult runTest(
       String text, List<CobolText> copybooks, Map<String, Diagnostic> expectedDiagnostics) {
     return runTest(text, copybooks, expectedDiagnostics, ImmutableList.of(), CobolLanguageId.COBOL);
+  }
+
+  /**
+   * @param text - COBOL text to analyse. It will be cleaned up before analysis to exclude all the
+   *     technical tokens and collect syntax and semantic elements
+   * @param copybooks - list of the copybooks used in the document
+   * @param expectedDiagnostics - map of IDs and diagnostics that are expected to appear in the
+   *     document or copybooks. IDs are the same as in the diagnostic sections inside the text.
+   * @param preprocessorsDirectives - initial preprocessor directives
+   * @return analysis result object
+   */
+  public AnalysisResult runTest(
+      String text,
+      List<CobolText> copybooks,
+      Map<String, Diagnostic> expectedDiagnostics,
+      Map<String, List<String>> preprocessorsDirectives) {
+    return runTest(
+        text,
+        copybooks,
+        expectedDiagnostics,
+        ImmutableList.of(),
+        AnalysisConfig.defaultConfig(CopybookProcessingMode.ENABLED),
+        CobolLanguageId.COBOL,
+        preprocessorsDirectives);
   }
 
   /**
@@ -222,7 +247,8 @@ public class UseCaseEngine {
         expectedDiagnostics,
         subroutineNames,
         AnalysisConfig.defaultConfig(CopybookProcessingMode.ENABLED),
-        languageId);
+        languageId,
+        ImmutableMap.of());
   }
 
   /**
@@ -244,6 +270,7 @@ public class UseCaseEngine {
    * @param analysisConfig - analysis settings: copybook processing mode and the SQL backend for the
    *     analysis
    * @param languageId - language Id
+   * @param preprocessorsDirectives - initial preprocessor directives
    * @return analysis result object
    */
   public AnalysisResult runTest(
@@ -252,7 +279,8 @@ public class UseCaseEngine {
       Map<String, Diagnostic> expectedDiagnostics,
       List<String> subroutineNames,
       AnalysisConfig analysisConfig,
-      CobolLanguageId languageId) {
+      CobolLanguageId languageId,
+      Map<String, List<String>> preprocessorsDirectives) {
 
     SQLBackend sqlBackendSetting =
         Optional.ofNullable(analysisConfig.getDialectsSettings().get("target-sql-backend"))
@@ -261,7 +289,13 @@ public class UseCaseEngine {
             .orElse(SQLBackend.DB2_SERVER);
     PreprocessedDocument document =
         AnnotatedDocumentCleaning.prepareDocument(
-            text, copybooks, subroutineNames, expectedDiagnostics, sqlBackendSetting, analysisConfig.getCompilerOptions());
+            text,
+            copybooks,
+            subroutineNames,
+            expectedDiagnostics,
+            sqlBackendSetting,
+            analysisConfig.getCompilerOptions());
+
     AnalysisResult actual =
         analyze(
             UseCase.builder()
@@ -275,9 +309,12 @@ public class UseCaseEngine {
                 .sqlBackend(sqlBackendSetting)
                 .dialectsSettings(analysisConfig.getDialectsSettings())
                 .compilerOptions(analysisConfig.getCompilerOptions())
+                .preprocessorsDirectives(preprocessorsDirectives)
                 .build(),
             languageId);
     assertResultEquals(actual, document.getTestData());
+    UseCaseUtils.storeDocumentToUnitTextExtensionContext(
+        document.getText(), document.getCopybooks(), document.getTestData());
     return actual;
   }
 
@@ -313,7 +350,8 @@ public class UseCaseEngine {
         expectedDiagnostics,
         subroutineNames,
         analysisConfig,
-        CobolLanguageId.COBOL);
+        CobolLanguageId.COBOL,
+        ImmutableMap.of());
   }
 
   /**
@@ -343,7 +381,12 @@ public class UseCaseEngine {
 
     PreprocessedDocument document =
         AnnotatedDocumentCleaning.prepareDocument(
-            text, copybooks, subroutineNames, expectedDiagnostics, sqlBackendSetting, analysisConfig.getCompilerOptions());
+            text,
+            copybooks,
+            subroutineNames,
+            expectedDiagnostics,
+            sqlBackendSetting,
+            analysisConfig.getCompilerOptions());
     AnalysisResult actual =
         analyze(
             UseCase.builder()
@@ -379,18 +422,20 @@ public class UseCaseEngine {
     assertResult(
         "Paragraph definition:",
         expected.getParagraphDefinitions(),
-        extractDefinitions(actual, PARAGRAPH_NAME_NODE));
+        extractProcedureData(actual, ProcedureId::isParagraph, CodeBlockReference::getDefinitions));
     assertResult(
         "Paragraph usages:",
         expected.getParagraphUsages(),
-        extractUsages(actual, PARAGRAPH_NAME_NODE));
+        extractProcedureData(actual, ProcedureId::isParagraph, CodeBlockReference::getUsage));
 
     assertResult(
         "Section definition:",
         expected.getSectionDefinitions(),
-        extractDefinitions(actual, SECTION_NAME_NODE));
+        extractProcedureData(actual, ProcedureId::isSection, CodeBlockReference::getDefinitions));
     assertResult(
-        "Section usages:", expected.getSectionUsages(), extractUsages(actual, SECTION_NAME_NODE));
+        "Section usages:",
+        expected.getSectionUsages(),
+        extractProcedureData(actual, ProcedureId::isSection, CodeBlockReference::getUsage));
 
     assertResult(
         "Subroutine definitions: ",
@@ -400,6 +445,42 @@ public class UseCaseEngine {
         "Subroutine usage:",
         expected.getSubroutineUsages(),
         extractUsages(actual, SUBROUTINE_NAME_NODE));
+
+    assertResult(
+        "Function definition:",
+        expected.getFunctionDefinitions(),
+        extractFunctionDefinitions(actual));
+
+    assertResult("Function usage:", expected.getFunctionUsages(), extractDefinitionsUsage(actual));
+  }
+
+  private static Map<ProcedureId, List<Location>> extractProcedureData(
+      AnalysisResult actual,
+      Predicate<ProcedureId> filter,
+      Function<CodeBlockReference, List<Location>> extractor) {
+    Map<ProcedureId, List<Location>> result = new HashMap<>();
+    actual
+        .getRootNode()
+        .findPrograms()
+        .forEach(
+            programNode -> {
+              SymbolTable symbolTable =
+                  actual.getSymbolTableMap().get(SymbolTable.generateKey(programNode));
+              symbolTable
+                  .getProcedures()
+                  .forEach(
+                      (key, value) -> {
+                        if (!filter.test(key)) {
+                          return;
+                        }
+                        List<Location> data = extractor.apply(value);
+                        if (data.isEmpty()) {
+                          return;
+                        }
+                        result.computeIfAbsent(key, it -> new ArrayList<>()).addAll(data);
+                      });
+            });
+    return result;
   }
 
   private Map<String, List<Location>> extractVariableDefinitions(AnalysisResult result) {
@@ -427,7 +508,6 @@ public class UseCaseEngine {
         .map(p -> result.getSymbolTableMap().get(SymbolTable.generateKey(p)))
         .filter(Objects::nonNull)
         .map(SymbolTable::getVariables)
-        .map(Multimap::values)
         .flatMap(Collection::stream)
         .filter(it -> !FILLER_NAME.equals(it.getName()))
         .filter(predicate)
@@ -442,6 +522,37 @@ public class UseCaseEngine {
         context ->
             !(context.getDefinitions().isEmpty()
                 || ImplicitCodeUtils.isImplicit(context.getDefinitions().get(0).getUri())));
+  }
+
+  private Map<String, List<Location>> extractFunctionDefinitions(AnalysisResult result) {
+    return result
+        .getRootNode()
+        .getDepthFirstStream()
+        .filter(hasType(FUNCTION_REFERENCE))
+        .map(FunctionReference.class::cast)
+        .filter(
+            context ->
+                !(context.getDefinitions().isEmpty()
+                    || ImplicitCodeUtils.isImplicit(context.getDefinitions().get(0).getUri())))
+        .collect(
+            Collectors.toMap(
+                fr -> fr.getName().toUpperCase(Locale.ROOT),
+                FunctionReference::getDefinitions,
+                (l1, l2) -> Stream.concat(l1.stream(), l2.stream()).distinct().collect(toList())));
+  }
+
+  private Map<String, List<Location>> extractDefinitionsUsage(AnalysisResult result) {
+    return result
+        .getRootNode()
+        .getDepthFirstStream()
+        .filter(hasType(FUNCTION_REFERENCE))
+        .map(FunctionReference.class::cast)
+        .filter(context -> !context.getDefinitions().isEmpty())
+        .collect(
+            Collectors.toMap(
+                d -> d.getName().toUpperCase(Locale.ROOT),
+                d -> ImmutableList.of(d.getLocality().toLocation()),
+                (l1, l2) -> Stream.concat(l1.stream(), l2.stream()).distinct().collect(toList())));
   }
 
   private Map<String, List<Location>> extractUsages(AnalysisResult result, NodeType nodeType) {
@@ -483,18 +594,48 @@ public class UseCaseEngine {
   private void assertDiagnostics(
       Map<String, List<Diagnostic>> expected, Map<String, List<Diagnostic>> actual) {
     assertEquals(expected.keySet(), actual.keySet(), "Diagnostic documents are not the same");
+
+    // Below code provides flexible validation, as a strict assertion would lead to update of most
+    // of the TestCases. Strict assertion is done when the expectedDiagnostics includes an
+    // ErrorCode.
     for (String documentUri : expected.keySet()) {
-      List<Diagnostic> expectedDiagnostic =
+      List<Diagnostic> expectedDiagnostics =
           expected.get(documentUri).stream().sorted(diagnosticComparator).collect(toList());
-      List<Diagnostic> actualDiagnostic =
+      List<Diagnostic> actualDiagnostics =
           actual.get(documentUri).stream().sorted(diagnosticComparator).collect(toList());
       assertEquals(
-          expectedDiagnostic, actualDiagnostic, "Different diagnostics for: " + documentUri);
+          expectedDiagnostics.size(), actualDiagnostics.size(), "Different diagnostics size");
+      for (int i = 0; i < expectedDiagnostics.size(); i++) {
+        Diagnostic expectedDiagnostic = expectedDiagnostics.get(i);
+        Diagnostic actualDiagnostic = actualDiagnostics.get(i);
+        if (expectedDiagnostic.getCode() == null && actualDiagnostic.getCode() != null) {
+          assertDiagnosticEqualsIgnoringCode(expectedDiagnostic, actualDiagnostic);
+        } else {
+          assertEquals(
+              expectedDiagnostic, actualDiagnostic, "Different diagnostics for: " + documentUri);
+        }
+      }
     }
   }
 
-  private void assertResult(
-      String message, Map<String, List<Location>> expected, Map<String, List<Location>> actual) {
+  private static void assertDiagnosticEqualsIgnoringCode(
+      @NonNull Diagnostic expected, @NonNull Diagnostic actual) {
+    assertEquals(expected.getRange(), actual.getRange(), "Diagnostic range mismatch");
+    assertEquals(expected.getSeverity(), actual.getSeverity(), "Diagnostic severity mismatch");
+    assertEquals(expected.getSource(), actual.getSource(), "Diagnostic source mismatch");
+    assertEquals(expected.getMessage(), actual.getMessage(), "Diagnostic message mismatch");
+    assertEquals(
+        expected.getCodeDescription(), actual.getCodeDescription(), " Code Description mismatch");
+    assertEquals(expected.getTags(), actual.getTags(), " Tags mismatch");
+    assertEquals(
+        expected.getRelatedInformation(),
+        actual.getRelatedInformation(),
+        "RelatedInformation mismatch");
+    assertEquals(expected.getData(), actual.getData(), "Data mismatch");
+  }
+
+  private <T> void assertResult(
+      String message, Map<T, List<Location>> expected, Map<T, List<Location>> actual) {
     assertEquals(expected.keySet(), actual.keySet(), message);
     expected.forEach(
         (key, value) ->

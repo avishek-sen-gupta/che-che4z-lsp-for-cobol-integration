@@ -14,27 +14,22 @@
  */
 package org.eclipse.lsp.cobol.usecases;
 
+import static org.eclipse.lsp.cobol.test.engine.UseCaseUtils.DOCUMENT_URI;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Multimap;
+import java.util.Optional;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 import org.eclipse.lsp.cobol.common.model.tree.ProgramNode;
-import org.eclipse.lsp.cobol.common.model.tree.variable.VariableNode;
 import org.eclipse.lsp.cobol.common.symbols.SymbolTable;
 import org.eclipse.lsp.cobol.test.CobolText;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
-
-import static org.eclipse.lsp.cobol.test.engine.UseCaseUtils.DOCUMENT_URI;
-
-/**
- * Tests a nested copybook with replacing can be used at multiple place in a cobol document.
- */
+/** Tests a nested copybook with replacing can be used at multiple place in a cobol document. */
 public class TestNestedCopybookMultipleUseInCobolDocument {
   private static final String TEXT =
       "       IDENTIFICATION DIVISION.\n"
@@ -81,14 +76,11 @@ public class TestNestedCopybookMultipleUseInCobolDocument {
             .map(ProgramNode.class::cast)
             .findFirst();
     Assertions.assertTrue(programNode.isPresent());
-    Multimap<String, VariableNode> variables =
-        analysisResult
-            .getSymbolTableMap()
-            .get(SymbolTable.generateKey(programNode.get()))
-            .getVariables();
-    Assertions.assertTrue(variables.containsKey("FILE2_OBJECT"));
-    Assertions.assertTrue(variables.containsKey("FILE1_OBJECT"));
-    Assertions.assertTrue(variables.containsKey("DAT2"));
-    Assertions.assertTrue(variables.containsKey("DATA1"));
+    SymbolTable symbolTable =
+        analysisResult.getSymbolTableMap().get(SymbolTable.generateKey(programNode.get()));
+    Assertions.assertEquals(1, symbolTable.findVariables("FILE1_OBJECT").size());
+    Assertions.assertEquals(1, symbolTable.findVariables("FILE2_OBJECT").size());
+    Assertions.assertEquals(1, symbolTable.findVariables("DAT2").size());
+    Assertions.assertEquals(1, symbolTable.findVariables("DATA1").size());
   }
 }

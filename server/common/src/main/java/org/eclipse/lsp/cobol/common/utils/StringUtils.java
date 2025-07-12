@@ -14,10 +14,9 @@
  */
 package org.eclipse.lsp.cobol.common.utils;
 
+import java.util.regex.Pattern;
 import lombok.NonNull;
 import lombok.experimental.UtilityClass;
-
-import java.util.regex.Pattern;
 
 /** This utility class provides functions that are useful for pre-processing a COBOL document */
 @UtilityClass
@@ -33,5 +32,12 @@ public class StringUtils {
   @NonNull
   public String trimQuotes(@NonNull String line) {
     return QUOTE_PATTERN.matcher(line).replaceAll("");
+  }
+
+  public boolean isEnclosedInSingleQuotes(String str) {
+    if (str == null || str.length() < 2) return false;
+    char first = str.charAt(0);
+    char last = str.charAt(str.length() - 1);
+    return (first == '\'' && last == '\'');
   }
 }

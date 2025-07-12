@@ -14,35 +14,33 @@
  */
 package org.eclipse.lsp.cobol.core.model.tree.logic;
 
+import static org.eclipse.lsp.cobol.common.model.tree.Node.hasType;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.NodeType;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.ProgramNode;
+import org.eclipse.lsp.cobol.common.model.tree.ProgramSubtype;
 import org.eclipse.lsp.cobol.common.model.tree.variable.*;
 import org.eclipse.lsp.cobol.core.engine.processors.SectionNodeProcessorHelper;
-import org.eclipse.lsp.cobol.core.engine.symbols.SymbolAccumulatorService;
+import org.eclipse.lsp.cobol.core.engine.symbols.SymbolAccumulator;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import static org.eclipse.lsp.cobol.common.model.tree.Node.hasType;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
 /** Test {@link SectionNodeProcessorHelper} */
 class SectionNodeProcessorHelperTest {
-  private static final Locality LOCALITY = Locality.builder()
-      .uri("")
-      .range(new Range(new Position(1, 1), new Position(2, 2)))
-      .build();
+  private static final Locality LOCALITY =
+      Locality.builder().uri("").range(new Range(new Position(1, 1), new Position(2, 2))).build();
 
   @Test
   void simpleStructureTest() {
-    Node programNode = new ProgramNode(LOCALITY);
+    Node programNode = new ProgramNode(LOCALITY, ProgramSubtype.Program, 0);
     // 01 Level-01-order-1
     // 01 Level-01-order-2
     //    05 Level-05-order-1
@@ -86,7 +84,7 @@ class SectionNodeProcessorHelperTest {
             .variableNameAndLocality(new VariableNameAndLocality("Level-01-order-3", LOCALITY))
             .build());
     SectionNodeProcessorHelper.processNodeWithVariableDefinitions(programNode);
-    new SymbolAccumulatorService().registerVariablesInProgram(programNode);
+    new SymbolAccumulator().registerVariablesInProgram(programNode);
     List<VariableNode> nodesLevel01 = getVariables(programNode);
     checkNames(nodesLevel01, "Level-01-order-1", "Level-01-order-2", "Level-01-order-3");
     List<VariableNode> nodesLevel05 = getVariables(nodesLevel01.get(1));
@@ -97,7 +95,7 @@ class SectionNodeProcessorHelperTest {
 
   @Test
   void nonCorrectStructures() {
-    Node programNode = new ProgramNode(LOCALITY);
+    Node programNode = new ProgramNode(LOCALITY, ProgramSubtype.Program, 0);
     // 05 Level-05
     // 01 Level-01
     //   10 Level-10
@@ -127,7 +125,7 @@ class SectionNodeProcessorHelperTest {
             .variableNameAndLocality(new VariableNameAndLocality("Level-07", LOCALITY))
             .build());
     SectionNodeProcessorHelper.processNodeWithVariableDefinitions(programNode);
-    new SymbolAccumulatorService().registerVariablesInProgram(programNode);
+    new SymbolAccumulator().registerVariablesInProgram(programNode);
     List<VariableNode> nodesLowLevel = getVariables(programNode);
     checkNames(nodesLowLevel, "Level-05", "Level-01");
     List<VariableNode> nodesNestedLevel = getVariables(nodesLowLevel.get(1));
@@ -136,7 +134,7 @@ class SectionNodeProcessorHelperTest {
 
   @Test
   void moveLevel66ToTop() {
-    Node programNode = new ProgramNode(LOCALITY);
+    Node programNode = new ProgramNode(LOCALITY, ProgramSubtype.Program, 0);
     // 01 Level-01
     //    05 Level-05
     // 66 Level-66
@@ -159,7 +157,7 @@ class SectionNodeProcessorHelperTest {
             .variableNameAndLocality(new VariableNameAndLocality("Level-66", LOCALITY))
             .build());
     SectionNodeProcessorHelper.processNodeWithVariableDefinitions(programNode);
-    new SymbolAccumulatorService().registerVariablesInProgram(programNode);
+    new SymbolAccumulator().registerVariablesInProgram(programNode);
     List<VariableNode> nodesLevel01 = getVariables(programNode);
     checkNames(nodesLevel01, "Level-01", "Level-66");
   }
@@ -169,7 +167,7 @@ class SectionNodeProcessorHelperTest {
     List<ValueClause> valueClauses =
         ImmutableList.of(
             new ValueClause(ImmutableList.of(new ValueInterval("", "", "thru")), LOCALITY));
-    Node programNode = new ProgramNode(LOCALITY);
+    Node programNode = new ProgramNode(LOCALITY, ProgramSubtype.Program, 0);
     // 01 Level-01
     //      88 Cond-1
     //    05 Level-05-1
@@ -208,7 +206,7 @@ class SectionNodeProcessorHelperTest {
             .variableNameAndLocality(new VariableNameAndLocality("Level-05-2", LOCALITY))
             .build());
     SectionNodeProcessorHelper.processNodeWithVariableDefinitions(programNode);
-    new SymbolAccumulatorService().registerVariablesInProgram(programNode);
+    new SymbolAccumulator().registerVariablesInProgram(programNode);
     List<VariableNode> nodesLevel01 = getVariables(programNode);
     checkNames(nodesLevel01, "Level-01");
     List<VariableNode> nodesUnder01 = getVariables(nodesLevel01.get(0));

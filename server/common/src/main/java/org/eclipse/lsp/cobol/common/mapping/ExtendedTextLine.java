@@ -14,28 +14,33 @@
  */
 package org.eclipse.lsp.cobol.common.mapping;
 
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-/**
- * Extended Text Line with symbols
- */
+/** Extended Text Line with symbols */
 public class ExtendedTextLine {
-  @Getter
-  private final List<MappedCharacter> characters = new ArrayList<>();
+  @Getter private final List<MappedCharacter> characters = new ArrayList<>();
 
-  private ExtendedTextLine() {
-  }
+  private ExtendedTextLine() {}
 
   ExtendedTextLine(String line, Location instantLocation, String uri) {
     for (int i = 0; i < line.length(); i++) {
       char character = line.charAt(i);
       checkCharacter(character);
-      characters.add(new MappedCharacter(character, null, uri, this, instantLocation, new HashMap<>()));
+      characters.add(new MappedCharacter(character, null, uri, this, instantLocation, null));
+    }
+  }
+
+  ExtendedTextLine(String line, Location instantLocation) {
+    for (int i = 0; i < line.length(); i++) {
+      char character = line.charAt(i);
+      checkCharacter(character);
+      characters.add(
+          new MappedCharacter(
+              character, null, instantLocation.getUri(), this, instantLocation, null));
     }
   }
 
@@ -48,12 +53,13 @@ public class ExtendedTextLine {
       char character = line.charAt(i);
       checkCharacter(character);
       Position position = new Position(start.getLine(), start.getCharacter() + i);
-      characters.add(new MappedCharacter(character, position, uri, this, null, new HashMap<>()));
+      characters.add(new MappedCharacter(character, position, uri, this, null, null));
     }
   }
 
   /**
    * Returns size of the line
+   *
    * @return the size
    */
   int size() {
@@ -62,6 +68,7 @@ public class ExtendedTextLine {
 
   /**
    * Returns character for given position
+   *
    * @param position - position of the character in the line
    * @return a character at the given position
    */
@@ -79,16 +86,18 @@ public class ExtendedTextLine {
   }
 
   /**
-   * Removes characters from line
+   * Removes characters from line. [start, end)
+   *
    * @param start - start position
-   * @param end - end position
+   * @param end - end position exclusive
    */
   void delete(int start, int end) {
-    characters.subList(start, Math.min(characters.size(), end + 1)).clear();
+    characters.subList(start, Math.min(characters.size(), end)).clear();
   }
 
   /**
    * Trim characters
+   *
    * @param pos - position to start trimming
    */
   void trim(int pos) {
@@ -99,6 +108,7 @@ public class ExtendedTextLine {
 
   /**
    * Insert new text line to the given character position
+   *
    * @param pos - character position for insert, text will be inserted before this position
    * @param line - Extended Text Line
    */
@@ -109,13 +119,16 @@ public class ExtendedTextLine {
 
   /**
    * Creates a new line objects with characters in the given range
+   *
    * @param start - start position of the range
    * @param end - end position of the range
    * @return a new line object
    */
   ExtendedTextLine subline(int start, int end) {
-    List<MappedCharacter> newCharacters = characters.subList(start, end + 1).stream()
-        .map(MappedCharacter::shadowCopy).collect(Collectors.toList());
+    List<MappedCharacter> newCharacters =
+        characters.subList(start, end + 1).stream()
+            .map(MappedCharacter::shadowCopy)
+            .collect(Collectors.toList());
 
     ExtendedTextLine result = new ExtendedTextLine();
     result.characters.addAll(newCharacters);
@@ -125,6 +138,7 @@ public class ExtendedTextLine {
 
   /**
    * Appends the line with given line
+   *
    * @param line - line that will be added to the end of this line
    */
   public void append(ExtendedTextLine line) {
@@ -133,23 +147,43 @@ public class ExtendedTextLine {
   }
 
   /**
-   * Clears the line from start to end position
+   * Clears the line from start to end position. [start, end)
+   *
    * @param start - start position
-   * @param end - end position
+   * @param end - end position exclusive
    */
   void clear(int start, int end) {
-    characters.subList(start, Math.min(end + 1, characters.size())).forEach(c -> c.setCharacter(' '));
+    characters.subList(start, Math.min(end, characters.size())).forEach(c -> c.setCharacter(' '));
+  }
+
+  /** Clears whole line */
+  void clear() {
+    clear(0, size());
   }
 
   /**
-   * Clears whole line
+   * Fill area. [start, end)
+   *
+   * @param start - start position
+   * @param end - end position exclusive
+   * @param c - character to fill the area with
    */
-  void clear() {
-    clear(0, size() - 1);
+  void fillArea(int start, int end, char c) {
+    characters.subList(start, Math.min(end, characters.size())).forEach(l -> l.setCharacter(c));
+  }
+
+  /**
+   * Fill line
+   *
+   * @param c - character to fill the area with
+   */
+  void fillLine(char c) {
+    fillArea(0, size(), c);
   }
 
   /**
    * Creates a shadow copy of the line object
+   *
    * @return a line object
    */
   ExtendedTextLine shadowCopy() {
@@ -161,17 +195,16 @@ public class ExtendedTextLine {
 
   /**
    * Add spaces to the beginning of the line
+   *
    * @param character - a padding position
    */
   void addPadding(int character) {
     for (int i = 0; i < character; i++) {
-      characters.add(0, new MappedCharacter(' ', new Position(0, 0), "", this, null, new HashMap<>()));
+      characters.add(0, new MappedCharacter(' ', new Position(0, 0), "", this, null, null));
     }
   }
 
-  /**
-   * Trim spaces from the beginning of the line
-   */
+  /** Trim spaces from the beginning of the line */
   void trim() {
     while (characters.size() > 0 && characters.get(0).getCharacter() == ' ') {
       characters.remove(0);
@@ -180,6 +213,7 @@ public class ExtendedTextLine {
 
   /**
    * Replace characters in the line with given string
+   *
    * @param position - start position for replacement
    * @param line - new string
    */

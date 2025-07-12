@@ -18,21 +18,20 @@ options {tokenVocab = CompilerDirectivesLexer;}
 compilerOptions: compilerOption | (compilerOption COMMACHAR compilerOptions)+;
 compilerOption
     : deprecatedCompilerOptions
-    | compilerXOpts
-    | cicsTranslatorCompileDirectivedKeywords
+    | cicsTranslatorDirectives
     | cobolCompilerOption
     ;
 
-// compiler options
-compilerXOpts
-       : XOPTS LPARENCHAR compilerXOptsOption (COMMACHAR? compilerXOptsOption)* RPARENCHAR
-       ;
+// compiler translator options
+cicsTranslatorDirectives: (CICS | XOPTS | XOPT) LPARENCHAR (cicsTranslatorOptions | LITERAL ) (COMMACHAR? cicsTranslatorOptions)* RPARENCHAR;
 
-compilerXOptsOption
+cicsTranslatorOptions
        : APOST
        | CBLCARD
        | CICS
+       | CO2
        | COBOL2
+       | CO3
        | COBOL3
        | CPSM
        | DBCS
@@ -44,6 +43,7 @@ compilerXOptsOption
        | ((FLAG | F_CHAR) LPARENCHAR (E_CHAR | I_CHAR | S_CHAR | U_CHAR | W_CHAR) (COMMACHAR (E_CHAR | I_CHAR | S_CHAR | U_CHAR | W_CHAR))? RPARENCHAR)
        | LENGTH
        | ((LINECOUNT | LC) LPARENCHAR INTEGERLITERAL RPARENCHAR)
+       | LIN
        | LINKAGE
        | NATLANG
        | NOCBLCARD
@@ -59,7 +59,9 @@ compilerXOptsOption
        | NOSPIE
        | NOVBREF
        | NUM
+       | OP
        | OPTIONS
+       | Q_CHAR
        | QUOTE
        | SEQ
        | SP
@@ -69,32 +71,26 @@ compilerXOptsOption
        | VBREF
        ;
 
-cicsTranslatorCompileDirectivedKeywords
-       : CBLCARD | COBOL2 | COBOL3 | CPSM | DLI | EDF | EXCI | FEPI | NATLANG | NOCBLCARD | NOCPSM | NODEBUG | NOEDF
-       | NOFEPI | NOLENGTH | NOLINKAGE | NOOPTIONS | NOSPIE | OPTIONS | SP | SPIE | SYSEIB
-       ;
-
 deprecatedCompilerOptions:
+            unSupportedDeprecatedCompilerDirectives
+            | optionalDeprecatedCompilerDirectives
+            | compilableSupportedDeprecatedCompilerDirectives
+        ;
+
+unSupportedDeprecatedCompilerDirectives:
             CPP
-           | (DATEPROC | DP) (LPARENCHAR (FLAG | NOFLAG)? COMMACHAR? (TRIG | NOTRIG)? RPARENCHAR)?
            | EPILOG
            | GDS
            | GRAPHIC
            | LEASM
-           | LIB
            | LIN
            | MARGINS LPARENCHAR LITERAL COMMACHAR LITERAL (COMMACHAR LITERAL)? RPARENCHAR
            | NATLANG LPARENCHAR (CS | EN | KA) RPARENCHAR
-           | NUMPROC LPARENCHAR MIG RPARENCHAR
            | NOCMPR2
-           | (NODATEPROC | NODP)
            | NODE
            | NOEPILOG
-           | NOFLAGMIG
            | NOGRAPHIC
-           | NOLIB
            | NOOPSEQUENCE
-           | (NOOPTIMIZE | NOOPT)
            | NOP
            | NOPROLOG
            | NOSTDTRUNC
@@ -104,9 +100,23 @@ deprecatedCompilerOptions:
            | OP
            | PROLOG
            | RES
-           | (SIZE | SZ) LPARENCHAR (MAX | LITERAL) RPARENCHAR
-           | (YEARWINDOW | YW) LPARENCHAR LITERAL RPARENCHAR
         ;
+
+optionalDeprecatedCompilerDirectives:
+           LIB
+           | (NOOPTIMIZE | NOOPT)
+           | (SIZE | SZ) LPARENCHAR (MAX | LITERAL) RPARENCHAR
+           | NOFLAGMIG
+           | FLAGMIG
+           ;
+
+compilableSupportedDeprecatedCompilerDirectives:
+            NUMPROC LPARENCHAR MIG RPARENCHAR
+            | (NODATEPROC | NODP)
+            | (DATEPROC | DP) (LPARENCHAR (FLAG | NOFLAG)? COMMACHAR? (TRIG | NOTRIG)? RPARENCHAR)?
+            | NOLIB
+            | (YEARWINDOW | YW) LPARENCHAR LITERAL RPARENCHAR
+            ;
 
 cobolCompilerOption
    : ADATA | NOADATA
@@ -184,7 +194,7 @@ cobolCompilerOption
    | SQL (LPARENCHAR LITERAL RPARENCHAR)? | NOSQL
    | SQLCCSID | SQLC | NOSQLCCSID | NOSQLC
    | SQLIMS (LPARENCHAR LITERAL RPARENCHAR)? | NOSQLIMS
-   | (SSRANGE | SSR) LPARENCHAR (ssrangeSuboptions (COMMACHAR ssrangeSuboptions)*)? RPARENCHAR | (NOSSRANGE | NOSSR)
+   | (SSRANGE | SSR) (LPARENCHAR ssrangeSuboptions (COMMACHAR ssrangeSuboptions)* RPARENCHAR)? | (NOSSRANGE | NOSSR)
    | STGOPT | SO | NOSTGOPT | NOSO
    | SUPPRESS | SUPP | NOSUPPRESS | NOSUPP
    | TERMINAL | TERM | NOTERMINAL | NOTERM

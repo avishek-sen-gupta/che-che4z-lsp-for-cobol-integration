@@ -26,9 +26,11 @@ import org.eclipse.lsp.cobol.dialects.idms.IdmsDialect;
 public class DialectConfigs {
   public AnalysisConfig getIDMSAnalysisConfig() {
     return new AnalysisConfig(
-            CopybookProcessingMode.DISABLED,
-        ImmutableList.of(IdmsDialect.NAME), true,
-        ImmutableList.of(),
-        ImmutableMap.of());
+        CopybookProcessingMode.DISABLED,
+        ImmutableList.of(IdmsDialect.NAME),
+        true,
+            ImmutableMap.of(), false,
+        ImmutableList.of()
+    );
   }
 }

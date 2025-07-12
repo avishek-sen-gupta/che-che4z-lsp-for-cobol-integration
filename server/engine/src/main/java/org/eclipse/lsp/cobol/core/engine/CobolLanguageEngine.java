@@ -19,6 +19,7 @@ import static java.util.stream.Collectors.toList;
 import static org.eclipse.lsp.cobol.common.error.ErrorSource.WORKSPACE_SETTINGS;
 import static org.eclipse.lsp.cobol.common.model.NodeType.COPY;
 import static org.eclipse.lsp.cobol.common.model.tree.Node.hasType;
+import static org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService.TOLERATED_ERRORS;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
@@ -29,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.common.*;
 import org.eclipse.lsp.cobol.common.benchmark.BenchmarkService;
 import org.eclipse.lsp.cobol.common.benchmark.BenchmarkSession;
+import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.common.dialects.TrueDialectService;
 import org.eclipse.lsp.cobol.common.error.ErrorCodes;
 import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
@@ -36,16 +38,14 @@ import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.mapping.OriginalLocation;
 import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.model.tree.CopyNode;
-import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.RootNode;
+import org.eclipse.lsp.cobol.common.pipeline.Pipeline;
+import org.eclipse.lsp.cobol.common.pipeline.PipelineResult;
+import org.eclipse.lsp.cobol.common.pipeline.StageResult;
 import org.eclipse.lsp.cobol.common.utils.ImplicitCodeUtils;
 import org.eclipse.lsp.cobol.common.utils.ThreadInterruptionUtil;
 import org.eclipse.lsp.cobol.core.engine.analysis.AnalysisContext;
 import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
-import org.eclipse.lsp.cobol.common.pipeline.Pipeline;
-import org.eclipse.lsp.cobol.common.pipeline.PipelineResult;
-import org.eclipse.lsp.cobol.common.pipeline.StageResult;
-import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.dialects.ibm.ProcessingResult;
 import org.eclipse.lsp.cobol.lsp.handlers.HandlerUtility;
 import org.eclipse.lsp.cobol.service.utils.ServerTypeUtil;
@@ -83,7 +83,7 @@ public class CobolLanguageEngine {
 
   private static AnalysisResult toAnalysisResult(
       ResultWithErrors<AnalysisResult> result, String uri) {
-    Node rootNode = result.getResult().getRootNode();
+    RootNode rootNode = result.getResult().getRootNode();
 
     List<String> copyUriList =
         rootNode
@@ -127,18 +127,21 @@ public class CobolLanguageEngine {
   /**
    * Perform syntax and semantic analysis for the given text document
    *
-   * @param documentUri    unique resource identifier of the processed document
-   * @param text           the content of the document that should be processed
+   * @param documentUri unique resource identifier of the processed document
+   * @param text the content of the document that should be processed
    * @param analysisConfig contains analysis processing features info and copybook config with
-   *                       following information: target backend sql server, copybook processing mode which reflect
-   *                       the sync status of the document (DID_OPEN|DID_CHANGE)
-   * @param languageId     language identifier
+   *     following information: target backend sql server, copybook processing mode which reflect
+   *     the sync status of the document (DID_OPEN|DID_CHANGE)
+   * @param languageId language identifier
    * @return Semantic information wrapper object and list of syntax error that might send back to
-   * the client
+   *     the client
    */
   @NonNull
   public AnalysisResult run(
-          @NonNull String documentUri, @NonNull String text, @NonNull AnalysisConfig analysisConfig, CobolLanguageId languageId) {
+      @NonNull String documentUri,
+      @NonNull String text,
+      @NonNull AnalysisConfig analysisConfig,
+      CobolLanguageId languageId) {
     ThreadInterruptionUtil.checkThreadInterrupted();
     if (shouldNotAnalyse(text, languageId)) {
       return AnalysisResult.builder().build();
@@ -150,7 +153,8 @@ public class CobolLanguageEngine {
     }
 
     BenchmarkSession session = benchmarkService.startSession();
-    AnalysisContext ctx = new AnalysisContext(analysisConfig, session, documentUri, text, languageId);
+    AnalysisContext ctx =
+        new AnalysisContext(null, analysisConfig, session, documentUri, text, languageId);
 
     Pipeline pipeline = trueDialectService.getPipeline(languageId);
 
@@ -163,6 +167,7 @@ public class CobolLanguageEngine {
     session.attr("size", String.valueOf(ctx.getExtendedDocument().toString().length()));
     session.attr("result", result.stopProcessing() ? "stopped" : "done");
     benchmarkService.logTiming();
+    benchmarkService.endSession(documentUri);
     if (result.stopProcessing() || !(result.getData() instanceof ProcessingResult)) {
       return toAnalysisResult(
           new ResultWithErrors<>(
@@ -171,6 +176,7 @@ public class CobolLanguageEngine {
                   .symbolTableMap(ImmutableMap.of())
                   .build(),
               ctx.getAccumulatedErrors().stream()
+                  .filter(err -> errorFinalizerService.keepDiagnotics(err, TOLERATED_ERRORS))
                   .map(errorFinalizerService::localizeErrorMessage)
                   .collect(toList())),
           documentUri);
@@ -185,6 +191,7 @@ public class CobolLanguageEngine {
                   .symbolTableMap(processingResult.getSymbolTableMap())
                   .build(),
               ctx.getAccumulatedErrors().stream()
+                  .filter(err -> errorFinalizerService.keepDiagnotics(err, TOLERATED_ERRORS))
                   .map(errorFinalizerService::localizeErrorMessage)
                   .collect(toList())),
           documentUri);

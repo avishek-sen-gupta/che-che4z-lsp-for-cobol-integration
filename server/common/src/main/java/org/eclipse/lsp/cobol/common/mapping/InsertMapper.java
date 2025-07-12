@@ -14,22 +14,34 @@
  */
 package org.eclipse.lsp.cobol.common.mapping;
 
+import java.util.Map;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Range;
 
-/**
- * Handle insert mapping situations
- */
+/** Handle insert mapping situations */
 class InsertMapper implements Mapper {
   @Override
-  public Location apply(MappedCharacter startCharacter, MappedCharacter endCharacter) {
-    if (startCharacter != null && !startCharacter.getUri().equals(endCharacter.getUri()) && startCharacter.getOriginalPosition() != null) {
-      Location location = endCharacter.getInitialLocationMap().get(startCharacter.getUri());
-      if (location != null) {
-        return new Location(startCharacter.getUri(), new Range(startCharacter.getOriginalPosition(), location.getRange().getEnd()));
-      }
-      return new Location(startCharacter.getUri(), new Range(startCharacter.getOriginalPosition(), startCharacter.getOriginalPosition()));
+  public boolean canApply(MappedCharacter startCharacter, MappedCharacter endCharacter) {
+    if (startCharacter == null || endCharacter == null) {
+      return false;
     }
-    return null;
+    if (startCharacter.getOriginalPosition() == null) {
+      return false;
+    }
+    return !startCharacter.getUri().equals(endCharacter.getUri());
+  }
+
+  @Override
+  public Location apply(MappedCharacter startCharacter, MappedCharacter endCharacter) {
+    Map<String, Location> ilm = endCharacter.getInitialLocationMap();
+    Location location = ilm != null ? ilm.get(startCharacter.getUri()) : null;
+    if (location != null) {
+      return new Location(
+          startCharacter.getUri(),
+          new Range(startCharacter.getOriginalPosition(), location.getRange().getEnd()));
+    }
+    return new Location(
+        startCharacter.getUri(),
+        new Range(startCharacter.getOriginalPosition(), startCharacter.getOriginalPosition()));
   }
 }

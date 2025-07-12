@@ -14,15 +14,13 @@
  */
 package org.eclipse.lsp.cobol.common.mapping;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.eclipse.lsp4j.Position;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-/**
- * Test for ExtendedTextLine
- */
+/** Test for ExtendedTextLine */
 class ExtendedTextLineTest {
   @Test
   void testToString() {
@@ -62,7 +60,7 @@ class ExtendedTextLineTest {
   @Test
   void testDelete() {
     ExtendedTextLine line = new ExtendedTextLine("text DELETE end", 5, "uri");
-    line.delete(5, 10);
+    line.delete(5, 11);
     assertEquals("text  end", line.toString());
   }
 
@@ -81,16 +79,19 @@ class ExtendedTextLineTest {
 
   @Test
   void testNewLineCharacter() {
-    RuntimeException thrown = Assertions.assertThrows(RuntimeException.class, () -> {
-      new ExtendedTextLine("text \r\n end", 6, "uri");
-    });
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> {
+              new ExtendedTextLine("text \r\n end", 6, "uri");
+            });
     Assertions.assertEquals("Text line contains a new line characters", thrown.getMessage());
   }
 
   @Test
   void testClear() {
     ExtendedTextLine line = new ExtendedTextLine("text end", 7, "uri");
-    line.clear(2, 5);
+    line.clear(2, 6);
     assertEquals("te    nd", line.toString());
   }
 

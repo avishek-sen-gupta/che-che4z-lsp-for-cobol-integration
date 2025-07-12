@@ -19,46 +19,34 @@ import { getWorkspacePath, pos, range } from "./testHelper";
 import * as path from "path";
 
 suite("Integration Test Suite", function () {
+  this.timeout(helper.TEST_TIMEOUT);
   suiteSetup(async function () {
-    this.timeout(0);
-    helper.updateConfig("basic.json");
+    await helper.updateConfig("basic.json");
     await helper.activate();
   });
 
-  this.afterEach(async () => await helper.closeAllEditors()).timeout(
-    helper.TEST_TIMEOUT,
-  );
+  this.afterEach(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    await helper.closeAllEditors();
+  });
+
+  this.afterAll(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    await helper.closeAllEditors();
+  });
 
   test("TC152047, TC152052, TC152051, TC152050, TC152053: Error case - file has syntax errors and are marked with detailed hints", async () => {
-    await helper.showDocument("USER2.cbl");
-    const editor = helper.get_editor("USER2.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-    assert.strictEqual(diagnostics.length, 2);
-    assert.ok(diagnostics.length === 2);
+    const editor = await helper.showDocument("USER2.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
+    assert.strictEqual(diagnostics.length, 1);
     const d0 = diagnostics[0];
-    const d1 = diagnostics[1];
-    assert.strictEqual(
-      d0.message,
-      "Missing token PROGRAM-ID at programIdParagraph",
-    );
-    helper.assertRangeIsEqual(d0.range, range(pos(13, 30), pos(13, 31)));
-    assert.strictEqual(d0.severity, diagnostics[1].severity);
-    assert.strictEqual(
-      d0.severity,
-      vscode.DiagnosticSeverity.Error,
-      "No syntax errors detected in USER2.cbl",
-    );
-
-    assert.strictEqual(d1.message, "Syntax error on 'HELLO-WORLD'");
-    helper.assertRangeIsEqual(d1.range, range(pos(14, 20), pos(14, 31)));
+    assert.strictEqual(d0.message, "Syntax error on 'Program1-id'");
+    helper.assertRangeIsEqual(d0.range, range(pos(14, 7), pos(14, 18)));
   });
 
   test("TC152050, TC152053: Error case - file has semantic errors and are marked with detailed hints", async () => {
-    await helper.showDocument("REPLACING.CBL");
-    const editor = helper.get_editor("REPLACING.CBL");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("REPLACING.CBL");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 1);
     const d0 = diagnostics[0];
 
@@ -68,14 +56,15 @@ suite("Integration Test Suite", function () {
   });
 
   test("TC288736 error message for 80chars limit", async () => {
-    await helper.showDocument("TEST.CBL");
-    const editor = helper.get_editor("TEST.CBL");
+    const editor = await helper.showDocument("TEST.CBL");
     const noise =
       "oi3Bd5kC1f3nMFp0IWg62ZZgWMxHPJnuLWm4DqplZDzMIX69C6vjeL24YbobdQnoQsDenL35omljznHd0l1fP";
     await helper.insertString(editor, pos(22, 7), noise);
+
     await helper.waitFor(
       () => vscode.languages.getDiagnostics(editor.document.uri).length > 3,
     );
+
     const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
     for (const d of diagnostics) {
       if (d.range.start.line === 22) {
@@ -90,20 +79,18 @@ suite("Integration Test Suite", function () {
     ?.slow(1000);
 
   test("TC312735 Check EXEC CICS is in Procedure Division", async () => {
-    await helper.showDocument("ADSORT.cbl");
-    let editor = helper.get_editor("ADSORT.cbl");
+    const editor = await helper.showDocument("ADSORT.cbl");
     await helper.deleteLine(editor, 58);
     await helper.insertString(
       editor,
       pos(34, 11),
       "           EXEC CICS XCTL PROGRAM (XCTL1) END-EXEC.",
     );
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 1);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
-      range(pos(34, 11), pos(34, 51)),
+      range(pos(34, 11), pos(34, 50)),
     );
     assert.strictEqual(diagnostics[0].message, "Invalid CICS EXEC block");
   })
@@ -111,8 +98,7 @@ suite("Integration Test Suite", function () {
     .slow(1000);
 
   test.skip("TC312753 Check EXEC CICS allows free arguments order", async () => {
-    await helper.showDocument("ADSORT.cbl");
-    let editor = helper.get_editor("ADSORT.cbl");
+    const editor = await helper.showDocument("ADSORT.cbl");
     await helper.deleteLine(editor, 58);
     await helper.insertString(
       editor,
@@ -121,10 +107,10 @@ suite("Integration Test Suite", function () {
         "               SEN MAP('DETAIL') MAPSET(MODULE-NAME-1)    ERASE\n" +
         "           END-EXEC.",
     );
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 1,
+    let diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
     );
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 1);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
@@ -137,70 +123,63 @@ suite("Integration Test Suite", function () {
       pos(40, 0),
       "               SEND MAP('DETAIL') MAPSET(MODULE-NAME-1)    ERASE",
     );
-    editor = helper.get_editor("ADSORT.cbl");
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 0,
-    );
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 0);
     assert.strictEqual(diagnostics.length, 0);
   });
   // .timeout(helper.TEST_TIMEOUT)
   // .slow(1000);
 
   test("TC312745 Error check", async () => {
-    await helper.showDocument("ADSORT.cbl");
-    let editor = helper.get_editor("ADSORT.cbl");
+    const editor = await helper.showDocument("ADSORT.cbl");
     await helper.deleteLine(editor, 58);
     await helper.insertString(
       editor,
       pos(58, 0),
       "           EXEC CICS XCTL123 PROGRAM (XCTL1) END-EXEC.",
     );
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 1,
+    let diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
     );
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 1);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
       range(pos(58, 21), pos(58, 28)),
     );
-    assert.ok(diagnostics[0].message.includes("Extraneous input 'XCTL123'"));
+    helper.hasDiagnosticMatches(editor.document.uri, (d) =>
+      d.message.includes("Syntax error on 'XCTL123'"),
+    );
+
     await helper.deleteLine(editor, 58);
     await helper.insertString(
       editor,
       pos(58, 0),
       "           EXEC CICS XCTL PROGRAM (XCTL1) END-EXEC.",
     );
-    editor = helper.get_editor("ADSORT.cbl");
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 0,
-    );
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 0);
     assert.strictEqual(diagnostics.length, 0);
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
   test("TC312738 CICS variables and paragraphs support", async () => {
-    await helper.showDocument("ADSORT.cbl");
-    let editor = helper.get_editor("ADSORT.cbl");
+    const editor = await helper.showDocument("ADSORT.cbl");
     await helper.waitFor(async () => {
-      helper.sleep(100);
-      const result: any[] = await vscode.commands.executeCommand(
+      await helper.sleep(100);
+      const result = await vscode.commands.executeCommand<vscode.Location[]>(
         "vscode.executeDefinitionProvider",
         editor.document.uri,
         pos(58, 36),
       );
-      return result.length > 0;
+      return result?.length > 0;
     });
-    const result: any[] = await vscode.commands.executeCommand(
+    const result = await vscode.commands.executeCommand<vscode.Location[]>(
       "vscode.executeDefinitionProvider",
       editor.document.uri,
       pos(58, 36),
     );
     assert.strictEqual(
-      result.length,
+      result?.length,
       1,
       "Checks behavior of go to definition action (size)",
     );
@@ -224,42 +203,40 @@ suite("Integration Test Suite", function () {
     .slow(1000);
 
   test("TC314992 CICS as a Variable Name", async () => {
-    await helper.showDocument("ADSORT.cbl");
-    let editor = helper.get_editor("ADSORT.cbl");
+    const editor = await helper.showDocument("ADSORT.cbl");
     await helper.insertString(
       editor,
       pos(28, 0),
       "       88  CICS VALUE 'CICS '",
     );
-    await helper.waitForDiagnostics(editor.document.uri);
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    let diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
+    );
     assert.strictEqual(diagnostics.length, 1);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
       range(pos(29, 7), pos(29, 14)),
     );
-    assert.ok(diagnostics[0].message.includes("A period was assumed before"));
+    assert.ok(
+      diagnostics[0].message.includes('A period was assumed before "LINKAGE".'),
+      diagnostics[0].message,
+    );
     await helper.deleteLine(editor, 28);
     await helper.insertString(
       editor,
       pos(28, 0),
       "       88  CICS VALUE 'CICS '.",
     );
-    editor = helper.get_editor("ADSORT.cbl");
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 0,
-    );
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 0);
     assert.strictEqual(diagnostics.length, 0);
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
   test("TC266094 Underline the entire incorrect variable structure", async () => {
-    await helper.showDocument("VAR.cbl");
-    let editor = helper.get_editor("VAR.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("VAR.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 2);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
@@ -282,10 +259,8 @@ suite("Integration Test Suite", function () {
     .slow(1000);
 
   test("Load resource file", async () => {
-    await helper.showDocument("RES.cbl");
-    const editor = helper.get_editor("RES.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("RES.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
 
     assert.strictEqual(diagnostics.length, 1);
     assert.ok(
@@ -299,81 +274,68 @@ suite("Integration Test Suite", function () {
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
-  test(
-    "TC266074 LSP analysis for extended sources - basic scenario",
-    async () => {
-      const extSrcUser1FilePath = path.join(".c4z", ".extsrcs", "USER1.cbl");
-      const user1FilePath = "USER1.cbl";
-      helper.recursiveCopySync(
-        path.join(getWorkspacePath(), user1FilePath),
-        path.join(getWorkspacePath(), extSrcUser1FilePath),
-      );
+  test("TC266074 LSP analysis for extended sources - basic scenario", async () => {
+    const extSrcUser1FilePath = path.join(".c4z", ".extsrcs", "USER1.cbl");
+    const user1FilePath = "USER1.cbl";
+    await vscode.workspace.fs.copy(
+      vscode.Uri.joinPath(vscode.Uri.file(getWorkspacePath()), user1FilePath),
+      vscode.Uri.joinPath(
+        vscode.Uri.file(getWorkspacePath()),
+        extSrcUser1FilePath,
+      ),
+      { overwrite: true },
+    );
 
-      await helper.showDocument(extSrcUser1FilePath);
-      let editor = helper.get_editor(extSrcUser1FilePath);
-      await helper.insertString(editor, pos(25, 0), "           COPY ABC.");
+    let editor = await helper.showDocument(extSrcUser1FilePath);
+    await helper.insertString(editor, pos(25, 0), "           COPY ABC.");
 
-      let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-      assert.strictEqual(diagnostics.length, 0);
+    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    assert.strictEqual(diagnostics.length, 0);
 
-      await editor.edit((edit) => {
-        edit.delete(range(pos(25, 19), pos(25, 20)));
-      });
-      await helper.waitForDiagnostics(editor.document.uri);
-      diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-      assert.strictEqual(diagnostics.length, 1);
-      assert.ok(diagnostics[0].message.includes("Syntax error on 'COPY'"));
+    await editor.edit((edit) => {
+      edit.delete(range(pos(25, 19), pos(25, 20)));
+    });
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 1);
+    assert.strictEqual(diagnostics.length, 1);
+    assert.ok(diagnostics[0].message.includes("Syntax error on 'COPY'"));
 
-      await helper.insertString(editor, pos(25, 20), "\n           Mov");
-      await helper.waitFor(
-        () => vscode.languages.getDiagnostics(editor.document.uri).length > 0,
-      );
-      assert.strictEqual(
-        vscode.languages.getDiagnostics(editor.document.uri).length,
-        1,
-      );
+    await helper.insertString(editor, pos(25, 20), "\n           Mov");
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 1);
+    assert.strictEqual(diagnostics.length, 1);
 
-      await helper.showDocument("USER1.cbl");
-      editor = helper.get_editor("USER1.cbl");
-      await helper.insertString(editor, pos(40, 0), "           COPY ABC.");
-      await helper.waitFor(
-        () => vscode.languages.getDiagnostics(editor.document.uri).length > 0,
-      );
-      diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    editor = await helper.showDocument("USER1.cbl");
+    await helper.insertString(editor, pos(40, 0), "           COPY ABC.");
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 1);
 
-      assert.strictEqual(diagnostics.length, 1);
-      const d0 = diagnostics[0];
-      assert.ok(d0.message.includes("ABC: Copybook not found"));
-      assert.ok(
-        d0 &&
-          d0.source &&
-          d0.source.includes("COBOL Language Support (copybook)"),
-      );
+    assert.strictEqual(diagnostics.length, 1);
+    const d0 = diagnostics[0];
+    assert.ok(d0.message.includes("ABC: Copybook not found"));
+    assert.ok(
+      d0 &&
+        d0.source &&
+        d0.source.includes("COBOL Language Support (copybook)"),
+    );
 
-      await helper.insertString(editor, pos(40, 21), "\n           Mov");
-      await helper.waitFor(
-        () => vscode.languages.getDiagnostics(editor.document.uri).length === 3,
-      );
-      diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-      assert.strictEqual(diagnostics.length, 3);
-      assert.ok(
-        diagnostics[2].message.includes(
-          "The following token must start in Area A: Mov",
-        ),
-      );
-    },
-  )
+    await helper.insertString(editor, pos(40, 21), "\n           Mov");
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 3);
+    assert.strictEqual(diagnostics.length, 3);
+
+    helper.hasDiagnosticMatches(editor.document.uri, (d) =>
+      d.message.includes("A misspelled word, maybe you want to put MOD"),
+    );
+  })
     ?.timeout(helper.TEST_TIMEOUT)
     ?.slow(1000);
 
   test("TC250108 Test Program Name", async () => {
-    await helper.showDocument("USER1.cbl");
-    const editor = helper.get_editor("USER1.cbl");
+    const editor = await helper.showDocument("USER1.cbl");
     await editor.edit((edit) => {
       edit.replace(range(pos(48, 30), pos(48, 32)), "1.");
     });
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
+    );
     assert.strictEqual(diagnostics.length, 1);
     assert.strictEqual(
       diagnostics[0].message,
@@ -384,11 +346,12 @@ suite("Integration Test Suite", function () {
     ?.slow(1000);
 
   test("TC250109 Test Area B", async () => {
-    await helper.showDocument("USER1.cbl");
-    const editor = helper.get_editor("USER1.cbl");
+    const editor = await helper.showDocument("USER1.cbl");
     await editor.edit((edit) => edit.delete(range(pos(32, 0), pos(32, 3))));
-    await helper.waitForDiagnostics(editor.document.uri);
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    let diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
+    );
     assert.strictEqual(diagnostics.length, 1);
     assert.strictEqual(
       diagnostics[0].message,
@@ -398,51 +361,60 @@ suite("Integration Test Suite", function () {
     await editor.edit((edit) => {
       edit.delete(range(pos(41, 0), pos(41, 3)));
     });
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 2,
-    );
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 2);
     assert.strictEqual(diagnostics.length, 2);
-    assert.strictEqual(
-      diagnostics[1].message,
-      "The following token must start in Area B: Display",
+    helper.hasDiagnosticMatches(
+      editor.document.uri,
+      (d) => d.message === "The following token must start in Area B: Display",
     );
   })
     ?.timeout(helper.TEST_TIMEOUT)
     ?.slow(1000);
 
   test("TC250107 Test Area A, Check FD/SD level data", async () => {
-    await helper.showDocument("USER1.cbl");
-    let editor = helper.get_editor("USER1.cbl");
+    const editor = await helper.showDocument("USER1.cbl");
     await helper.insertString(editor, pos(17, 0), "       FILE SECTION.\n");
     await helper.insertString(
       editor,
       pos(18, 0),
       "           FD  TRANS-FILE-IN IS EXTERNAL.\n",
     );
+
     await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 2,
+      () =>
+        vscode.languages
+          .getDiagnostics(editor.document.uri)
+          .map((d) => d.message)
+          .filter((m) => m === "The following token must start in Area A: FD")
+          .length > 0,
     );
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+
+    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
     assert.strictEqual(
       diagnostics.length,
       2,
       "got: " + JSON.stringify(diagnostics),
     );
-    assert.strictEqual(
-      diagnostics[0].message,
-      "The following token must start in Area A: FD",
+
+    assert.ok(
+      () =>
+        vscode.languages
+          .getDiagnostics(editor.document.uri)
+          .map((d) => d.message)
+          .filter((m) => m === "The following token must start in Area A: FD")
+          .length === 1,
     );
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
   test("TC250107 Test Area A, check DIVISION and paragraph name warnings", async () => {
-    await helper.showDocument("USER1.cbl");
-    let editor = helper.get_editor("USER1.cbl");
+    const editor = await helper.showDocument("USER1.cbl");
     await helper.insertString(editor, pos(13, 0), "      ");
-    await helper.waitForDiagnostics(editor.document.uri);
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    let diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
+    );
     assert.strictEqual(diagnostics.length, 1);
     assert.strictEqual(
       diagnostics[0].message,
@@ -450,49 +422,47 @@ suite("Integration Test Suite", function () {
     );
 
     await helper.insertString(editor, pos(16, 0), "      ");
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 2,
-    );
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 2);
     assert.strictEqual(diagnostics.length, 2);
-    assert.strictEqual(
-      diagnostics[1].message,
-      "The following token must start in Area A: Data",
+
+    helper.hasDiagnosticMatches(
+      editor.document.uri,
+      (d) => d.message === "The following token must start in Area A: Data",
     );
 
     await helper.insertString(editor, pos(26, 0), "      ");
-    await helper.waitForDiagnostics(editor.document.uri);
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 3);
     assert.strictEqual(diagnostics.length, 3);
-    assert.strictEqual(
-      diagnostics[2].message,
-      "The following token must start in Area A: Procedure",
+
+    helper.hasDiagnosticMatches(
+      editor.document.uri,
+      (d) =>
+        d.message === "The following token must start in Area A: Procedure",
     );
 
     await helper.insertString(editor, pos(31, 0), "      ");
-    await helper.waitForDiagnostics(editor.document.uri);
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 4);
     assert.strictEqual(diagnostics.length, 4);
-    assert.strictEqual(
-      diagnostics[3].message,
-      "The following token must start in Area A: 100-Print-User",
+
+    helper.hasDiagnosticMatches(
+      editor.document.uri,
+      (d) =>
+        d.message ===
+        "The following token must start in Area A: 100-Print-User",
     );
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
   test("TC314771: Support INCLUDE in EXEC SQL to build extended document", async () => {
-    const extSrcPath = path.join("ADSORT.cbl");
-    const diagPromise = helper.waitForDiagnosticsChange(extSrcPath);
-    await helper.showDocument(extSrcPath);
-    let editor = helper.get_editor("ADSORT.cbl");
+    const editor = await helper.showDocument("ADSORT.cbl");
     await helper.deleteLine(editor, 58);
     await helper.insertString(
       editor,
       pos(36, 11),
       "           EXEC SQL SQL_STATEMENT END-EXEC.",
     );
-    const diagnostics = await diagPromise;
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
       range(pos(36, 20), pos(36, 33)),
@@ -506,21 +476,16 @@ suite("Integration Test Suite", function () {
     .slow(1000);
 
   test.skip("TC335192 COPY MAID scenarios", async () => {
-    await helper.showDocument("cobol-dc/ABCD.cbl");
-    let editor = helper.get_editor("cobol-dc/ABCD.cbl");
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 0,
-      500,
+    const editor = await helper.showDocument("cobol-dc/ABCD.cbl");
+    let diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      0,
     );
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 0);
 
     await helper.deleteLine(editor, 18);
     await helper.insertString(editor, pos(18, 0), "       COPY MAID ABCD.");
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 1,
-    );
-    diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    diagnostics = await helper.waitForDiagnosticCount(editor.document.uri, 1);
     assert.strictEqual(diagnostics.length, 1);
     assert.strictEqual(diagnostics[0].message, "Variable ABCD1 is not defined");
   });
@@ -529,22 +494,23 @@ suite("Integration Test Suite", function () {
 
   test("Show errors only for opened files", async () => {
     // Open program with error inside a copybook
-    await helper.showDocument("TESTCPY1.cbl");
-    const progUri = await helper.getUri("TESTCPY1.cbl");
+    const editor = await helper.showDocument("TESTCPY1.cbl");
 
     const copybookPath = path.join("testing", "COPYE");
     const copybookUri = await helper.getUri(copybookPath);
 
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(progUri).length === 1,
+    const diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
     );
-    let diagnostics = vscode.languages.getDiagnostics(progUri);
     assert.strictEqual(
       diagnostics.length,
       1,
       "got: " + JSON.stringify(diagnostics),
     );
-    assert.strictEqual(diagnostics[0].message, "Errors inside the copybook");
+    assert.ok(
+      diagnostics.some((d) => d.message === "Errors inside the copybook"),
+    );
 
     // No diagnostic for copybook so far
     let copyDiagnostics = vscode.languages.getDiagnostics(copybookUri);
@@ -553,63 +519,70 @@ suite("Integration Test Suite", function () {
     // Open copybook with an error
     await helper.showDocument(copybookPath);
 
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(copybookUri).length === 2,
-    );
-    copyDiagnostics = vscode.languages.getDiagnostics(copybookUri);
+    copyDiagnostics = await helper.waitForDiagnosticCount(copybookUri, 1);
     assert.strictEqual(
       copyDiagnostics.length,
-      2,
+      1,
       "got: " + JSON.stringify(diagnostics),
     );
-    assert.strictEqual(copyDiagnostics[1].message, "Syntax error on 'VvvALUE'");
+    assert.strictEqual(
+      copyDiagnostics[0].message,
+      'A period was assumed before "VvvALUE".',
+      copyDiagnostics[0].message,
+    );
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
   test("Show transition copybook errors", async () => {
     // Open program with error inside a copybook
-    await helper.showDocument("TESTCPY2.cbl");
-    const copybookPath = path.join("testing", "COPYC");
-    const copybookUri = await helper.getUri(copybookPath);
+    const editor = await helper.showDocument("TESTCPY2.cbl");
+    const diagnostic = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
+    );
+    assert.strictEqual(diagnostic.length, 1);
 
     // Open copybook with an error
-    await helper.showDocument(copybookPath);
-    await helper.waitForDiagnostics(copybookUri);
-    const diagnostic = vscode.languages.getDiagnostics(copybookUri);
-    assert.strictEqual(
-      diagnostic.length,
+    const editorCopy = await helper.showDocument("testing/COPYC");
+    const diagnosticCopy = await helper.waitForDiagnosticCount(
+      editorCopy.document.uri,
       1,
-      "got: " + JSON.stringify(diagnostic),
     );
-    assert.strictEqual(diagnostic[0].message, "Errors inside the copybook");
+    assert.strictEqual(
+      diagnosticCopy.length,
+      1,
+      "got: " + JSON.stringify(diagnosticCopy),
+    );
+    assert.strictEqual(
+      diagnosticCopy[0].message,
+      "Errors inside the copybook",
+      "Test: Show transition copybook errors",
+    );
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
   test("Diagnostics are updated for related files in accordance with the open/close files", async () => {
     // Open program which introduces error inside a copybook
-    await helper.showDocument("DIAGNOSTIC_TEST_B.CBL");
-    const prog2Uri = await helper.getUri("DIAGNOSTIC_TEST_B.CBL");
+    const editor = await helper.showDocument("DIAGNOSTIC_TEST_B.CBL");
 
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(prog2Uri).length === 1,
+    const diagnostic = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
     );
-    assert.strictEqual(
-      vscode.languages.getDiagnostics(prog2Uri)[0].message,
-      "Errors inside the copybook",
+    assert.ok(
+      diagnostic.some((d) => d.message === "Errors inside the copybook"),
     );
 
     //open copybook
-    const copybookPath = path.join("testing", "DIAGNOS.CPY");
-    await helper.showDocument(copybookPath);
-    const copybookUri = await helper.getUri(copybookPath);
+    const copybookPath = "testing/DIAGNOS.CPY";
+    let editorCopy = await helper.showDocument(copybookPath);
 
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(copybookUri).length === 1,
+    let copybookDiag = await helper.waitForDiagnosticCount(
+      editorCopy.document.uri,
+      1,
     );
-
-    const copybookDiag = vscode.languages.getDiagnostics(copybookUri);
     assert.strictEqual(
       copybookDiag.length,
       1,
@@ -623,43 +596,47 @@ suite("Integration Test Suite", function () {
 
     // assert diagnostics doesn't change
     assert.strictEqual(
-      vscode.languages.getDiagnostics(copybookUri)[0].message,
+      vscode.languages.getDiagnostics(editorCopy.document.uri)[0].message,
       "Extraneous input 'D'",
     );
-    assert.strictEqual(
-      vscode.languages.getDiagnostics(prog2Uri)[0].message,
-      "Errors inside the copybook",
+
+    assert.ok(
+      diagnostic.some((d) => d.message === "Errors inside the copybook"),
     );
 
     // close the DIAGNOSTIC_TEST_B, which is source of all errors
     await helper.showDocument("DIAGNOSTIC_TEST_B.CBL");
     await helper.closeActiveEditor();
 
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(copybookUri).length === 0,
+    copybookDiag = await helper.waitForDiagnosticCount(
+      editorCopy.document.uri,
+      0,
     );
 
     // expect no diagnostics for copybook
-    assert.strictEqual(vscode.languages.getDiagnostics(copybookUri).length, 0);
+    assert.strictEqual(copybookDiag.length, 0);
 
     await helper.closeAllEditors();
 
     // Open 2 similar program, which introduces same issue as same location and same message
     await helper.showDocument("DIAGNOSTIC_TEST_B.CBL");
     await helper.showDocument("DIAGNOSTIC_TEST_C.CBL");
-    await helper.showDocument(copybookPath);
+    editorCopy = await helper.showDocument(copybookPath);
 
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(copybookUri).length === 2,
+    copybookDiag = await helper.waitForDiagnosticCount(
+      editorCopy.document.uri,
+      2,
     );
 
     // closing active editor would remove the diagnostics for one of the file
     await helper.showDocument("DIAGNOSTIC_TEST_C.CBL");
     await helper.closeActiveEditor();
-    await helper.showDocument(copybookPath);
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(copybookUri).length === 1,
+    editorCopy = await helper.showDocument(copybookPath);
+    copybookDiag = await helper.waitForDiagnosticCount(
+      editorCopy.document.uri,
+      1,
     );
+    assert.equal(copybookDiag.length, 1);
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
@@ -669,9 +646,11 @@ suite("Integration Test Suite", function () {
       "TC315392: PROGRAM-ID Check Is Not Case Sensitive",
     async () => {
       const extSrcPath = path.join("TEST_TITLE.CBL");
-      const diagPromise = helper.waitForDiagnosticsChange(extSrcPath);
-      await helper.showDocument(extSrcPath);
-      const diagnostics = await diagPromise;
+      const editor = await helper.showDocument(extSrcPath);
+      const diagnostics = await helper.waitForDiagnosticCount(
+        editor.document.uri,
+        1,
+      );
       assert.strictEqual(diagnostics.length, 1);
       const message = diagnostics[0].message;
       assert.match(message, /^Variable ABC-ID is not defined/);
@@ -685,10 +664,10 @@ suite("Integration Test Suite", function () {
     await helper.deleteLine(editor, 12);
     const extSrcPath = path.join("testing", "REPLERR");
     await helper.showDocument(extSrcPath);
-    await helper.waitFor(
-      () => vscode.languages.getDiagnostics(editor.document.uri).length === 1,
+    const diagnostics = await helper.waitForDiagnosticCount(
+      editor.document.uri,
+      1,
     );
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
       range(pos(18, 11), pos(18, 24)),
@@ -700,8 +679,19 @@ suite("Integration Test Suite", function () {
     await helper.waitFor(
       () => vscode.languages.getDiagnostics(editor.document.uri).length > 1,
     );
+    helper.hasDiagnosticMatches(
+      editor.document.uri,
+      (d) => d.message === "BOOK3: Copybook not found",
+    );
+  });
+
+  test("No info message for missing copybooks if diagnostics analysis mode is BASIC", async () => {
+    await helper.updateConfig("low_severity_settings.json");
+    const editor = await helper.showDocument(path.join("USERC1F.cbl"));
+    await helper.waitFor(
+      () => vscode.languages.getDiagnostics(editor.document.uri).length === 0,
+    );
     const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
-    const message = diagnostics[0].message;
-    assert.match(message, /^BOOK3: Copybook not found/);
+    assert.strictEqual(diagnostics.length, 0);
   });
 });

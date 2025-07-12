@@ -1,0 +1,121 @@
+/*
+ * Copyright (c) 2024 Broadcom.
+ * The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *    Broadcom, Inc. - initial API and implementation
+ *
+ */
+package org.eclipse.lsp.cobol.usecases;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+import org.eclipse.lsp.cobol.common.error.ErrorSource;
+import org.eclipse.lsp.cobol.usecases.common.CICSTestUtils;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.Range;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Test CICS CONNECT PROCESS command. Documentation link: <a
+ * href="https://www.ibm.com/docs/en/cics-ts/6.x?topic=summary-connect-process">Connect Process
+ * Command</a>
+ *
+ * <p>This class tests all variations of the Connect Process command found in the link above.
+ */
+public class TestCICSConnectProcessStatement {
+  private static final String CONNECT_PROCESS_VALID_PATH_ONE =
+      "CONNECT PROCESS CONVID({$varFour}) PROCNAME({$varFour}) PROCLENGTH({$varFour})"
+          + " PIPLIST({$varFour}) PIPLENGTH({$varFour}) SYNCLEVEL({$varFour}) STATE({$varFour})";
+  private static final String CONNECT_PROCESS_VALID_PATH_TWO =
+      "CONNECT PROCESS CONVID({$varFour}) PARTNER({$varFour}) " + "SYNCLEVEL({$varFour}) ";
+  private static final String CONNECT_PROCESS_INVALID =
+      "CONNECT {_PROCESS SESSION({$varFour}) SYNCLEVEL({$varFour})"
+          + " {PARTNER|errorPartner}(100)|errorMissingProc_}";
+  private static final String CONNECT_PROCESS_PIPLENGTH_INVALID =
+      "CONNECT {_PROCESS CONVID(100) PIPLENGTH(100) \n "
+          + "SYNCLEVEL(100) PROCNAME(100)|errorPiplength_}";
+
+  private static final String CONNECT_PROCESS_TRANS_PIPLENGTH_INVALID =
+      "CONNECT {_PROCESS CONVID({$varFour}) PARTNER(100) PIPLIST({$varFour}) \n "
+          + "SYNCLEVEL({$varFour})|error_}";
+  private static final String CONNECT_PROCESS_TRANS_PROCLENGTH_INVALID =
+      "CONNECT {_PROCESS CONVID({$varFour}) \n " + "SYNCLEVEL(100) PROCNAME({$varFour})|error_}";
+
+  @Test
+  void testConnectProcessValid() {
+    CICSTestUtils.noErrorTest(CONNECT_PROCESS_VALID_PATH_ONE);
+  }
+
+  @Test
+  void testConnectProcessPathTwoValidT() {
+    CICSTestUtils.noErrorTest(CONNECT_PROCESS_VALID_PATH_TWO);
+  }
+
+  @Test
+  void testConnectProcessSessionPartnerInvalid() {
+    Map<String, Diagnostic> expectedDiagnostic =
+        ImmutableMap.of(
+            "errorMissingProc",
+            new Diagnostic(
+                new Range(),
+                "Missing required option: PROCNAME",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText()),
+            "errorPartner",
+            new Diagnostic(
+                new Range(),
+                "Invalid option provided: PARTNER",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText()));
+    CICSTestUtils.errorTest(CONNECT_PROCESS_INVALID, expectedDiagnostic);
+  }
+
+  @Test
+  void testConnectProcessPiplengthInvalid() {
+    Map<String, Diagnostic> expectedDiagnostic =
+        ImmutableMap.of(
+            "errorPiplength",
+            new Diagnostic(
+                new Range(),
+                "Missing required option: PIPLENGTH without PIPLIST",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText()));
+    CICSTestUtils.errorTest(CONNECT_PROCESS_PIPLENGTH_INVALID, expectedDiagnostic);
+  }
+
+  @Test
+  void testConnectProcessPiplengthNoLengthInvalid() {
+    Map<String, Diagnostic> expectedDiagnostic =
+        ImmutableMap.of(
+            "error",
+            new Diagnostic(
+                new Range(),
+                "Missing required option: PIPLENGTH",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText()));
+    CICSTestUtils.errorTest(
+        CONNECT_PROCESS_TRANS_PIPLENGTH_INVALID, expectedDiagnostic, "NOLENGTH");
+  }
+
+  @Test
+  void testConnectProcessProclengthNoLengthInvalid() {
+    Map<String, Diagnostic> expectedDiagnostic =
+        ImmutableMap.of(
+            "error",
+            new Diagnostic(
+                new Range(),
+                "Missing required option: PROCLENGTH",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText()));
+    CICSTestUtils.errorTest(
+        CONNECT_PROCESS_TRANS_PROCLENGTH_INVALID, expectedDiagnostic, "NOLENGTH");
+  }
+}

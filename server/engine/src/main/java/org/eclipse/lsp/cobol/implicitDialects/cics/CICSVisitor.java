@@ -18,6 +18,7 @@ package org.eclipse.lsp.cobol.implicitDialects.cics;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
 import static org.antlr.v4.runtime.Lexer.HIDDEN;
+import static org.eclipse.lsp.cobol.AntlrRangeUtils.constructRange;
 
 import com.google.common.collect.ImmutableList;
 import java.util.*;
@@ -28,7 +29,6 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -39,12 +39,14 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.lsp.cobol.AntlrRangeUtils;
 import org.eclipse.lsp.cobol.common.dialects.CobolDialect;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
 import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
 import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.message.MessageService;
+import org.eclipse.lsp.cobol.common.message.MessageTemplate;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.CodeBlockUsageNode;
 import org.eclipse.lsp.cobol.common.model.tree.CompilerDirectiveNode;
@@ -53,10 +55,13 @@ import org.eclipse.lsp.cobol.common.model.tree.StopNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.QualifiedReferenceNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableUsageNode;
 import org.eclipse.lsp.cobol.common.utils.ThreadInterruptionUtil;
+import org.eclipse.lsp.cobol.core.visitor.VisitorHelper;
 import org.eclipse.lsp.cobol.implicitDialects.cics.nodes.ExecCicsHandleNode;
 import org.eclipse.lsp.cobol.implicitDialects.cics.nodes.ExecCicsNode;
 import org.eclipse.lsp.cobol.implicitDialects.cics.nodes.ExecCicsReturnNode;
-import org.eclipse.lsp.cobol.implicitDialects.cics.utility.VisitorUtility;
+import org.eclipse.lsp.cobol.implicitDialects.cics.utility.CICSCheckUtilityParameters;
+import org.eclipse.lsp.cobol.implicitDialects.cics.utility.CICSLiteralCheckOption;
+import org.eclipse.lsp.cobol.implicitDialects.cics.utility.CICSOptionsCheckUtility;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
@@ -65,11 +70,21 @@ import org.eclipse.lsp4j.Range;
  * This visitor analyzes the parser tree for CICS and returns its semantic context as a syntax tree
  */
 @Slf4j
-@AllArgsConstructor
+// @AllArgsConstructor
 class CICSVisitor extends ErrorHandlingCICSVisitor {
 
   private final DialectProcessingContext context;
   private final MessageService messageService;
+  private final CICSOptionsCheckUtility cicsOptionsCheckUtility;
+  private final CICSCheckUtilityParameters cicsOptionsCheckUtilityParams;
+
+  CICSVisitor(DialectProcessingContext context, MessageService messageService) {
+    this.context = context;
+    this.messageService = messageService;
+    this.cicsOptionsCheckUtilityParams = getCheckParams();
+    this.cicsOptionsCheckUtility =
+        new CICSOptionsCheckUtility(context, errors, cicsOptionsCheckUtilityParams);
+  }
 
   @Getter private final List<SyntaxError> errors = new LinkedList<>();
 
@@ -81,31 +96,50 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
   @Override
   public List<Node> visitCicsExecBlock(CICSParser.CicsExecBlockContext ctx) {
     areaBWarning(ctx);
-    addReplacementContext(ctx);
+    changeContextToDialectStatement(ctx);
+    if (ctx.stop.getType() != CICSLexer.END_EXEC) {
+      SyntaxError error =
+          SyntaxError.syntaxError()
+              .errorSource(ErrorSource.PARSING)
+              .location(getTokenEndLocality(ctx.stop).toOriginalLocation())
+              .suggestion(messageService.getMessage("cicsParser.missingEndExec"))
+              .severity(ErrorSeverity.ERROR)
+              .build();
+      errors.add(error);
+    }
 
-    boolean isReturn = (ctx.allCicsRule() != null && ctx.allCicsRule().size() > 0 && ctx.allCicsRule().get(0).cics_return() != null);
-    boolean isHandle = (ctx.allCicsRule() != null && ctx.allCicsRule().size() > 0 && ctx.allCicsRule().get(0).cics_handle() != null);
+    boolean isReturn =
+        (ctx.allCicsRule() != null
+            && ctx.allCicsRule().size() > 0
+            && ctx.allCicsRule().get(0).cics_return() != null);
+    boolean isHandle =
+        (ctx.allCicsRule() != null
+            && ctx.allCicsRule().size() > 0
+            && ctx.allCicsRule().get(0).cics_handle() != null);
 
     if (isReturn) {
       return addTreeNode(ctx, ExecCicsReturnNode::new);
     } else if (isHandle) {
-      boolean isProgram = Optional.ofNullable(ctx.allCicsRule().get(0).cics_handle())
-          .map(CICSParser.Cics_handleContext::cics_handle_abend)
-          .map(CICSParser.Cics_handle_abendContext::PROGRAM)
-          .filter(s -> s.size() > 0)
-          .isPresent();
+      boolean isProgram =
+          Optional.ofNullable(ctx.allCicsRule().get(0).cics_handle())
+              .map(CICSParser.Cics_handleContext::cics_handle_abend)
+              .map(CICSParser.Cics_handle_abendContext::PROGRAM)
+              .filter(s -> s.size() > 0)
+              .isPresent();
 
-      boolean isLabel = Optional.ofNullable(ctx.allCicsRule().get(0).cics_handle())
-          .map(CICSParser.Cics_handleContext::cics_handle_abend)
-          .map(CICSParser.Cics_handle_abendContext::LABEL)
-          .filter(s -> s.size() > 0)
-          .isPresent();
+      boolean isLabel =
+          Optional.ofNullable(ctx.allCicsRule().get(0).cics_handle())
+              .map(CICSParser.Cics_handleContext::cics_handle_abend)
+              .map(CICSParser.Cics_handle_abendContext::LABEL)
+              .filter(s -> s.size() > 0)
+              .isPresent();
 
-      boolean isReset = Optional.ofNullable(ctx.allCicsRule().get(0).cics_handle())
-          .map(CICSParser.Cics_handleContext::cics_handle_abend)
-          .map(CICSParser.Cics_handle_abendContext::RESET)
-          .filter(s -> s.size() > 0)
-          .isPresent();
+      boolean isReset =
+          Optional.ofNullable(ctx.allCicsRule().get(0).cics_handle())
+              .map(CICSParser.Cics_handleContext::cics_handle_abend)
+              .map(CICSParser.Cics_handle_abendContext::RESET)
+              .filter(s -> s.size() > 0)
+              .isPresent();
 
       ExecCicsHandleNode.HandleAbendType type;
       if (isProgram) {
@@ -130,14 +164,9 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
   }
 
   @Override
-  public List<Node> visitCompilerXOpts(CICSParser.CompilerXOptsContext ctx) {
-    addReplacementContext(ctx);
-    return visitChildren(ctx);
-  }
-
-  @Override
   public List<Node> visitAllExciRules(CICSParser.AllExciRulesContext ctx) {
-    // TODO: uncomment and adjust below when we decide to support this feature based on compiler directive
+    // TODO: uncomment and adjust below when we decide to support this feature based on compiler
+    // directive
     //    boolean isExciModeEnabled = context
     //            .getConfig()
     //            .getCompilerOptions()
@@ -181,20 +210,33 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
   @Override
   public List<Node> visitParagraphNameUsage(CICSParser.ParagraphNameUsageContext ctx) {
     String name = getName(ctx);
-    Locality locality = buildNameRangeLocality(ctx, name, context.getProgramDocumentUri());
-    //    locality.setRange(RangeUtils.shiftRangeWithPosition(position, locality.getRange()));
-
+    Locality locality =
+        VisitorHelper.buildNameRangeLocality(ctx, name, context.getProgramDocumentUri());
     Location location = context.getExtendedDocument().mapLocation(locality.getRange());
 
     Node node =
         new CodeBlockUsageNode(
-            Locality.builder().range(location.getRange()).uri(location.getUri()).build(), name);
+            Locality.builder().range(location.getRange()).uri(location.getUri()).build(),
+            name,
+            null);
     visitChildren(ctx).forEach(node::addChild);
     return ImmutableList.of(node);
   }
 
+  /**
+   * Traverses children of the parse tree.
+   *
+   * <p>Inspects CICS Rules to make sure mandatory options exist since the Parser Rules only enforce
+   * if any combination of possible inputs exist. Also checks for Invalid options given the other
+   * provided optionals and checks for duplicates.
+   *
+   * @param node the node under inspection
+   * @return List of children nodes
+   */
   @Override
   public List<Node> visitChildren(RuleNode node) {
+    if (node.getRuleContext().parent != null)
+      cicsOptionsCheckUtility.checkOptions((ParserRuleContext) node.getRuleContext());
     ThreadInterruptionUtil.checkThreadInterrupted();
     return super.visitChildren(node);
   }
@@ -215,9 +257,15 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
   }
 
   private List<Node> addTreeNode(ParserRuleContext ctx, Function<Locality, Node> nodeConstructor) {
-    Node node = nodeConstructor.apply(VisitorUtility.constructLocality(ctx, context));
+    Node node = nodeConstructor.apply(getOriginalLocality(ctx));
     visitChildren(ctx).forEach(node::addChild);
     return ImmutableList.of(node);
+  }
+
+  private Locality getOriginalLocality(ParserRuleContext ctx) {
+    Location location =
+        context.getExtendedDocument().mapLocation(AntlrRangeUtils.constructRange(ctx));
+    return Locality.builder().uri(location.getUri()).range(location.getRange()).build();
   }
 
   private String getName(ParserRuleContext context) {
@@ -232,14 +280,14 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
    * @param uri is an uri of the document
    * @return locality object
    */
-  public Locality buildNameRangeLocality(ParserRuleContext ctx, String name, String uri) {
-    Range range =
-        new Range(
-            new Position(ctx.start.getLine() - 1, ctx.start.getCharPositionInLine()),
-            new Position(
-                ctx.stop.getLine() - 1, ctx.start.getCharPositionInLine() + name.length()));
+  private Locality buildNameRangeLocality(ParserRuleContext ctx, String name, String uri) {
+    return VisitorHelper.buildNameRangeLocality(ctx, name, uri);
+  }
 
-    return Locality.builder().uri(uri).range(range).build();
+  private void changeContextToDialectStatement(ParserRuleContext ctx) {
+    context
+        .getExtendedDocument()
+        .fillArea(AntlrRangeUtils.constructRange(ctx), CobolDialect.FILLER.charAt(0));
   }
 
   private void addReplacementContext(ParserRuleContext ctx) {
@@ -249,7 +297,7 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
                 context
                     .getExtendedDocument()
                     .replace(
-                        constructRange(node),
+                        constructRange(node.getSymbol()),
                         StringUtils.repeat(CobolDialect.FILLER, node.getText().length())));
   }
 
@@ -266,16 +314,6 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
     return result;
   }
 
-  public Range constructRange(TerminalNode ctx) {
-    return new Range(
-        new Position(ctx.getSymbol().getLine() - 1, ctx.getSymbol().getCharPositionInLine()),
-        new Position(
-            ctx.getSymbol().getLine() - 1,
-            ctx.getSymbol().getCharPositionInLine()
-                + ctx.getSymbol().getStopIndex()
-                - ctx.getSymbol().getStartIndex()));
-  }
-
   private void areaBWarning(ParserRuleContext ctx) {
     List<Token> tokenList =
         getAllTerminalNodes(ctx).stream().map(TerminalNode::getSymbol).collect(toList());
@@ -290,15 +328,22 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
                 .ifPresent(
                     locality ->
                         throwException(
-                            token.getText(),
                             locality,
-                            messageService.getMessage("CobolVisitor.AreaBWarningMsg"))));
+                            MessageTemplate.of("CobolVisitor.AreaBWarningMsg", token.getText()),
+                            ErrorSeverity.WARNING)));
   }
 
   private Locality getTokenLocality(Token token) {
     return Locality.builder()
         .uri(context.getProgramDocumentUri())
-        .range(buildTokenRange(token))
+        .range(VisitorHelper.buildTokenRange(token))
+        .build();
+  }
+
+  private Locality getTokenEndLocality(Token token) {
+    return Locality.builder()
+        .uri(context.getProgramDocumentUri())
+        .range(buildTokenEndRange(token))
         .build();
   }
 
@@ -309,13 +354,14 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
     };
   }
 
-  private void throwException(String wrongToken, @NonNull Locality locality, String message) {
+  private void throwException(
+      @NonNull Locality locality, MessageTemplate messageTemplate, ErrorSeverity severity) {
     SyntaxError error =
         SyntaxError.syntaxError()
             .errorSource(ErrorSource.PARSING)
             .location(locality.toOriginalLocation())
-            .suggestion(message + wrongToken)
-            .severity(ErrorSeverity.WARNING)
+            .messageTemplate(messageTemplate)
+            .severity(severity)
             .build();
 
     LOG.debug("Syntax error by CobolVisitor#throwException: {}", error);
@@ -324,16 +370,65 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
     }
   }
 
-  /**
-   * Builds context name locality based on the name and uri of the document
-   *
-   * @param token is a token
-   * @return range object
-   */
-  public Range buildTokenRange(Token token) {
-    return new Range(
-        new Position(token.getLine() - 1, token.getCharPositionInLine()),
+  private Range buildTokenEndRange(Token token) {
+    Position p =
         new Position(
-            token.getLine() - 1, token.getCharPositionInLine() + token.getText().length()));
+            token.getLine() - 1,
+            token.getCharPositionInLine() + token.getStopIndex() - token.getStartIndex() + 1);
+    return new Range(p, p);
+  }
+
+  private CICSCheckUtilityParameters getCheckParams() {
+    CICSCheckUtilityParameters cicsCheckUtilityParameters = new CICSCheckUtilityParameters();
+    final List<String> opts = context.getPreprocessorsDirectives().get("CICS");
+    if (opts == null || opts.isEmpty()) {
+      // This is a special case to reduce false positives until we have CICS configuration
+      cicsCheckUtilityParameters.spEnabled = true;
+      cicsCheckUtilityParameters.literalChecks = CICSLiteralCheckOption.IGNORE;
+      return cicsCheckUtilityParameters;
+    }
+    for (String opt : opts) {
+      switch (opt.toUpperCase()) {
+        case "LENGTH":
+          cicsCheckUtilityParameters.noLengthEnabled = false;
+          break;
+        case "NOLENGTH":
+          cicsCheckUtilityParameters.noLengthEnabled = true;
+          break;
+        case "SP":
+          cicsCheckUtilityParameters.spEnabled = true;
+          break;
+        case "EXCI":
+          cicsCheckUtilityParameters.exciEnabled = true;
+          break;
+        case "APOST":
+          cicsCheckUtilityParameters.literalChecks = CICSLiteralCheckOption.APOST;
+          break;
+        case "QUOTE":
+          cicsCheckUtilityParameters.literalChecks = CICSLiteralCheckOption.QUOTE;
+          break;
+        default:
+          break;
+      }
+    }
+    return cicsCheckUtilityParameters;
+  }
+
+  @Override
+  public List<Node> visitVariableNameUsage(CICSParser.VariableNameUsageContext ctx) {
+    if ((ctx.NONNUMERICLITERAL() != null || ctx.NUMERICLITERAL() != null)) {
+      final CICSLiteralCheckOption opt = cicsOptionsCheckUtilityParams.literalChecks;
+      if (opt == CICSLiteralCheckOption.QUOTE && ctx.getText().endsWith("\'"))
+        throwException(
+            getTokenLocality(ctx.start),
+            MessageTemplate.of("cics.invalidLiteralDelimeter", "\""),
+            ErrorSeverity.ERROR);
+      else if (opt == CICSLiteralCheckOption.APOST && ctx.getText().endsWith("\""))
+        throwException(
+            getTokenLocality(ctx.start),
+            MessageTemplate.of("cics.invalidLiteralDelimeter", "'"),
+            ErrorSeverity.ERROR);
+    }
+    return visitChildren(ctx);
   }
 }

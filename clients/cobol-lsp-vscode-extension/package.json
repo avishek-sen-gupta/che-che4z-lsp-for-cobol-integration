@@ -4,11 +4,11 @@
   "description": "Autocomplete, highlighting and diagnostics for COBOL code and copybooks.",
   "author": "Broadcom",
   "license": "EPL-2.0",
-  "version": "2.2.0",
+  "version": "2.4.1",
   "preview": false,
   "publisher": "BroadcomMFD",
   "engines": {
-    "vscode": "^1.71.0"
+    "vscode": "^1.82.0"
   },
   "repository": {
     "type": "git",
@@ -94,6 +94,11 @@
         "command": "cobol-lsp.open.copybook.internalfolder",
         "title": "Open Copybooks Internal Folder",
         "category": "COBOL"
+      },
+      {
+        "command": "cobol-lsp.cpy-manager.reenable.failed.zowe.requests",
+        "title": "Reenable failed Zowe requests",
+        "category": "COBOL"
       }
     ],
     "menus": {
@@ -101,68 +106,57 @@
         {
           "command": "cobol-lsp.cpy-manager.fetch-copybook",
           "category": "COBOL",
-          "title": "Fetch Copybook",
-          "when": "!isWeb"
+          "title": "Fetch Copybook"
         },
         {
           "command": "cobol-lsp.cpy-manager.goto-settings",
           "category": "COBOL",
-          "title": "Open Copybook Location Settings",
-          "when": "!isWeb"
+          "title": "Open Copybook Location Settings"
         },
         {
           "command": "cobol-lsp.serverRuntime.goto-settings",
           "category": "COBOL",
-          "title": "Open Server Runtime Settings",
-          "when": "!isWeb"
+          "title": "Open Server Runtime Settings"
         },
         {
           "command": "cobol-lsp.dialects.goto-settings",
           "category": "COBOL",
-          "title": "Open Dialect Settings",
-          "when": "!isWeb"
+          "title": "Open Dialect Settings"
         },
         {
           "command": "cobol-lsp.commentLine.toggle",
           "category": "COBOL",
-          "title": "Toggle COBOL Line Comment",
-          "when": "!isWeb"
+          "title": "Toggle COBOL Line Comment"
         },
         {
           "command": "cobol-lsp.commentLine.comment",
           "category": "COBOL",
-          "title": "Add COBOL Line Comment",
-          "when": "!isWeb"
+          "title": "Add COBOL Line Comment"
         },
         {
           "command": "cobol-lsp.commentLine.uncomment",
           "category": "COBOL",
-          "title": "Remove COBOL Line Comment",
-          "when": "!isWeb"
+          "title": "Remove COBOL Line Comment"
         },
         {
           "command": "cobol-lsp.clear.downloaded.copybooks",
           "category": "COBOL",
-          "title": "Clear Downloaded Copybooks",
-          "when": "!isWeb"
+          "title": "Clear Downloaded Copybooks"
         },
         {
           "command": "cobol-lsp.analysis.runAnalysis",
           "category": "COBOL",
-          "title": "Run Analysis in CLI",
-          "when": "!isWeb"
+          "title": "Run Analysis in CLI"
         },
         {
           "command": "cobol-lsp.snippets.insertSnippets",
           "title": "Insert COBOL Snippet",
-          "category": "Snippets",
-          "when": "!isWeb"
+          "category": "Snippets"
         },
         {
           "command": "cobol-lsp.open.copybook.internalfolder",
           "title": "Open Copybooks Internal Folder",
-          "category": "COBOL",
-          "when": "!isWeb"
+          "category": "COBOL"
         }
       ]
     },
@@ -186,13 +180,6 @@
         ]
       },
       {
-        "id": "expcobol",
-        "aliases": [
-          "EXP-COBOL"
-        ],
-        "configuration": "./syntaxes/lang-config.json"
-      },
-      {
         "id": "hpcobol",
         "aliases": [
           "HP-COBOL"
@@ -203,14 +190,6 @@
     "grammars": [
       {
         "language": "cobol",
-        "scopeName": "source.cobol",
-        "path": "./syntaxes/COBOL.tmLanguage.json",
-        "embeddedLanguages": {
-          "meta.embedded.block.html": "html"
-        }
-      },
-      {
-        "language": "expcobol",
         "scopeName": "source.cobol",
         "path": "./syntaxes/COBOL.tmLanguage.json",
         "embeddedLanguages": {
@@ -292,7 +271,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Default list of local paths to search for copybooks",
+          "description": "Default list of local paths to search for copybooks. Folders are searched in the order they are listed.",
           "uniqueItems": true
         },
         "cobol-lsp.cpy-manager.paths-dsn": {
@@ -300,7 +279,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Default list of datasets to search for copybooks\nZowe Explorer version 1.15.0 or higher is required to download copybooks from the mainframe",
+          "description": "Default list of datasets to search for copybooks. Datasets are searched in the order they are listed.\nZowe Explorer version 1.15.0 or higher is required to download copybooks from the mainframe",
           "uniqueItems": true
         },
         "cobol-lsp.cpy-manager.paths-uss": {
@@ -308,7 +287,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Default list of USS paths to search for copybooks\nZowe Explorer version 1.15.0 or higher is required to download copybooks from the mainframe",
+          "description": "Default list of USS paths to search for copybooks. USS paths are searched in the order they are listed.\nZowe Explorer version 1.15.0 or higher is required to download copybooks from the mainframe",
           "uniqueItems": true
         },
         "cobol-lsp.cpy-manager.copybook-extensions": {
@@ -549,21 +528,47 @@
             "NATIVE - Use platform binary"
           ],
           "description": "COBOL LS server runtime."
+        },
+        "cobol-lsp.formatting": {
+          "type": "string",
+          "default": "None",
+          "enum": [
+            "Uppercase",
+            "Lowercase",
+            "None"
+          ],
+          "description": "Formatting settings"
+        },
+        "cobol-lsp.lspconfig.compiler": {
+          "type": "string",
+          "default": "",
+          "description": "Name of the COBOL compiler used by the LSPConfig"
+        },
+        "cobol-lsp.lspconfig.preprocessors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of preprocessors used by the LSPConfig",
+          "uniqueItems": true
+        },
+        "cobol-lsp.analysis-mode": {
+          "type": "string",
+          "enum": [
+            "BASIC",
+            "ADVANCED"
+          ],
+          "enumDescriptions": [
+            "Enables basic syntax checks",
+            "Enables advanced analysis including syntax and semantic checks"
+          ],
+          "description": "Analysis mode",
+          "default": "ADVANCED"
         }
       }
     },
     "configurationDefaults": {
       "[cobol]": {
-        "editor.guides.indentation": false,
-        "editor.rulers": [
-          7,
-          11,
-          72,
-          80
-        ],
-        "editor.wordSeparators": "!\"#$%&'()*+,./:;<=>?@[\\]^`{|}~"
-      },
-      "[expcobol]": {
         "editor.guides.indentation": false,
         "editor.rulers": [
           7,
@@ -608,58 +613,66 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run -S build -- --minify && npm run -S build:web -- --production -- --minify",
+    "vscode:prepublish": "npm run build:worker && npm run -S build -- --minify && npm run -S build:web -- --production -- --minify",
     "postinstall": "node -e \"if (process.env.NODE_ENV === 'production'){process.exit(1)} \" && patch-package || echo skip patching",
-    "build": "esbuild src/extension.ts --bundle --sourcemap --platform=node --target=node16.17.1 --outdir=dist --external:vscode --format=cjs",
+    "build": "npm run build:worker && esbuild src/extension.ts --bundle --sourcemap --platform=node --target=node18 --outdir=dist --external:vscode --format=cjs",
+    "build:worker": "esbuild src/services/worker/Worker.ts --bundle --sourcemap --platform=node --target=node18 --outdir=dist --external:vscode --format=cjs",
     "build:web": "node build.web.js",
     "build:watch": "npm run build -- --watch",
     "test:integration": "npm run compile && node ./out/test/runTest.js",
     "test:web": "npm run build:web && vscode-test-web --browserType=chromium --headless --extensionDevelopmentPath=. --extensionTestsPath=dist/web/test/suite/extensionTests.js",
-    "compile": "tsc -p ./",
-    "lint": "prettier -c .",
-    "pretest": "npm run compile && npm run lint",
+    "compile": "npm run build:worker && tsc -p ./",
+    "lint-format": "prettier -c .",
+    "lint-quality": "eslint ./src",
+    "lint-fix": "eslint --fix ./src && prettier -w .",
+    "lint": "npm run lint-format && npm run lint-quality",
+    "pretest": "npm run compile",
     "pretty": "prettier -w .",
     "watch": "tsc -watch -p ./",
     "test": "jest -w 1 --unhandled-rejections=strict",
+    "test-watch": "jest --watchAll -w 1 --unhandled-rejections=strict",
     "coverage": "jest --coverage --runInBand",
     "package": "vsce package --no-dependencies",
     "package:web": "vsce package --target web --no-dependencies"
   },
   "dependencies": {
     "@code4z/cobol-dialect-api": "file:../cobol-dialect-api",
-    "@vscode/extension-telemetry": "^0.9.7",
-    "glob": "10.3.10",
+    "@code4z/analysis": "file:../analysis",
+    "@vscode/extension-telemetry": "^0.9.8",
+    "glob": "11.0.0",
     "iconv-lite": "^0.6.3",
-    "micromatch": "^4.0.7",
-    "vscode-languageclient": "^8.1.0"
+    "io-ts": "2.2.21",
+    "micromatch": "^4.0.8",
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
-    "@types/assert": "^1.5.10",
-    "@types/fs-extra": "^9.0.13",
-    "@types/jest": "^29.0.3",
+    "@eslint/js": "^9.15.0",
+    "@types/assert": "^1.5.11",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^29.5.14",
     "@types/minimatch": "5.1.2",
-    "@types/mocha": "^9.1.1",
-    "@types/node": "^14.18.29",
-    "@types/vscode": "^1.71.0",
-    "@vscode/test-electron": "2.3.8",
-    "@vscode/test-web": "^0.0.56",
-    "@vscode/vsce": "2.19.0",
+    "@types/mocha": "^10.0.9",
+    "@types/node": "^22.9.0",
+    "@types/vscode": "1.82",
+    "@vscode/test-electron": "^2.4.1",
+    "@vscode/test-web": "^0.0.63",
+    "@vscode/vsce": "3.2.1",
     "assert": "^2.1.0",
-    "decache": "^4.6.1",
-    "esbuild": "^0.20.2",
-    "eslint-plugin-sonarjs": "^0.15.0",
-    "fs-extra": "10.1.0",
-    "jest": "^29.0.3",
-    "jest-jasmine2": "^29.0.3",
+    "c8": "^10.1.3",
+    "esbuild": "^0.24.0",
+    "esbuild-plugin-polyfill-node": "^0.3.0",
+    "eslint": "^9.15.0",
+    "fs-extra": "11.2.0",
+    "globals": "^15.12.0",
+    "jest": "^29.7.0",
+    "jest-jasmine2": "^29.7.0",
     "jest-sonar-reporter": "^2.0.0",
-    "mocha": "^10.0.0",
-    "nyc": "^15.1.0",
-    "patch-package": "^6.4.7",
-    "prettier": "2.8.7",
-    "ts-jest": "^29.0.1",
-    "tslint": "^5.18.0",
-    "typescript": "^4.9.4"
+    "mocha": "^10.8.2",
+    "patch-package": "^8.0.0",
+    "prettier": "3.3.3",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.15.0"
   },
   "overrides": {
     "isexe": "^3.1.1"

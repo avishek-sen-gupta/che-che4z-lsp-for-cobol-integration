@@ -15,6 +15,7 @@
     },
     "children": [
       {
+        "performUntilType": "UNTIL_CONDITION",
         "type": "inlineperform",
         "location": {
           "uri": "fake/path",
@@ -60,7 +61,7 @@
         }
       },
       {
-        "snippet": "PAR1.\r\n           CONTINUE.",
+        "snippet": "       PAR1.\r\n           CONTINUE.",
         "name": "PAR1",
         "type": "paragraph",
         "location": {

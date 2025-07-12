@@ -14,19 +14,11 @@
  */
 package org.eclipse.lsp.cobol.cli.command;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import org.eclipse.lsp.cobol.cfg.CFASTBuilder;
-import org.eclipse.lsp.cobol.cli.di.CliModule;
-import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
-import org.eclipse.lsp.cobol.common.model.tree.Node;
-import org.eclipse.lsp.cobol.common.pipeline.StageResult;
-import org.eclipse.lsp.cobol.dialects.ibm.ProcessingResult;
-import picocli.CommandLine;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -34,15 +26,20 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.concurrent.Callable;
+import org.eclipse.lsp.cobol.cfg.CFASTBuilder;
+import org.eclipse.lsp.cobol.cli.di.CliModule;
+import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
+import org.eclipse.lsp.cobol.common.model.tree.ProgramNode;
+import org.eclipse.lsp.cobol.common.pipeline.StageResult;
+import org.eclipse.lsp.cobol.dialects.ibm.ProcessingResult;
+import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
+import picocli.CommandLine;
 
-/**
- * Generates CFAST representation of the COBOL program in the defined folder
- */
+/** Generates CFAST representation of the COBOL program in the defined folder */
 @CommandLine.Command(name = "cfast", description = "generate cfast from cobol source")
-public class CliCFAST  implements Callable<Integer> {
+public class CliCFAST implements Callable<Integer> {
 
-  @CommandLine.ParentCommand
-  private Cli parent;
+  @CommandLine.ParentCommand private Cli parent;
 
   @CommandLine.Option(
       description = "Path to the source folder.",
@@ -60,8 +57,12 @@ public class CliCFAST  implements Callable<Integer> {
         if (paths == null) {
           throw new Exception("Cannot find folder: " + workspace.toFile().getAbsolutePath());
         }
-
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        Gson gson =
+            new MessageJsonHandler(ImmutableMap.of())
+                .getGson()
+                .newBuilder()
+                .setPrettyPrinting()
+                .create();
 
         Arrays.stream(paths)
             .filter(CliCFAST::isCobolFile)
@@ -77,11 +78,12 @@ public class CliCFAST  implements Callable<Integer> {
 
   private void generateCFAST(File file, CFASTBuilder builder, Gson gson, Injector diCtx) {
     try {
-      Cli.Result analysisResult = parent.runAnalysis(file.getCanonicalFile(), CobolLanguageId.COBOL, diCtx, true);
-      StageResult<ProcessingResult> result = (StageResult<ProcessingResult>) analysisResult.pipelineResult.getLastStageResult();
-      Node rootNode = result.getData().getRootNode();
-
-      String json = gson.toJson(builder.build(rootNode).getControlFlowAST());
+      Cli.Result analysisResult =
+          parent.runAnalysis(file.getCanonicalFile(), CobolLanguageId.COBOL, diCtx, true, false);
+      StageResult<ProcessingResult> result =
+          (StageResult<ProcessingResult>) analysisResult.pipelineResult.getLastStageResult();
+      ProgramNode programNode = result.getData().getRootNode().findFirstProgramNode();
+      String json = gson.toJson(builder.build(programNode).getControlFlowAST());
 
       try (FileWriter writer = new FileWriter(getCFASTFileName(file.toPath()))) {
         writer.write(json);
@@ -89,7 +91,8 @@ public class CliCFAST  implements Callable<Integer> {
       }
 
     } catch (IOException e) {
-      System.out.println("Error processing file: " + file.getAbsolutePath() + " \n" + e.getMessage());
+      System.out.println(
+          "Error processing file: " + file.getAbsolutePath() + " \n" + e.getMessage());
     }
   }
 

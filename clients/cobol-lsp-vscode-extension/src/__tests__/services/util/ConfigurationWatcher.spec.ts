@@ -15,25 +15,7 @@
 import * as vscode from "vscode";
 import { SettingsService } from "../../../services/Settings";
 import { ConfigurationWatcher } from "../../../services/util/ConfigurationWatcher";
-jest.mock("../../../services/reporter/TelemetryService");
-
-jest.mock("vscode", () => ({
-  commands: {
-    executeCommand: jest.fn(),
-  },
-  window: {
-    showInformationMessage: jest.fn(),
-  },
-  workspace: {
-    getConfiguration: jest.fn().mockReturnValue({
-      get: jest.fn().mockReturnValueOnce(undefined).mockReturnValue("JAVA"),
-      update: jest.fn(),
-    }),
-    onDidChangeConfiguration: jest
-      .fn()
-      .mockReturnValue("onDidChangeConfiguration"),
-  },
-}));
+jest.mock("../../../services/reporter");
 
 describe("Tests ConfigurationWatcher utility", () => {
   afterEach(() => {
@@ -47,9 +29,7 @@ describe("Tests ConfigurationWatcher utility", () => {
       .mockReturnValue("NATIVE");
     vscode.window.showInformationMessage = jest.fn().mockReturnValue("Ok");
     const configurationWatcher = new ConfigurationWatcher();
-    await (
-      configurationWatcher as any
-    ).handleServerRuntimeConfigurationChange();
+    await configurationWatcher["handleServerRuntimeConfigurationChange"]();
     expect(vscode.commands.executeCommand).toBeCalled();
   });
 
@@ -60,9 +40,7 @@ describe("Tests ConfigurationWatcher utility", () => {
       .mockReturnValue("JAVA");
     vscode.window.showInformationMessage = jest.fn().mockReturnValue("Ok");
     const configurationWatcher = new ConfigurationWatcher();
-    await (
-      configurationWatcher as any
-    ).handleServerRuntimeConfigurationChange();
+    await configurationWatcher["handleServerRuntimeConfigurationChange"]();
     expect(vscode.commands.executeCommand).not.toBeCalled();
   });
 });

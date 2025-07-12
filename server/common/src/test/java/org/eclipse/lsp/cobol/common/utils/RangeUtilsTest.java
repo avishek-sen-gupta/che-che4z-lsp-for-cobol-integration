@@ -15,15 +15,14 @@
 
 package org.eclipse.lsp.cobol.common.utils;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.google.common.collect.ImmutableList;
 import org.eclipse.lsp.cobol.common.model.NodeSymbolType;
 import org.eclipse.lsp4j.DocumentSymbol;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Test to check RangeUtils */
 class RangeUtilsTest {
@@ -63,6 +62,7 @@ class RangeUtilsTest {
   void isInsideNegative() {
     assertFalse(RangeUtils.isInside(firstRange, secondRange));
   }
+
   @Test
   void isPositionsAreEquals() {
     assertFalse(RangeUtils.isAfter(firstLine, firstLine));
@@ -75,16 +75,7 @@ class RangeUtilsTest {
     Range range = new Range(new Position(2, 3), new Position(7, 8));
     Range expectedRange = new Range(new Position(7, 3), new Position(12, 8));
     Range result = RangeUtils.shiftRangeWithPosition(position, range);
-    assertTrue(expectedRange.equals(result));
-  }
-
-  @Test
-  void testExtendByCharacter() {
-    Range range = new Range(new Position(1, 2), new Position(3, 4));
-    int count = 5;
-    Range expectedRange = new Range(new Position(1, 2), new Position(3, 9));
-    Range result = RangeUtils.extendByCharacter(range, count);
-    assertTrue(expectedRange.equals(result));
+    assertEquals(expectedRange, result);
   }
 
   @Test
@@ -93,7 +84,7 @@ class RangeUtilsTest {
     int count = 2;
     Range expectedRange = new Range(new Position(3, 2), new Position(5, 4));
     Range result = RangeUtils.moveByLine(range, count);
-    assertTrue(expectedRange.equals(result));
+    assertEquals(expectedRange, result);
   }
 
   private static DocumentSymbol constructNode(

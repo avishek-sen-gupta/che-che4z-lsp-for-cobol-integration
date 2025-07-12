@@ -28,7 +28,8 @@ import org.eclipse.lsp.cobol.lsp.LspQuery;
 import org.eclipse.lsp.cobol.lsp.handlers.extended.AnalysisHandler;
 
 /**
- * Analysis request event triggered by custom cobol LS request supplied by {@link org.eclipse.lsp.cobol.lsp.jrpc.ExtendedApi}
+ * Analysis request event triggered by custom cobol LS request supplied by {@link
+ * org.eclipse.lsp.cobol.lsp.jrpc.ExtendedApi}
  */
 public class AnalysisQuery implements LspQuery<ExtendedApiResult> {
   final AnalysisResultEvent analysisResultEvent;
@@ -42,7 +43,7 @@ public class AnalysisQuery implements LspQuery<ExtendedApiResult> {
     result = new CompletableFuture<>();
     analysisResultEvent =
         ofNullable(new Gson().fromJson(params.toString(), AnalysisResultEvent.class))
-            .orElseGet(() -> new AnalysisResultEvent("", ""));
+            .orElseGet(() -> new AnalysisResultEvent("", "", 0, 0));
   }
 
   @Override

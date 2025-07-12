@@ -53,11 +53,13 @@ class TestSetUpDownBy {
           + "           SET {$IND1} {$IND2} {$IND3} DOWN BY 1.\n"
           + "           SET {$IND1} {$INTVAL|1} DOWN BY -1.\n"
           + "           SET {$NOT-A-TABLE|1} UP BY 1.\n"
+          + "           SET {$NOT-A-TABLE|1} TO 4.\n"
+          + "           SET {$INTVAL} TO {$IND3}.\n"
           + "           SET {$NOT-A-TABLE|1} DOWN BY 1.\n"
           + "           SET {$NOT-A-TABLE|1} {$IND1} UP BY 1.\n"
           + "           SET {$IND1} UP BY {$INTVAL}.\n"
           + "           SET {$IND1} UP BY {$SUBINT} OF {$GROUP-VAR}.\n"
-          + "           SET {$IND1} UP BY {$SUBINT} {#*IND3|3|5}.\n"
+          + "           SET {$IND1} UP BY {$SUBINT} {#*IND3|3|ariaa}.\n"
           + "           SET {$INTVAL|1} DOWN BY {$SUBINT} OF {$GROUP-VAR}.\n"
           + "           SET {$IND1} DOWN BY {IND4|4}.\n"
           + "           SET {IND4|4} DOWN BY {$INTVAL}.\n"
@@ -81,14 +83,15 @@ class TestSetUpDownBy {
             "2",
             new Diagnostic(
                 new Range(),
-                "Invalid sending field type. Expected: Elementary integer data item, Non-zero integer",
+                "Invalid sending field type. Expected: Elementary integer data item, Non-zero"
+                    + " integer",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText()),
             "3",
             new Diagnostic(
                 new Range(),
-                    "Extraneous input 'IND3'",
-                    DiagnosticSeverity.Error,
+                "A period was assumed before \"IND3\".",
+                DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText()),
             "4",
             new Diagnostic(
@@ -96,7 +99,7 @@ class TestSetUpDownBy {
                 "Variable IND4 is not defined",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText()),
-            "5",
+            "ariaa",
             new Diagnostic(
                 new Range(),
                 "The following token must start in Area A: IND3",

@@ -16,6 +16,8 @@ package org.eclipse.lsp.cobol.core.preprocessor.delegates.transformer;
 
 import static java.util.Optional.ofNullable;
 import static org.eclipse.lsp.cobol.common.error.ErrorSeverity.ERROR;
+import static org.eclipse.lsp.cobol.common.error.ErrorSeverity.WARNING;
+import static org.eclipse.lsp.cobol.core.preprocessor.delegates.rewriter.LineIndicatorProcessor.FLOATING_COMMENT_LINE;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,17 +28,17 @@ import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
+import org.eclipse.lsp.cobol.common.dialects.CobolProgramLayout;
 import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.message.MessageService;
+import org.eclipse.lsp.cobol.common.message.MessageTemplate;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.core.model.CobolLineTypeEnum;
 import org.eclipse.lsp.cobol.core.preprocessor.CobolLine;
 import org.eclipse.lsp.cobol.core.preprocessor.delegates.reader.CompilerDirectives;
-import org.eclipse.lsp.cobol.common.dialects.CobolProgramLayout;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
-import static org.eclipse.lsp.cobol.core.preprocessor.delegates.rewriter.LineIndicatorProcessor.FLOATING_COMMENT_LINE;
 
 /**
  * Process continuation lines. Any sentence, entry, clause, or phrase that requires more than one
@@ -63,14 +65,14 @@ public abstract class ContinuationLineTransformation implements CobolLinesTransf
       String documentURI, List<CobolLine> lines) {
     List<CobolLine> result = new ArrayList<>();
     List<SyntaxError> errors = new ArrayList<>();
-      for (int i = 0; i < lines.size(); i++) {
+    for (int i = 0; i < lines.size(); i++) {
       CobolLine cobolLine = lines.get(i);
 
       ofNullable(checkContinuationLine(documentURI, i, cobolLine)).ifPresent(errors::add);
       ofNullable(checkInvalidIndexOfInlineComment(documentURI, i + 1, cobolLine))
           .ifPresent(errors::add);
 
-        result.add(cobolLine);
+      result.add(cobolLine);
     }
     return new ResultWithErrors<>(result, errors);
   }
@@ -132,9 +134,8 @@ public abstract class ContinuationLineTransformation implements CobolLinesTransf
                   .recognizer(ContinuationLineTransformation.class)
                   .build()
                   .toOriginalLocation())
-          .suggestion(
-              messageService.getMessage(
-                  "ContinuationLineTransformation.compilerDirectiveContinued"))
+          .messageTemplate(
+              MessageTemplate.of("ContinuationLineTransformation.compilerDirectiveContinued"))
           .build();
     }
     return null;
@@ -228,9 +229,8 @@ public abstract class ContinuationLineTransformation implements CobolLinesTransf
                     .recognizer(ContinuationLineTransformation.class)
                     .build()
                     .toOriginalLocation())
-            .suggestion(
-                messageService.getMessage(
-                    "ContinuationLineTransformation.continuationLineContentAreaA"))
+            .messageTemplate(
+                MessageTemplate.of("ContinuationLineTransformation.continuationLineContentAreaA"))
             .severity(ERROR)
             .build();
     LOG.debug(
@@ -269,8 +269,8 @@ public abstract class ContinuationLineTransformation implements CobolLinesTransf
                 .recognizer(ContinuationLineTransformation.class)
                 .build()
                 .toOriginalLocation())
-        .suggestion(messageService.getMessage("inlineComment.missingBlank"))
-        .severity(ERROR)
+        .messageTemplate(MessageTemplate.of("inlineComment.missingBlank"))
+        .severity(WARNING)
         .build();
   }
 

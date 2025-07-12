@@ -15,15 +15,17 @@
 import * as vscode from "vscode";
 import { ResolvedProfile } from "../../type/e4eApi";
 
-async function safeActivate(ext: vscode.Extension<any>) {
+async function safeActivate(ext: vscode.Extension<unknown>) {
   try {
     return await ext.activate();
-  } catch (_) {}
+  } catch (_) {
+    // ignored
+  }
 }
 
 async function extractApi<T>(
-  ext: vscode.Extension<any>,
-  validate: (api: any) => api is T,
+  ext: vscode.Extension<unknown>,
+  validate: (api: unknown) => api is T,
 ): Promise<T | undefined> {
   const api = ext.isActive ? ext.exports : await safeActivate(ext);
   if (!validate(api)) return undefined;
@@ -37,7 +39,7 @@ function asAPI<T>(api: T | undefined) {
 
 export async function getExtensionApi<T>(
   extName: string,
-  validate: (api: any) => api is T,
+  validate: (api: unknown) => api is T,
 ): Promise<
   undefined | { api: T } | { futureApi: Promise<undefined | { api: T }> }
 > {
@@ -51,7 +53,7 @@ export async function getExtensionApi<T>(
         const ext = vscode.extensions.getExtension(extName);
         if (!ext) return;
         extAdded.dispose();
-        extractApi<T>(ext, validate).then((api) => res(asAPI<T>(api)));
+        void extractApi<T>(ext, validate).then((api) => res(asAPI<T>(api)));
       });
     }),
   };
@@ -76,12 +78,13 @@ export class Utils {
    *  Ref : https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-dtyp/62e862f4-2a51-452e-8eeb-dc4ff5ee33cc?redirectedfrom=MSDN
    */
   private static UNC_PATH_REGEX =
+    // eslint-disable-next-line no-control-regex, no-useless-escape
     /^\\\\([^\\:\|\[\]\/";<>+=,?* _]+)\\([\u0020-\u0021\u0023-\u0029\u002D-\u002E\u0030-\u0039\u0040-\u005A\u005E-\u007B\u007E-\u00FF]{1,80})(((?:\\[\u0020-\u0021\u0023-\u0029\u002D-\u002E\u0030-\u0039\u0040-\u005A\u005E-\u007B\u007E-\u00FF]{1,255})+?|)(?:\\((?:[\u0020-\u0021\u0023-\u0029\u002B-\u002E\u0030-\u0039\u003B\u003D\u0040-\u005B\u005D-\u007B]{1,255}){1}(?:\:(?=[\u0001-\u002E\u0030-\u0039\u003B-\u005B\u005D-\u00FF]|\:)(?:([\u0001-\u002E\u0030-\u0039\u003B-\u005B\u005D-\u00FF]+(?!\:)|[\u0001-\u002E\u0030-\u0039\u003B-\u005B\u005D-\u00FF]*)(?:\:([\u0001-\u002E\u0030-\u0039\u003B-\u005B\u005D-\u00FF]+)|))|)))|)$/;
 
   public static async getZoweExplorerAPI() {
     return getExtensionApi<IApiRegisterClient>(
       "Zowe.vscode-extension-for-zowe",
-      (api: any): api is IApiRegisterClient => !!api,
+      (api: unknown): api is IApiRegisterClient => !!api,
     );
   }
 
@@ -97,4 +100,27 @@ export class Utils {
   public static profileAsString(profile: ResolvedProfile) {
     return `${profile.instance}.${profile.profile}`;
   }
+}
+
+export function hasMember<
+  M extends PropertyKey,
+  T extends object = { [K in M]: unknown },
+>(e: unknown, m: M): e is T {
+  return typeof e === "object" && e !== null && m in e;
+}
+
+export function asPartialProfile(s: string): Partial<ResolvedProfile> {
+  const idx = s.indexOf("@");
+  if (idx === -1)
+    return { instance: whitespaceAsUndefined(s), profile: undefined };
+  else
+    return {
+      instance: whitespaceAsUndefined(s.substring(0, idx)),
+      profile: whitespaceAsUndefined(s.substring(idx + 1)),
+    };
+}
+
+function whitespaceAsUndefined(s: string) {
+  for (const c of s) if (c !== " ") return s;
+  return undefined;
 }

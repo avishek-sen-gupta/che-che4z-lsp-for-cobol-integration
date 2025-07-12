@@ -15,20 +15,18 @@
 
 package org.eclipse.lsp.cobol.service.delegates.formations;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.NonNull;
 import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 import org.eclipse.lsp4j.TextEdit;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-/**
- * Test {@link TrimFormation}
- */
+/** Test {@link TrimFormation} */
 class TrimFormationTest {
   private static final String TEXT =
       "A sample text line-0 \r\n"
@@ -40,14 +38,15 @@ class TrimFormationTest {
   @Test
   void WhenFormatIsCalledWithNullParam_thenIllegalArgumentException() {
     TrimFormation trimFormation = new TrimFormation();
-    Assertions.assertThrows(IllegalArgumentException.class, () -> trimFormation.format(null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> trimFormation.format(null, ImmutableList.of()));
   }
 
   @Test
   void whenFormatIsCalledEmptyListParam_thenGetEmptyCollection() {
     TrimFormation trimFormation = new TrimFormation();
     @NonNull List<CobolDocumentModel.Line> inputLines = new ArrayList<>();
-    List<TextEdit> format = trimFormation.format(inputLines);
+    List<TextEdit> format = trimFormation.format(inputLines, ImmutableList.of());
     assertEquals(0, format.size());
   }
 
@@ -56,7 +55,7 @@ class TrimFormationTest {
     TrimFormation trimFormation = new TrimFormation();
     CobolDocumentModel model = new CobolDocumentModel("", TEXT);
     List<CobolDocumentModel.Line> lines = model.getLines();
-    List<TextEdit> format = trimFormation.format(lines);
+    List<TextEdit> format = trimFormation.format(lines, ImmutableList.of());
     assertEquals(5, format.size());
     for (int i = 0; i < format.size(); i++) {
       assertEquals("A sample text line-" + i, format.get(i).getNewText());

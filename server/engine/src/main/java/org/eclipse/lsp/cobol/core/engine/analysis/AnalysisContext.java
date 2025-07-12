@@ -14,9 +14,9 @@
  */
 package org.eclipse.lsp.cobol.core.engine.analysis;
 
+import com.google.gson.JsonElement;
 import java.util.*;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
@@ -26,14 +26,12 @@ import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.mapping.ExtendedDocument;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
+import org.eclipse.lsp.cobol.common.processor.ProcessingPhase;
 import org.eclipse.lsp.cobol.core.semantics.CopybooksRepository;
 
-/**
- * Contains related to analysis state
- */
+/** Contains related to analysis state */
 @Slf4j
 @Getter
-@RequiredArgsConstructor
 public class AnalysisContext implements BenchmarkSessionProvider {
   private @Setter ExtendedDocument extendedDocument;
   private final AnalysisConfig config;
@@ -42,21 +40,43 @@ public class AnalysisContext implements BenchmarkSessionProvider {
   private final String documentUri;
   private final String text;
   private final CobolLanguageId languageId;
+  private final Map<ProcessingPhase, JsonElement> astChanges = new HashMap<>();
 
   private @Setter List<Node> dialectNodes = new ArrayList<>();
   private @Setter CopybooksRepository copybooksRepository;
+  Map<String, List<String>> preprocessorsDirectives = new HashMap<>();
 
-  public AnalysisContext(ExtendedDocument extendedDocument,
-                         AnalysisConfig config,
-                         BenchmarkSession benchmarkSession,
-                         String documentUri,
-                         String text,
-                         CobolLanguageId languageId) {
+  public AnalysisContext(
+      ExtendedDocument extendedDocument,
+      AnalysisConfig config,
+      BenchmarkSession benchmarkSession,
+      String documentUri,
+      String text,
+      CobolLanguageId languageId) {
     this.extendedDocument = extendedDocument;
     this.config = config;
     this.benchmarkSession = benchmarkSession;
     this.documentUri = documentUri;
     this.text = text;
     this.languageId = languageId;
+
+    final Map<String, List<String>> pd = config.getPreprocessorsDirectives();
+    if (pd != null) {
+      pd.entrySet()
+          .forEach(
+              e -> {
+                preprocessorsDirectives.put(e.getKey(), new ArrayList<String>(e.getValue()));
+              });
+    }
+  }
+
+  /**
+   * Logs the Abstract Syntax Tree (AST) changes for a specific processing phase.
+   *
+   * @param phase The processing phase for which the AST changes are being logged.
+   * @param jsonTree The JSON representation of the AST changes.
+   */
+  public void logAst(ProcessingPhase phase, JsonElement jsonTree) {
+    astChanges.put(phase, jsonTree);
   }
 }

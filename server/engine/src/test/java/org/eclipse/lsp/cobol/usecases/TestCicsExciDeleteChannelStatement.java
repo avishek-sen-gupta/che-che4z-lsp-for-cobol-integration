@@ -34,11 +34,10 @@ public class TestCicsExciDeleteChannelStatement {
           + "       PROCEDURE DIVISION.\n"
           + "           EXEC CICS \n"
           + "               DELETE CHANNEL({$EVALUATE-VAR}) \n"
-          + "               RETCODE({$CHECK})\n"
           + "           END-EXEC.";
 
-    @Test
-    void test() {
-        UseCaseEngine.runTest(TEXT, ImmutableList.of(), ImmutableMap.of());
-    }
+  @Test
+  void test() {
+    UseCaseEngine.runTest(TEXT, ImmutableList.of(), ImmutableMap.of());
+  }
 }

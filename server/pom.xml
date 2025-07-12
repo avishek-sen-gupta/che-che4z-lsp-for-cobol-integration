@@ -19,9 +19,8 @@
     </modules>
 
     <properties>
-        <dialect.api.version>1.0.8</dialect.api.version>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
+        <dialect.api.version>1.0.15</dialect.api.version>
+        <maven.compiler.release>8</maven.compiler.release>
         <commons.text.version>1.10.0</commons.text.version>
     </properties>
 
@@ -32,4 +31,21 @@
             <url>https://packages.broadcom.com/artifactory/brightside-maven/</url>
         </repository>
     </repositories>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.spotify.fmt</groupId>
+                <artifactId>fmt-maven-plugin</artifactId>
+                <version>2.25</version>
+                <executions>
+                    <execution>
+                        <phase>process-sources</phase>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+
+
 </project>

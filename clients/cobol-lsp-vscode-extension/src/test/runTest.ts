@@ -17,6 +17,7 @@ import { runTests, downloadAndUnzipVSCode } from "@vscode/test-electron";
 import { TestOptions } from "@vscode/test-electron/out/runTest";
 import * as os from "os";
 import * as process from "process";
+import * as fs from "fs";
 
 async function main() {
   try {
@@ -27,14 +28,24 @@ async function main() {
       path.join(__dirname, "../../../daco-dialect-support/"),
     ];
     const extensionTestsPath = path.join(__dirname, "./suite/index");
+    const userDir = os.tmpdir();
+    if (process.argv.indexOf("--native") != -1) {
+      console.log("Running tests with native language server");
+      fs.mkdirSync(path.join(userDir, "User"));
+      fs.writeFileSync(
+        path.join(userDir, "User", "settings.json"),
+        '{"cobol-lsp.serverRuntime": "NATIVE"}',
+      );
+    }
+
     const launchArgs = [
       path.join(__dirname, "../../../../tests/test_files/project"),
       "--disable-extensions",
       "--disable-workspace-trust",
       "--user-data-dir",
-      `${os.tmpdir()}`,
+      userDir,
     ];
-    var options: TestOptions;
+    let options: TestOptions;
     if (process.argv.length > 2 && process.argv[2] == "insiders") {
       const vscodeExecutablePath = await downloadAndUnzipVSCode("insiders");
       options = {
@@ -59,4 +70,4 @@ async function main() {
   }
 }
 
-main();
+void main();

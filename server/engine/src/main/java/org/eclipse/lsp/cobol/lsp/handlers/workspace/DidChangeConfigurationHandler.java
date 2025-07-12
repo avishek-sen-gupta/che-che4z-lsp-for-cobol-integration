@@ -18,12 +18,15 @@ import static java.util.stream.Collectors.toList;
 import static org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum.*;
 
 import com.google.inject.Inject;
+import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
 import org.eclipse.lsp.cobol.common.message.LocaleStore;
 import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.utils.LogLevelUtils;
+import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
 import org.eclipse.lsp.cobol.lsp.DisposableLSPStateService;
 import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.service.WatcherService;
@@ -33,9 +36,7 @@ import org.eclipse.lsp.cobol.service.settings.SettingsService;
 import org.eclipse.lsp.cobol.service.settings.layout.CodeLayoutStore;
 import org.eclipse.lsp4j.DidChangeConfigurationParams;
 
-/**
- * LSP DidChangeConfiguration Handler
- */
+/** LSP DidChangeConfiguration Handler */
 @Slf4j
 public class DidChangeConfigurationHandler {
   private final DisposableLSPStateService disposableLSPStateService;
@@ -48,18 +49,21 @@ public class DidChangeConfigurationHandler {
   private final AsyncAnalysisService asyncAnalysisService;
   private final CodeLayoutStore codeLayoutStore;
   private final CopybookService copybookService;
+  private final ErrorFinalizerService errorFinalizerService;
 
   @Inject
-  public DidChangeConfigurationHandler(DisposableLSPStateService disposableLSPStateService,
-                                       SettingsService settingsService,
-                                       CopybookNameService copybookNameService,
-                                       WatcherService watchingService,
-                                       LocaleStore localeStore,
-                                       Keywords keywords,
-                                       MessageService messageService,
-                                       AsyncAnalysisService asyncAnalysisService,
-                                       CodeLayoutStore codeLayoutStore,
-                                       CopybookService copybookService) {
+  public DidChangeConfigurationHandler(
+      DisposableLSPStateService disposableLSPStateService,
+      SettingsService settingsService,
+      CopybookNameService copybookNameService,
+      WatcherService watchingService,
+      LocaleStore localeStore,
+      Keywords keywords,
+      MessageService messageService,
+      AsyncAnalysisService asyncAnalysisService,
+      CodeLayoutStore codeLayoutStore,
+      CopybookService copybookService,
+      ErrorFinalizerService errorFinalizerService) {
     this.disposableLSPStateService = disposableLSPStateService;
     this.settingsService = settingsService;
     this.copybookNameService = copybookNameService;
@@ -70,10 +74,12 @@ public class DidChangeConfigurationHandler {
     this.asyncAnalysisService = asyncAnalysisService;
     this.codeLayoutStore = codeLayoutStore;
     this.copybookService = copybookService;
+    this.errorFinalizerService = errorFinalizerService;
   }
 
   /**
    * Handle didChangeConfiguration LSP event.
+   *
    * @param params DidChangeConfigurationParams
    */
   public void didChangeConfiguration(DidChangeConfigurationParams params) {
@@ -82,38 +88,65 @@ public class DidChangeConfigurationHandler {
     }
     copybookService.invalidateCache(false);
     messageService.reloadMessages();
-    copybookNameService
-        .copybookLocalFolders(null)
-        .thenAccept(
-            localFolders -> {
-              try {
-                acceptSettingsChange(localFolders);
-              } catch (InterruptedException e) {
-                LOG.error("InterruptedException while accepting settings changes");
-                Thread.currentThread().interrupt();
-              }
-            });
-
     settingsService.fetchConfiguration(LOCALE.label).thenAccept(localeStore.notifyLocaleStore());
-    settingsService.fetchConfiguration(LOGGING_LEVEL.label).thenAccept(LogLevelUtils.updateLogLevel());
-    settingsService.fetchConfiguration(COBOL_PROGRAM_LAYOUT.label).thenAccept(codeLayoutStore.updateCodeLayout());
+    settingsService
+        .fetchConfiguration(LOGGING_LEVEL.label)
+        .thenAccept(LogLevelUtils.updateLogLevel());
+    settingsService
+        .fetchConfiguration(COBOL_PROGRAM_LAYOUT.label)
+        .thenAccept(codeLayoutStore.updateCodeLayout());
+    settingsService
+        .fetchConfiguration(ANALYSIS_MODE.label)
+        .thenAccept(errorFinalizerService::updateDiagnosticsLevel);
     copybookNameService.collectLocalCopybookNames();
-    keywords.updateStorage();
+    reanalyseIfRequired();
   }
 
-  private void acceptSettingsChange(List<String> localFolders) throws InterruptedException {
-    List<String> watchingFolders = watchingService.getWatchingFolders();
+  private void reanalyseIfRequired() {
+    List<String> prevDialects = keywords.getDialectType();
+    CompletableFuture<Boolean> copybookFolderFuture =
+        copybookNameService
+            .copybookLocalFolders(null)
+            .thenApply(
+                localFolders -> {
+                  List<String> watchingFolders = watchingService.getWatchingFolders();
+                  if (!new HashSet<>(watchingFolders).equals(new HashSet<>(localFolders))) {
+                    acceptSettingsChange(localFolders);
+                    return true;
+                  }
+                  return false;
+                });
+    CompletableFuture<Boolean> dialectFuture =
+        keywords
+            .updateStorage()
+            .thenApply(
+                unused ->
+                    !new HashSet<>(prevDialects).equals(new HashSet<>(keywords.getDialectType())));
+    copybookFolderFuture
+        .thenCombine(dialectFuture, (b1, b2) -> b1 || b2)
+        .thenAccept(
+            shouldReAnalyse -> {
+              if (shouldReAnalyse) {
+                try {
+                  asyncAnalysisService.reanalyseOpenedPrograms();
+                } catch (InterruptedException e) {
+                  LOG.error("Interrupted while reanalysing programs", e);
+                  Thread.currentThread().interrupt();
+                }
+              }
+            });
+  }
 
+  private void acceptSettingsChange(List<String> localFolders) {
+    List<String> watchingFolders = watchingService.getWatchingFolders();
     updateWatchers(localFolders, watchingFolders);
-    asyncAnalysisService.reanalyseOpenedPrograms();
   }
 
   private void updateWatchers(List<String> newPaths, List<String> existingPaths) {
     watchingService.addWatchers(
-            newPaths.stream().filter(it -> !existingPaths.contains(it)).collect(toList()));
+        newPaths.stream().filter(it -> !existingPaths.contains(it)).collect(toList()));
 
     watchingService.removeWatchers(
-            existingPaths.stream().filter(it -> !newPaths.contains(it)).collect(toList()));
+        existingPaths.stream().filter(it -> !newPaths.contains(it)).collect(toList()));
   }
 }
-

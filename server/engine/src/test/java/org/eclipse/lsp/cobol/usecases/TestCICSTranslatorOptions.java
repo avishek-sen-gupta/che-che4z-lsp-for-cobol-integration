@@ -14,25 +14,27 @@
  */
 package org.eclipse.lsp.cobol.usecases;
 
+import static org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode.ENABLED;
+
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
 import org.eclipse.lsp.cobol.common.copybook.SQLBackend;
+import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.test.engine.UseCase;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
 import org.eclipse.lsp.cobol.test.engine.UseCaseUtils;
 import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Stream;
-
-import static org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode.ENABLED;
 
 /**
  * Tests CICS translator options. Refer <a
@@ -104,6 +106,14 @@ public class TestCICSTranslatorOptions {
         "VBREF");
   }
 
+  public static final String LITERAL_AFTER_KEYWORD_COMPILER_DIRECTIVE_CICS_TRANSLATOR =
+      "       CBL CICS (SP, {'EXCI'|1}) \n"
+          + "       IDENTIFICATION DIVISION.\n"
+          + "       PROGRAM-ID.  AB01FORE.\n"
+          + "       ENVIRONMENT DIVISION.\n"
+          + "       DATA DIVISION.\n"
+          + "       WORKING-STORAGE SECTION.";
+
   @ParameterizedTest
   @MethodSource("getOptions")
   void testOption(String cblOption) {
@@ -114,6 +124,20 @@ public class TestCICSTranslatorOptions {
   void testCompilerDirectivesMixedWithCICSTranslatorOptions() {
     UseCaseEngine.runTest(
         MIXED_COMPILER_DIRECTIVE_CICS_TRANSLATOR, ImmutableList.of(), ImmutableMap.of());
+  }
+
+  @Test
+  void testCompilerDirectivesLiteralAfterKeywordCICSTranslatorOptions() {
+    UseCaseEngine.runTest(
+        LITERAL_AFTER_KEYWORD_COMPILER_DIRECTIVE_CICS_TRANSLATOR,
+        ImmutableList.of(),
+        ImmutableMap.of(
+            "1",
+            new Diagnostic(
+                new Range(),
+                "No viable alternative at input CICS (SP, 'EXCI'",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText())));
   }
 
   @Test
@@ -133,7 +157,6 @@ public class TestCICSTranslatorOptions {
     Map<String, List<Diagnostic>> diagnostics = analyze.getDiagnostics();
     Assertions.assertEquals(1, diagnostics.get(UseCaseUtils.DOCUMENT_URI).size());
     Assertions.assertEquals(
-        "Syntax error on 'XOPTS'",
-        diagnostics.get(UseCaseUtils.DOCUMENT_URI).get(0).getMessage());
+        "Syntax error on 'XOPTS'", diagnostics.get(UseCaseUtils.DOCUMENT_URI).get(0).getMessage());
   }
 }

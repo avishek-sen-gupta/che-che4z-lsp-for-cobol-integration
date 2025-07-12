@@ -11,10 +11,10 @@
  * Contributors:
  *   Broadcom, Inc. - initial API and implementation
  */
-import * as path from "path";
 import * as vscode from "vscode";
 import { CopybookURI } from "../../../services/copybook/CopybookURI";
 import { Utils } from "../../../services/util/Utils";
+import { asMutable } from "../../../test/suite/testHelper";
 
 Utils.getZoweExplorerAPI = jest.fn();
 
@@ -22,32 +22,26 @@ describe("CopybooksPathGenerator tests", () => {
   const fsPath = "/projects";
   const profile = "profile";
   const dataset = "dataset";
-  (vscode.workspace.workspaceFolders as any) = [{ uri: { fsPath } } as any];
+
+  beforeEach(() => {
+    asMutable(vscode.workspace).workspaceFolders = [
+      { uri: { fsPath } } as unknown as vscode.WorkspaceFolder,
+    ];
+  });
 
   it("creates copybook path", () => {
     expect(
       CopybookURI.createCopybookPath(
-        profile,
+        [profile],
         dataset,
         "copybook",
         "downloadFolder",
       ),
-    ).toEqual(
-      path.join(
-        "downloadFolder",
-        "zowe",
-        "copybooks",
-        "profile",
-        "dataset",
-        "copybook",
-      ),
-    );
+    ).toEqual("downloadFolder/zowe/copybooks/profile/dataset/copybook");
   });
   it("creates dataset path", () => {
     expect(
-      CopybookURI.createDatasetPath(profile, dataset, "downloadFolder"),
-    ).toEqual(
-      path.join("downloadFolder", "zowe", "copybooks", "profile", "dataset"),
-    );
+      CopybookURI.createDatasetPath([profile], dataset, "downloadFolder"),
+    ).toEqual({ path: "downloadFolder/zowe/copybooks/profile/dataset" });
   });
 });

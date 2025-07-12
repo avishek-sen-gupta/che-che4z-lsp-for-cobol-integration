@@ -18,9 +18,7 @@ import lombok.experimental.UtilityClass;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 
-/**
- * AnalysisConfig Helper class
- */
+/** AnalysisConfig Helper class */
 @UtilityClass
 class AnalysisConfigHelper {
   /**
@@ -34,10 +32,14 @@ class AnalysisConfigHelper {
   public AnalysisConfig fromConfigEntity(
       CopybookProcessingMode mode, ConfigurationService.ConfigurationEntity entity) {
 
-    AnalysisConfig analysisConfig = new AnalysisConfig(mode, entity.getDialects(),
+    AnalysisConfig analysisConfig =
+        new AnalysisConfig(
+            mode,
+            entity.getDialects(),
             entity.isCicsTranslatorEnabled(),
-            entity.getDialectRegistry(),
-            entity.getDialectsSettings());
+                entity.getDialectsSettings(), false,
+            entity.getDialectRegistry()
+        );
     analysisConfig.getCompilerOptions().addAll(entity.getCompilerOptions());
     return analysisConfig;
   }

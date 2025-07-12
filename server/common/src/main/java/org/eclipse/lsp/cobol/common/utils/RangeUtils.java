@@ -15,14 +15,13 @@
 
 package org.eclipse.lsp.cobol.common.utils;
 
+import java.util.Optional;
 import lombok.experimental.UtilityClass;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.CopyNode;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
-
-import java.util.Optional;
 
 /** The utility class for work with document positions and ranges. */
 @UtilityClass
@@ -38,21 +37,14 @@ public class RangeUtils {
    */
   public static Optional<Node> findNodeByPosition(Node node, String uri, Position position) {
     Node candidate = null;
-    if (isFromCopybook(uri, node)) {
-      if (node.getChildren().isEmpty()) {
-        return Optional.of(node);
-      }
-      candidate = node;
-    }
-
-    if (isInside(uri, position, node.getLocality())) {
-      if (node.getChildren().isEmpty()) {
-        return Optional.of(node);
-      }
-      candidate = node;
-    }
-
     for (Node child : node.getChildren()) {
+      if (isFromCopybook(uri, child)) {
+        candidate = child;
+      }
+
+      if (isInside(uri, position, child.getLocality())) {
+        candidate = child;
+      }
       Optional<Node> nodeByPosition = findNodeByPosition(child, uri, position);
       if (nodeByPosition.isPresent()) {
         return nodeByPosition;
@@ -93,9 +85,9 @@ public class RangeUtils {
     return compareTo(after, before) < 0;
   }
 
-
   /**
    * Check if a range is in a scope
+   *
    * @param range range that should be in scope
    * @param scope a scope
    * @return is range in scope
@@ -133,6 +125,7 @@ public class RangeUtils {
 
   /**
    * Shifts range with a given position
+   *
    * @param position a starting position
    * @param range is an original range
    * @return shifted range
@@ -140,39 +133,23 @@ public class RangeUtils {
   public Range shiftRangeWithPosition(Position position, Range range) {
     int shift = range.getStart().getLine() == 0 ? position.getCharacter() : 0;
     return new Range(
-        new Position(position.getLine() + range.getStart().getLine(), range.getStart().getCharacter() + shift),
-        new Position(position.getLine() + range.getEnd().getLine(), range.getEnd().getCharacter() + shift)
-    );
-  }
-
-  /**
-   * Moves the end of the range on defined character's count
-   * @param range - range to extend
-   * @param count - character's count
-   * @return a new range
-   */
-  public Range extendByCharacter(Range range, int count) {
-    return new Range(range.getStart(),
-        new Position(range.getEnd().getLine(), range.getEnd().getCharacter() + count));
+        new Position(
+            position.getLine() + range.getStart().getLine(),
+            range.getStart().getCharacter() + shift),
+        new Position(
+            position.getLine() + range.getEnd().getLine(), range.getEnd().getCharacter() + shift));
   }
 
   /**
    * Moves the end of the range on defined lines's count
+   *
    * @param range - range to extend
    * @param count - line's count
    * @return a new range
    */
   public Range moveByLine(Range range, int count) {
-    return new Range(new Position(range.getStart().getLine() + count, range.getStart().getCharacter()),
+    return new Range(
+        new Position(range.getStart().getLine() + count, range.getStart().getCharacter()),
         new Position(range.getEnd().getLine() + count, range.getEnd().getCharacter()));
-  }
-
-  /**
-   * Returns character size of the range
-   * @param range - range
-   * @return character size
-   */
-  public int charSize(Range range) {
-    return range.getEnd().getCharacter() - range.getStart().getCharacter() + 1;
   }
 }

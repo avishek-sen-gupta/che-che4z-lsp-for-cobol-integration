@@ -15,19 +15,19 @@ import {
   CopybookDownloadService,
   CopybookName,
 } from "../services/copybook/CopybookDownloadService";
-import { TelemetryService } from "../services/reporter/TelemetryService";
+import { registerEvent } from "../services/reporter";
 
-export function fetchCopybookCommand(
+export async function fetchCopybookCommand(
   copybook: string,
   downloader: CopybookDownloadService,
   programName: string,
 ) {
-  TelemetryService.registerEvent(
+  registerEvent(
     "Fetch copybook",
     ["COBOL", "copybook", "quickfix"],
     "The user tries to resolve a copybook that is not currently found",
   );
-  downloader.downloadCopybooks(programName, [
+  await downloader.downloadCopybooks(programName, [
     new CopybookName(copybook, "COBOL"),
   ]);
 }

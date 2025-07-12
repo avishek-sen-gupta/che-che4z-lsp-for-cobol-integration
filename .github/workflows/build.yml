@@ -11,18 +11,19 @@
 #   Broadcom, Inc. - initial API and implementation
 
 name: build
-
+env:
+  graalvm-version: '21'
 on:
   workflow_dispatch:
     inputs:
-      with_telemetry:
-        description: "Build with telemetry"
-        required: true
-        default: 'false'
       skip_ui_tests:
         description: "Skip UI tests"
         required: true
         default: 'false'
+      include_build_number:
+        description: "Include build number"
+        required: false
+        default: 'true'
   pull_request:
     branches:
       - development
@@ -33,10 +34,48 @@ on:
       - master
 
 jobs:
+  checks:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies for COBOL LS
+        working-directory: clients/cobol-lsp-vscode-extension
+        run: npm ci
+      - name: Install & Build Analysis Package
+        working-directory: clients/analysis
+        run: |
+          npm ci
+          npm run compile     
+      - name: Install & Build VS Code extension dialect API
+        working-directory: clients/cobol-dialect-api
+        run: |
+          npm ci
+          npm run compile     
+      - name: Check code formatting for COBOL LS
+        working-directory: clients/cobol-lsp-vscode-extension
+        run: npm run lint-format
+      - name: Check code quality for COBOL LS
+        working-directory: clients/cobol-lsp-vscode-extension
+        run: npm run lint-quality
+  checks-server:
+    name: Checks server
+    runs-on: ubuntu-latest 
+    steps:
+      - uses: actions/checkout@v4
+      - uses: axel-op/googlejavaformat-action@v4
+        with:
+          args: "-i"
+          skip-commit: true
+      - name: Print diffs
+        run: git --no-pager diff --exit-code       
   zipSources:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install dependencies for COBOL LS Analysis module
+        working-directory: clients/analysis
+        run: NODE_ENV=production npm ci
       - name: Install dependencies for COBOL LS API
         working-directory: clients/cobol-dialect-api
         run: NODE_ENV=production npm ci
@@ -49,7 +88,7 @@ jobs:
       - name: Install dependencies for DaCo dialect
         working-directory: clients/daco-dialect-support
         run: NODE_ENV=production npm ci
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: clients-for-bd-scan
           path: clients/**
@@ -61,18 +100,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: graalvm/setup-graalvm@v1
         with:
-          version: '22.3.0'
-          java-version: '11'
+          java-version: ${{ env.graalvm-version }}
           components: 'native-image'
+          distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ## uncomment me if you need native image job reports
           # native-image-job-reports: 'true'
           cache: 'maven'
       - name: Generate assisted configuration for GraalVM native build
         working-directory: server
-        run: mvn -e -B -Pnative -Dagent=true -Dtest=\!PositiveTest* -DfailIfNoTests=false test
+        run: mvn -e -B -Pnative -DskipNativeTests -Dagent=true -Dtest=\!PositiveTest -Dsurefire.failIfNoSpecifiedTests=false test
       - name: Upload native build configuration
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
           name: native-build-configuration
@@ -84,73 +123,105 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: graalvm/setup-graalvm@v1
+      - uses: actions/setup-java@v4
         with:
-          version: '22.3.0'
+          distribution: 'temurin'
           java-version: '11'
-          components: 'native-image'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          ## uncomment me if you need native image job reports
-          # native-image-job-reports: 'true'
           cache: 'maven'
       - name: Build Server and Dialects Jars
         working-directory: server
         run: mvn clean verify --no-transfer-progress
       - name: Upload performance data
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
           name: test-perfomance-data
           path: server/engine/target/perf.csv
       - name: Upload jar files
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jar
           path: server/engine/target/server.jar
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
+      - name: Build Cobol Analysis Package Library
+        working-directory: clients/analysis
+        run: |
+          npm ci
+          npm run compile
+      - name: Upload Cobol Analysis Package Library
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis_lib
+          path: clients/analysis/*
       - name: Build VS Code extension dialect API
         working-directory: clients/cobol-dialect-api
         run: |
           npm ci
           npm run compile
       - name: Upload cobol dialect API library
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: lib
           path: clients/cobol-dialect-api/lib/*    
+      - name: Unit Test COBOL LS Analysis package
+        working-directory: clients/analysis
+        run: |
+          npm ci
+          npm run test
       - name: Unit Test COBOL LS extension
         working-directory: clients/cobol-lsp-vscode-extension
         run: |
           npm ci
           npm run test
+      - name: Package default COBOL LS vsix
+        working-directory: clients/cobol-lsp-vscode-extension
+        run: |
+          npm ci
+          cp ../../server/engine/target/server.jar ./server/jar
+          npm run package -- --baseContentUrl "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/"
+          cp *.vsix ../../.
       - name: Package IDMS vsix
         working-directory: clients/idms-dialect-support
         run: |
           npm ci
           cp ../../server/dialect-idms/target/dialect-idms.jar ./server/jar
-          npm run package
+          npm run package -- --baseContentUrl "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/"
           cp *.vsix ../../.
       - name: Package DaCo vsix
         working-directory: clients/daco-dialect-support
         run: |
           npm ci
           cp ../../server/dialect-daco/target/dialect-daco.jar ./server/jar
-          npm run package
+          npm run package -- --baseContentUrl "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/"
           cp *.vsix ../../.
       - name: Upload IDMS vsix
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
           name: vsix-idms-dialect
           path: 'cobol-language-support-for-idms*.vsix'
       - name: Upload DaCo vsix
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
           name: vsix-daco-dialect
           path: 'cobol-language-support-for-daco*.vsix'
+      - name: Upload COBOL LS default vsix
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: vsix-cobol-ls-default
+          path: |
+            cobol-language-support-*.vsix
+            !cobol-language-support-for-*.vsix
+      - name: Run COBOL LS extension integration tests
+        working-directory: clients/cobol-lsp-vscode-extension
+        run: |
+          cp ../../server/engine/target/server.jar ./server/jar
+          npm run build
+          xvfb-run -a npm exec c8 -- --reporter=lcovonly --allowExternal --exclude="**/test/**" --exclude=".vscode-test/**" --exclude=".vscode-test-web/**" -- npm run test:integration
       - name: SonarCloud Scan
         if: github.ref == 'refs/heads/development'
         uses: sonarsource/sonarcloud-github-action@49e6cd3b187936a73b8280d59ffd9da69df63ec9
@@ -161,6 +232,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Compile COBOL LS Analysis package
+        working-directory: clients/analysis
+        run: |
+          npm ci
+          npm run compile           
       - name: Unit Test COBOL LS Web extension
         working-directory: clients/cobol-lsp-vscode-extension
         run: |
@@ -170,10 +246,10 @@ jobs:
         working-directory: clients/cobol-lsp-vscode-extension
         run: |
           npm ci
-          npm run package:web
+          npm run package:web -- --baseContentUrl "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/"
           cp *.vsix ../../.
       - name: Upload Web vsix
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
           name: vsix-cobol-language-support-web
@@ -213,19 +289,18 @@ jobs:
 #        run: |
 #          sudo xcode-select -s /Applications/Xcode_12.5.1.app/Contents/Developer
 #          xcodebuild -version
-      - uses: al-cheb/configure-pagefile-action@v1.2
+      - uses: al-cheb/configure-pagefile-action@v1.4
         if: matrix.os == 'windows-latest'
         with:
           minimum-size: 16GB
           maximum-size: 16GB
           disk-root: "C:"
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: graalvm/setup-graalvm@v1
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x64'
         with:
-          version: '22.3.0'
-          java-version: '11'
-          components: 'native-image'
+          java-version: ${{ env.graalvm-version }}
+          distribution: 'graalvm-community'
           native-image-musl: 'true'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ## uncomment me if you need native image job reports
@@ -234,9 +309,8 @@ jobs:
       - uses: graalvm/setup-graalvm@v1
         if: matrix.os != 'ubuntu-latest' || matrix.arch != 'x64'
         with:
-          version: '22.3.0'
-          java-version: '11'
-          components: 'native-image'
+          java-version: ${{ env.graalvm-version }}
+          distribution: 'graalvm-community'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           ## uncomment me if you need native image job reports
           # native-image-job-reports: 'true'
@@ -244,7 +318,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         if: matrix.os == 'windows-latest'
       - name: Retrieve native build configurations
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: native-build-configuration
           path: native-build-configuration
@@ -267,7 +341,7 @@ jobs:
         run: mvn -e -B -Plinux-native -DskipTests clean package
       - name: Prepare windows artifacts
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: staging-${{ env.target }}
           path: |
@@ -277,7 +351,7 @@ jobs:
           if-no-files-found: error
       - name: Prepare non-windows artifacts
         if: matrix.os != 'windows-latest'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: staging-${{ env.target }}
           path: server/engine/target/engine
@@ -310,31 +384,25 @@ jobs:
       - shell: sh
         if: matrix.os == 'ubuntu-latest'
         run: echo "target=linux-${{ matrix.arch }}" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Retrieve native build
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: staging-${{ env.target }}
           path: staging/${{ env.target }}
       - name: Retrieve server jars
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: jar
           path: jar
       - name: Deploy server jar
         working-directory: clients/cobol-lsp-vscode-extension
         run: cp ../../jar/server.jar ./server/jar
-      - name: Setup telemetry key
-        working-directory: clients/cobol-lsp-vscode-extension
-        if: github.event.inputs.with_telemetry == 'true'
-        run: echo ${{ secrets.TELEMETRY_INSTRUMENTATION_KEY }} > resources/TELEMETRY_KEY
       - name: Deploy windows executable
         working-directory: clients/cobol-lsp-vscode-extension
         if: startsWith( matrix.os, 'windows')
         run: |
-          cp ../../staging/${{ env.target }}/engine.build_artifacts.txt ./server/native
           cp ../../staging/${{ env.target }}/engine.exe ./server/native
-          cp ../../staging/${{ env.target }}/sunmscapi.dll ./server/native
           cp ./server/native/* ../../tests/native-executable-tests/server/windows/
       - name: Deploy macos executable
         working-directory: clients/cobol-lsp-vscode-extension
@@ -350,34 +418,41 @@ jobs:
           cp -p ../../staging/${{ env.target }}/engine ./server/native/server-linux
           chmod +x ./server/native/server-linux
           cp ./server/native/server-linux ../../tests/native-executable-tests/server/linux/
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: 16
+          node-version: 20
+      - name: Download VS Code Analysis package
+        uses: actions/download-artifact@v4
+        with:
+          name: analysis_lib
+          path: clients/analysis
       - name: Download VS Code extension dialect API
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: lib
           path: clients/cobol-dialect-api
-      - name: update version for PR
+      - name: update version with PR or build number
+        if: github.event_name == 'pull_request' || github.event.inputs.include_build_number == 'true'
         working-directory: clients/cobol-lsp-vscode-extension
-        if: github.event_name == 'pull_request'
+        env:
+          BUILD_ID: ${{github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_number }}
         run: |
-          node -e "const fs=require('fs');const fileName='./package.json';var content=require(fileName);content.version=content.version+'\+pr-'+${{ github.event.pull_request.number }};fs.writeFileSync(fileName,JSON.stringify(content,null,2));"
+          node -e "const fs=require('fs');const fileName='./package.json';var content=require(fileName);content.version=content.version+'\+'+'${{ env.BUILD_ID }}';fs.writeFileSync(fileName,JSON.stringify(content,null,2));"
       - name: Build COBOL LS extension 
         run: npm ci
         working-directory: clients/cobol-lsp-vscode-extension
       - name: Package COBOL LS vsix for ${{ env.target }}
         working-directory: clients/cobol-lsp-vscode-extension
         run: |
-          npm run package  -- --target ${{ env.target }}
+          npm run package  -- --target ${{ env.target }} --baseContentUrl "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/"
           cp *.vsix ../../.
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
           name: vsix-cobol-language-support-${{ env.target }}
           path: 'cobol-language-support*.vsix'
       - name: Retrieve idms dialect
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vsix-idms-dialect
           path: dialects-idms
@@ -387,7 +462,7 @@ jobs:
           unzip -j dialects-idms/*.vsix extension/server/jar/dialect-idms.jar -d clients/idms-dialect-support/server/jar
         shell: bash
       - name: Retrieve daco dialect
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: vsix-daco-dialect
           path: dialects-daco
@@ -396,14 +471,13 @@ jobs:
           unzip -j dialects-daco/*.vsix extension/dist/extension.js extension/dist/extension.js.map -d clients/daco-dialect-support/dist/
           unzip -j dialects-daco/*.vsix extension/server/jar/dialect-daco.jar -d clients/daco-dialect-support/server/jar
         shell: bash
+      - name: Run extension unit tests
+        run: npm run test
+        working-directory: clients/cobol-lsp-vscode-extension
       - name: Run integration tests
         if: github.event.inputs.skip_ui_tests != 'true'
-        uses: coactions/setup-xvfb@v1
-        with:
-          run: |
-            npm run compile
-            npm run test:integration
-          working-directory: clients/cobol-lsp-vscode-extension          
+        run: ${{ matrix.os == 'ubuntu-latest' && 'xvfb-run' || '' }} npm run test:integration -- --native
+        working-directory: clients/cobol-lsp-vscode-extension          
       - name: Run native executable test code
         working-directory: tests/native-executable-tests
         run: |

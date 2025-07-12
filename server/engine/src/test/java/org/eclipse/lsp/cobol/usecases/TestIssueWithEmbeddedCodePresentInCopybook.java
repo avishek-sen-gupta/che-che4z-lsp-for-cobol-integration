@@ -69,7 +69,7 @@ public class TestIssueWithEmbeddedCodePresentInCopybook {
             "3",
             new Diagnostic(
                 new Range(),
-                "Extraneous input 'TIMESEP1'",
+                "Extraneous input TIMESEP1",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText()),
             "4",
@@ -77,6 +77,6 @@ public class TestIssueWithEmbeddedCodePresentInCopybook {
                 new Range(),
                 "No viable alternative at input for detch",
                 DiagnosticSeverity.Error,
-                ErrorSource.PARSING.getText())));
+                ErrorSource.PREPROCESSING.getText())));
   }
 }

@@ -17,19 +17,28 @@ package org.eclipse.lsp.cobol.service;
 import static java.lang.String.format;
 
 import com.google.inject.Inject;
+import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.lsp.cobol.cfg.CFASTBuilder;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
 import org.eclipse.lsp.cobol.common.LanguageEngineFacade;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
 import org.eclipse.lsp.cobol.common.utils.ThreadInterruptionUtil;
+import org.eclipse.lsp.cobol.core.model.extendedapi.ExtendedApiResult;
+import org.eclipse.lsp.cobol.core.model.extendedapi.Program;
+import org.eclipse.lsp.cobol.lsp.jrpc.CobolLanguageClient;
 import org.eclipse.lsp.cobol.service.copybooks.CopybookIdentificationService;
 import org.eclipse.lsp.cobol.service.settings.ConfigurationService;
 
@@ -45,6 +54,8 @@ public class AnalysisService {
   private List<String> copybookExtensions;
 
   private final DocumentModelService documentService;
+  private final Optional<CFASTBuilder> cfastBuilder;
+  private final Provider<CobolLanguageClient> clientProvider;
 
   @Inject
   AnalysisService(
@@ -52,12 +63,16 @@ public class AnalysisService {
       ConfigurationService configurationService,
       @Named("combinedStrategy") CopybookIdentificationService copybookIdentificationService,
       CopybookService copybookService,
-      DocumentModelService documentService) {
+      DocumentModelService documentService,
+      @Nullable CFASTBuilder cfastBuilder,
+      Provider<CobolLanguageClient> clientProvider) {
     this.engine = engine;
     this.configurationService = configurationService;
     this.copybookIdentificationService = copybookIdentificationService;
     this.copybookService = copybookService;
     this.documentService = documentService;
+    this.cfastBuilder = Optional.ofNullable(cfastBuilder);
+    this.clientProvider = clientProvider;
   }
 
   /**
@@ -97,10 +112,12 @@ public class AnalysisService {
     String logPrefix = isNew ? "[analyzeDocument] Document " : "[reanalyzeDocument] Document ";
     LOG.debug(logPrefix + uri + " opened");
 
+    List<Program> astList = new LinkedList<>();
     if (!isCopybook(uri, text)) {
       LOG.debug(logPrefix + uri + " treated as a program, start analyzing");
-      analyzeDocumentWithCopybooks(uri, text);
+      astList = analyzeDocumentWithCopybooks(uri, text);
     }
+    this.clientProvider.get().cfastReady(new ExtendedApiResult(astList, uri));
   }
 
   /**
@@ -108,22 +125,38 @@ public class AnalysisService {
    *
    * @param uri - document uri
    * @param text - document text
+   * @return a list of program nodes
    */
-  private void analyzeDocumentWithCopybooks(String uri, String text) {
+  private List<Program> analyzeDocumentWithCopybooks(String uri, String text) {
+    List<Program> astList = new LinkedList<>();
     try {
-      CopybookProcessingMode copybookProcessingMode = CopybookProcessingMode.getCopybookProcessingMode(uri, CopybookProcessingMode.ENABLED);
+      CopybookProcessingMode copybookProcessingMode =
+          CopybookProcessingMode.getCopybookProcessingMode(uri, CopybookProcessingMode.ENABLED);
       AnalysisConfig config = configurationService.getConfig(uri, copybookProcessingMode);
-      AnalysisResult result = engine.analyze(uri, text, config, documentService.get(uri).getLanguageId());
+      ThreadInterruptionUtil.checkThreadInterrupted();
+      AnalysisResult result =
+          engine.analyze(uri, text, config, documentService.get(uri).getLanguageId());
       documentService.processAnalysisResult(uri, result, text);
       ThreadInterruptionUtil.checkThreadInterrupted();
       copybookService.sendCopybookDownloadRequest(
-              uri, DocumentServiceHelper.extractCopybookUris(result), copybookProcessingMode);
+          uri, DocumentServiceHelper.extractCopybookUris(result), copybookProcessingMode);
+
+      cfastBuilder.ifPresent(
+          builder ->
+              astList.addAll(
+                  result.getRootNode().findPrograms().stream()
+                      .map(builder::build)
+                      .flatMap(m -> m.getControlFlowAST().stream())
+                      .collect(Collectors.toList())));
+
       LOG.debug("[doAnalysis] Document " + uri + " analyzed: " + result.getDiagnostics());
+
     } catch (Exception e) {
-      documentService.processAnalysisResult(uri, AnalysisResult.builder().build(), text);
+      documentService.processAnalysisResult(uri, AnalysisResult.EMPTY, text);
       LOG.debug(format("An exception thrown while applying %s for %s:", "analysis", uri));
       LOG.error(format("An exception thrown while applying %s for %s:", "analysis", uri), e);
       throw e;
     }
+    return astList;
   }
 }

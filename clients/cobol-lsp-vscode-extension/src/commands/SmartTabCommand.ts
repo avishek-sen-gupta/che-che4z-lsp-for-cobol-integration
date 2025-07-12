@@ -14,7 +14,7 @@
 
 import * as vscode from "vscode";
 import { Selection } from "vscode";
-import { SettingsService, TabSettings } from "../services/Settings";
+import { getTabSettings, TabSettings } from "../services/SmartTabSettings";
 
 const SMART_TAB_COMMAND: string = "cobol-lsp.smart-tab";
 const SMART_OUTDENT_COMMAND: string = "cobol-lsp.smart-outdent";
@@ -43,7 +43,7 @@ abstract class SmartCommandProvider {
         (
           editor: vscode.TextEditor,
           edit: vscode.TextEditorEdit,
-          ...args: any[]
+          ...args: unknown[]
         ) => {
           this.execute(editor, edit, args);
         },
@@ -60,15 +60,15 @@ abstract class SmartCommandProvider {
   public abstract execute(
     editor: vscode.TextEditor,
     edit: vscode.TextEditorEdit,
-    args: any[],
+    args: unknown[],
   ): void;
 }
 
 export class SmartTabCommandProvider extends SmartCommandProvider {
   public execute(editor: vscode.TextEditor, edit: vscode.TextEditorEdit) {
-    let newSelections: Selection[] = new Array();
+    let newSelections: Selection[] = [];
     const selections = getActualSelectionForTab(editor);
-    for (let selection of selections.actualSelection) {
+    for (const selection of selections.actualSelection) {
       const position = selection.active;
       if (
         !checkRangeLiesBetweenSelection(selections.rangeSelection, position)
@@ -89,9 +89,9 @@ export class SmartTabCommandProvider extends SmartCommandProvider {
 
 export class SmartOutdentCommandProvider extends SmartCommandProvider {
   public execute(editor: vscode.TextEditor, edit: vscode.TextEditorEdit) {
-    let newSelections: Selection[] = new Array();
+    let newSelections: Selection[] = [];
     const selections = getActualSelectionForTab(editor);
-    for (let selection of selections.actualSelection) {
+    for (const selection of selections.actualSelection) {
       const position = selection.active;
       if (
         !checkRangeLiesBetweenSelection(selections.rangeSelection, position)
@@ -121,14 +121,14 @@ export class SmartOutdentCommandProvider extends SmartCommandProvider {
     position: vscode.Position,
     newSelections: vscode.Selection[],
   ) {
-    let charPosition = this.findSolidCharPosition(editor, position);
+    const charPosition = this.findSolidCharPosition(editor, position);
     if (charPosition === 0) {
       return;
     }
     let prevPosition = getPrevPosition(
       editor,
       charPosition,
-      SettingsService.getTabSettings(),
+      getTabSettings(),
       position.line,
     );
     if (
@@ -145,11 +145,11 @@ export class SmartOutdentCommandProvider extends SmartCommandProvider {
         ),
       );
     } else {
-      let prevSolidPosition = this.findPrevSolidPosition(
+      const prevSolidPosition = this.findPrevSolidPosition(
         editor,
         new vscode.Position(position.line, charPosition - 1),
       );
-      let removeSize = Math.max(
+      const removeSize = Math.max(
         0,
         Math.min(charPosition - prevSolidPosition - 1, getTabSize()),
       );
@@ -173,8 +173,8 @@ export class SmartOutdentCommandProvider extends SmartCommandProvider {
     edit: vscode.TextEditorEdit,
     rangeSelection: vscode.Selection[],
   ) {
-    const result: Selection[] = new Array();
-    for (let selection of rangeSelection) {
+    const result: Selection[] = [];
+    for (const selection of rangeSelection) {
       let { lastShift, lastShifts } = this.getlastShift(editor);
       for (
         let lineNumber = selection.start.line;
@@ -290,11 +290,11 @@ export class RangeTabShiftStore {
     }
   }
 
-  static clearCache(key: any) {
+  static clearCache(key: vscode.Uri) {
     this.store.delete(key);
   }
 
-  static getCachedShifts(key: any) {
+  static getCachedShifts(key: vscode.Uri) {
     return this.store.get(key);
   }
 
@@ -315,7 +315,7 @@ function handleIndividualTab(
     const nextPosition = getNextPosition(
       editor,
       column,
-      SettingsService.getTabSettings(),
+      getTabSettings(),
       position.line,
     );
     const lineLen = getCurrentLine(editor, position.line).length;
@@ -328,7 +328,7 @@ function handleIndividualTab(
     const nextPosition = getNextPosition(
       editor,
       column,
-      SettingsService.getTabSettings(),
+      getTabSettings(),
       position.line,
     );
     const insertSize = nextPosition - column;
@@ -419,13 +419,13 @@ export function getRule(
   line: number,
   tabSettings: TabSettings,
 ) {
-  let rule = tabSettings.defaultRule;
+  const rule = tabSettings.defaultRule;
   if (line > 0 && tabSettings.rules.length > 0) {
     line -= 1;
     const regexps = tabSettings.rules.map((r) => new RegExp(r.regex!));
 
     while (line >= 0) {
-      let str = getCurrentLine(editor, line);
+      const str = getCurrentLine(editor, line);
       if (str.length > 6 && str.charAt(6) !== "*") {
         for (let i = 0; i < regexps.length; i++) {
           if (regexps[i].test(str)) {
@@ -493,7 +493,7 @@ function getTabSize(): number {
 function getActualSelectionForTab(editor: vscode.TextEditor) {
   const actualSelection: vscode.Selection[] = [];
   const rangeSelection: vscode.Selection[] = [];
-  for (let selection of editor.selections) {
+  for (const selection of editor.selections) {
     const selectionStartLine = selection.start?.line
       ? selection.start.line
       : selection.active.line;
@@ -555,8 +555,8 @@ function handleRangeSelection(
   editor: vscode.TextEditor,
   edit: vscode.TextEditorEdit,
 ) {
-  const result: Selection[] = new Array();
-  for (let selection of rangeSelection) {
+  const result: Selection[] = [];
+  for (const selection of rangeSelection) {
     const expectedShiftMap = getCurrentPositionToNextPositionMap(
       selection,
       editor,
@@ -619,12 +619,7 @@ function getCurrentPositionToNextPositionMap(
     const column = currentLine.firstNonWhitespaceCharacterIndex;
     result.set(
       currentLine,
-      getNextPosition(
-        editor,
-        column,
-        SettingsService.getTabSettings(),
-        currentLine.lineNumber,
-      ),
+      getNextPosition(editor, column, getTabSettings(), currentLine.lineNumber),
     );
   }
   return result;

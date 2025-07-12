@@ -21,19 +21,23 @@ import * as path from "path";
 suite("Integration Test Suite: Copybooks", function () {
   suiteSetup(async function () {
     this.timeout(0);
-    helper.updateConfig("basic.json");
+    await helper.updateConfig("basic.json");
     await helper.activate();
   });
 
-  this.afterEach(async () => await helper.closeAllEditors()).timeout(
-    helper.TEST_TIMEOUT,
-  );
+  this.afterEach(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    await helper.closeAllEditors();
+  });
+
+  this.afterAll(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    await helper.closeAllEditors();
+  });
 
   test("TC174655: Copybook - Nominal", async () => {
-    await helper.showDocument("USERC1N1.cbl");
-    const editor = helper.get_editor("USERC1N1.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("USERC1N1.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(
       diagnostics[0].severity,
       vscode.DiagnosticSeverity.Error,
@@ -44,10 +48,8 @@ suite("Integration Test Suite: Copybooks", function () {
     .slow(1000);
 
   test("TC174657: Copybook - not exist: no syntax ok message", async () => {
-    await helper.showDocument("USERC1F.cbl");
-    const editor = helper.get_editor("USERC1F.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("USERC1F.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(
       diagnostics[0].severity,
       vscode.DiagnosticSeverity.Error,
@@ -58,10 +60,8 @@ suite("Integration Test Suite: Copybooks", function () {
     .slow(1000);
 
   test("TC174658, TC174658: Copybook - not exist: error underlying and detailed hint", async () => {
-    await helper.showDocument("USERC1F.cbl");
-    const editor = helper.get_editor("USERC1F.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("USERC1F.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 3);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
@@ -73,10 +73,8 @@ suite("Integration Test Suite: Copybooks", function () {
     .slow(1000);
 
   test("TC174916/TC174917 Copybook - recursive error and detailed hint", async () => {
-    await helper.showDocument("USERC1R.cbl");
-    const editor = helper.get_editor("USERC1R.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("USERC1R.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 3);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
@@ -91,10 +89,8 @@ suite("Integration Test Suite: Copybooks", function () {
     .slow(1000);
 
   test("TC174932/TC174933 Copybook - invalid definition and hint", async () => {
-    await helper.showDocument("USERC1N2.cbl");
-    const editor = helper.get_editor("USERC1N2.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("USERC1N2.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 4);
     helper.assertRangeIsEqual(
       diagnostics[3].range,
@@ -109,10 +105,8 @@ suite("Integration Test Suite: Copybooks", function () {
     .slow(1000);
 
   test("TC174952 Copybook - not exist, but dynamically appears", async () => {
-    await helper.showDocument("VAR.cbl");
-    let editor = helper.get_editor("VAR.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("VAR.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 2);
     helper.assertRangeIsEqual(
       diagnostics[0].range,
@@ -135,10 +129,8 @@ suite("Integration Test Suite: Copybooks", function () {
     .slow(1000);
 
   test("TC174952 / TC174953 Copybook - definition not exist, but dynamically appears", async () => {
-    await helper.showDocument("USERC1F.cbl");
-    let editor = helper.get_editor("USERC1F.cbl");
-    await helper.waitForDiagnostics(editor.document.uri);
-    let diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+    const editor = await helper.showDocument("USERC1F.cbl");
+    const diagnostics = await helper.waitForDiagnostics(editor.document.uri);
     helper.assertRangeIsEqual(
       diagnostics[2].range,
       new vscode.Range(pos(41, 29), pos(41, 46)),
@@ -171,7 +163,7 @@ suite("Integration Test Suite: Copybooks", function () {
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
 
-  test("TC247497 - Local Copybooks - check hidden folders under c4z", async () => {
+  test("TC247497 - Local Copybooks - check hidden folders under c4z", () => {
     const extSrcPath = path.join(getWorkspacePath(), ".c4z", ".extsrcs");
     const extSrcUri = vscode.Uri.file(extSrcPath);
     const hiddenFolder = vscode.workspace.getWorkspaceFolder(extSrcUri);
@@ -179,4 +171,107 @@ suite("Integration Test Suite: Copybooks", function () {
   })
     .timeout(helper.TEST_TIMEOUT)
     .slow(1000);
+
+  suite("Default local copybooks paths configuration", () => {
+    suite("local copybook path is configured", function () {
+      this.timeout(helper.TEST_TIMEOUT);
+      suiteSetup(async () => {
+        await helper.updateConfig("testing.json");
+        await helper.activate();
+      });
+
+      test("Only folder from configuration is used for local copybook resolution, copybooks outside of the selected folder are not resolved", async () => {
+        const editor = await helper.showDocument("USERC1N1.cbl");
+
+        let diagnostics: vscode.Diagnostic[] = [];
+        await helper.waitFor(() => {
+          diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+          return (
+            diagnostics.length > 0 &&
+            diagnostics.some((d) => d.message === "BOOK1N: Copybook not found")
+          );
+        });
+
+        assert.strictEqual(
+          diagnostics.filter((d) => d.message === "BOOK1N: Copybook not found")
+            .length,
+          1,
+        );
+      });
+    });
+
+    suite("remote dns copybook path is configured", function () {
+      this.timeout(helper.TEST_TIMEOUT);
+      suiteSetup(async () => {
+        await helper.updateConfig("default.json");
+        await helper.updateConfigValue("cobol-lsp.cpy-manager.paths-dsn", [
+          "DATASET.WITH.CPYBOOKS",
+        ]);
+        await helper.activate();
+      });
+
+      test("No local copybooks folder is used for local copybook resolution, copybook not found error is reported", async () => {
+        const editor = await helper.showDocument("USERC1N1.cbl");
+
+        let diagnostics: vscode.Diagnostic[] = [];
+        await helper.waitFor(() => {
+          diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+          return (
+            diagnostics.length > 0 &&
+            diagnostics.some((d) => d.message === "BOOK1N: Copybook not found")
+          );
+        });
+
+        assert.strictEqual(
+          diagnostics.filter((d) => d.message === "BOOK1N: Copybook not found")
+            .length,
+          1,
+        );
+      });
+    });
+  });
+
+  suite("Copybooks auto completions", function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    suiteSetup(async () => {
+      await helper.updateConfig("basic.json");
+      await helper.activate();
+    });
+
+    test("Copybooks auto completions are provided", async function () {
+      const editor = await helper.openUntitledDocument();
+      await helper.insertString(editor, pos(0, 0), "      COPY PAY.");
+
+      await helper.sleep(1000);
+
+      const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
+      assert.strictEqual(diagnostics.length, 0);
+
+      helper.moveCursor(editor, helper.pos(0, 14));
+
+      const completions = await helper.triggerCompletionsAndWaitForResults();
+      await helper.sleep(1000);
+
+      const position = completions.items.findIndex(
+        (ci) => ci.label === "PAYLIB",
+      );
+      assert.notEqual(
+        position,
+        -1,
+        `PAYLIB completion not found, ${JSON.stringify(completions.items.slice(0, 10))}`,
+      );
+
+      await helper.executeCommandMultipleTimes(
+        "selectNextSuggestion",
+        position,
+      );
+
+      await vscode.commands.executeCommand("acceptSelectedSuggestion");
+      await helper.waitFor(() => {
+        return editor.document.lineAt(0).text.trim() === "COPY PAYLIB.";
+      });
+
+      assert.strictEqual(editor.document.lineAt(0).text.trim(), "COPY PAYLIB.");
+    });
+  });
 });

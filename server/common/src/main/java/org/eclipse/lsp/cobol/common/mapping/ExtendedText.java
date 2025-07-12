@@ -15,25 +15,21 @@
 package org.eclipse.lsp.cobol.common.mapping;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import lombok.Getter;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.function.Consumer;
-
-/**
- * Extended Text contains information about original text and current text with the mapping
- */
+/** Extended Text contains information about original text and current text with the mapping */
 public class ExtendedText {
   private final List<ExtendedTextLine> lines = new ArrayList<>();
   private final List<Mapper> mappers;
   private final List<ReplaceStrategy> replacers;
-  @Getter
-  private final String uri;
+  @Getter private final String uri;
 
   public ExtendedText(String text, String uri) {
     String[] textLines = MappingHelper.split(text);
@@ -42,8 +38,13 @@ public class ExtendedText {
       lines.add(new ExtendedTextLine(line, i, uri));
     }
     this.uri = uri;
-    mappers = ImmutableList.of(new InsertMapper(), new ReplaceMapper(), new StraightforwardMapper());
-    replacers = ImmutableList.of(new OneToOneReplaceStrategy(), new SingleLineReplaceStrategy(), new MultilineReplaceStrategy());
+    mappers =
+        ImmutableList.of(new InsertMapper(), new ReplaceMapper(), new StraightforwardMapper());
+    replacers =
+        ImmutableList.of(
+            new OneToOneReplaceStrategy(),
+            new SingleLineReplaceStrategy(),
+            new MultilineReplaceStrategy());
   }
 
   @Override
@@ -78,9 +79,8 @@ public class ExtendedText {
       return new Location(uri, range);
     }
     for (Mapper mapper : mappers) {
-      Location result = mapper.apply(startCharacter, endCharacter);
-      if (result != null) {
-        return result;
+      if (mapper.canApply(startCharacter, endCharacter)) {
+        return mapper.apply(startCharacter, endCharacter);
       }
     }
     throw new RuntimeException("Cannot find original position");
@@ -88,6 +88,7 @@ public class ExtendedText {
 
   /**
    * Perform operation for the text lines
+   *
    * @param operation - operation to be performed on the test lines
    */
   public void perform(Consumer<ExtendedTextLine> operation) {
@@ -98,6 +99,7 @@ public class ExtendedText {
 
   /**
    * Inserts an extended text to the given line number
+   *
    * @param line - a line number to insert
    * @param text - an extended text
    * @param originalLocation - an original (before changes) location for the statement
@@ -110,12 +112,15 @@ public class ExtendedText {
   }
 
   private ExtendedTextLine updateLine(ExtendedTextLine textLine, Location initialLocation) {
-    textLine.getCharacters().forEach(c -> c.getInitialLocationMap().put(uri, initialLocation));
+    textLine
+        .getCharacters()
+        .forEach(c -> c.getOrCreateInitialLocationMap().put(uri, initialLocation));
     return textLine;
   }
 
   /**
    * Inserts an extended text line to the given position
+   *
    * @param position - a position to insert
    * @param newLine - an extended line
    */
@@ -125,6 +130,7 @@ public class ExtendedText {
 
   /**
    * Inserts an extended text line to the given line number
+   *
    * @param line - a line number to insert
    * @param newLine - an extended line
    */
@@ -134,6 +140,7 @@ public class ExtendedText {
 
   /**
    * Substitutes copybook statement range with a copybook extended text
+   *
    * @param copyStatementRange - a copybook statement range
    * @param copybook - a copybook extended text
    */
@@ -147,6 +154,7 @@ public class ExtendedText {
 
   /**
    * Substitutes copybook statement range with a copybook extended text with respect to spaces
+   *
    * @param copyStatementRange - a copybook statement range
    * @param copybook - a copybook extended text
    */
@@ -162,7 +170,10 @@ public class ExtendedText {
       ExtendedTextLine copybookLine = copybook.lines.get(0);
       ExtendedTextLine firstLine = lines.get(initialLine);
       copybookLine.trim();
-      firstLine.insert(copyStatementRange.getEnd().getCharacter(), updateLine(copybookLine, initialLocation));
+
+      delete(copyStatementRange);
+      firstLine.insert(
+          copyStatementRange.getStart().getCharacter(), updateLine(copybookLine, initialLocation));
 
       for (int i = 1; i < copybook.lines.size() - 1; i++) {
         copybookLine = copybook.lines.get(i);
@@ -180,7 +191,8 @@ public class ExtendedText {
           ExtendedTextLine lastLine = lines.get(initialLine + copybook.lines.size() - 1);
           lastLine.insert(0, updateLine(copybookLine, initialLocation));
         } else {
-          insert(initialLine + copybook.lines.size() - 1, updateLine(copybookLine, initialLocation));
+          insert(
+              initialLine + copybook.lines.size() - 1, updateLine(copybookLine, initialLocation));
         }
       }
     }
@@ -188,22 +200,26 @@ public class ExtendedText {
 
   /**
    * Removes given range of text
+   *
    * @param range - a range of text
    */
   public void delete(Range range) {
-    if (range.getStart().getLine() == range.getEnd().getLine()) {
-      lines.get(range.getStart().getLine()).delete(range.getStart().getCharacter(), range.getEnd().getCharacter());
+    Position start = range.getStart();
+    Position end = range.getEnd();
+    if (start.getLine() == end.getLine()) {
+      lines.get(start.getLine()).delete(start.getCharacter(), end.getCharacter());
     } else {
-      lines.get(range.getStart().getLine()).trim(range.getStart().getCharacter());
-      lines.get(range.getEnd().getLine()).delete(0, range.getEnd().getCharacter());
-      if (range.getStart().getLine() + 1 <= range.getEnd().getLine() - 1) {
-        lines.subList(range.getStart().getLine() + 1, range.getEnd().getLine()).clear();
+      lines.get(start.getLine()).trim(start.getCharacter());
+      lines.get(end.getLine()).delete(0, end.getCharacter());
+      if (start.getLine() + 1 <= end.getLine() - 1) {
+        lines.subList(start.getLine() + 1, end.getLine()).clear();
       }
     }
   }
 
   /**
    * Removes text lines that are represents by the range
+   *
    * @param range - range representation of line list
    */
   public void deleteLines(Range range) {
@@ -214,6 +230,7 @@ public class ExtendedText {
 
   /**
    * Removes a given line from the text
+   *
    * @param lineNumber - a line number to remove
    */
   public void delete(int lineNumber) {
@@ -222,6 +239,7 @@ public class ExtendedText {
 
   /**
    * Appends a line with an extended line
+   *
    * @param lineNumber - line number to append
    * @param line - an extended line
    */
@@ -231,24 +249,51 @@ public class ExtendedText {
 
   /**
    * Clears a range of the text
+   *
    * @param range - a range to clear
    */
   public void clear(Range range) {
     if (range.getStart().getLine() == range.getEnd().getLine()) {
-      lines.get(range.getStart().getLine()).clear(range.getStart().getCharacter(), range.getEnd().getCharacter());
+      lines
+          .get(range.getStart().getLine())
+          .clear(range.getStart().getCharacter(), range.getEnd().getCharacter());
     } else {
       ExtendedTextLine line = lines.get(range.getStart().getLine());
-      line.clear(range.getStart().getCharacter(), line.size() - 1);
+      line.clear(range.getStart().getCharacter(), line.size());
 
       if (range.getStart().getLine() + 1 <= range.getEnd().getLine() - 1) {
-        lines.subList(range.getStart().getLine() + 1, range.getEnd().getLine()).forEach(ExtendedTextLine::clear);
+        lines
+            .subList(range.getStart().getLine() + 1, range.getEnd().getLine())
+            .forEach(ExtendedTextLine::clear);
       }
       lines.get(range.getEnd().getLine()).clear(0, range.getEnd().getCharacter());
     }
   }
 
   /**
+   * Replace range with character
+   *
+   * @param range - a range to clear
+   */
+  public void fillArea(Range range, char c) {
+    Position start = range.getStart();
+    Position end = range.getEnd();
+    if (start.getLine() == end.getLine()) {
+      lines.get(start.getLine()).fillArea(start.getCharacter(), end.getCharacter(), c);
+    } else {
+      ExtendedTextLine line = lines.get(start.getLine());
+      line.fillArea(start.getCharacter(), line.size(), c);
+
+      if (start.getLine() + 1 <= end.getLine() - 1) {
+        lines.subList(start.getLine() + 1, end.getLine()).forEach((l) -> l.fillLine(c));
+      }
+      lines.get(end.getLine()).fillArea(0, end.getCharacter(), c);
+    }
+  }
+
+  /**
    * Adds a line break to the given position
+   *
    * @param position - a position in the text
    */
   public void addLineBreak(Position position) {
@@ -273,6 +318,7 @@ public class ExtendedText {
 
   /**
    * Replaces given range of text with a new text
+   *
    * @param range - range of text to replace
    * @param newText - a new text
    * @param instantLocation - an instant location for replaced block (can be null)
@@ -302,9 +348,16 @@ public class ExtendedText {
     int shift = character - (line.size() - 1);
     character = line.size() - 1;
     MappedCharacter result = line.getCharacterAt(character);
-    Position originalPos = Optional.ofNullable(result.getOriginalPosition())
-        .map(op -> new Position(op.getLine(), op.getCharacter() + shift))
-        .orElse(null);
-    return new MappedCharacter(result.getCharacter(), originalPos, result.getUri(), result.getParent(), result.getInstantLocation(), result.getInitialLocationMap());
+    Position originalPos =
+        Optional.ofNullable(result.getOriginalPosition())
+            .map(op -> new Position(op.getLine(), op.getCharacter() + shift))
+            .orElse(null);
+    return new MappedCharacter(
+        result.getCharacter(),
+        originalPos,
+        result.getUri(),
+        result.getParent(),
+        result.getInstantLocation(),
+        result.getInitialLocationMap());
   }
 }

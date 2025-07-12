@@ -14,16 +14,17 @@
  */
 package org.eclipse.lsp.cobol.common.mapping;
 
+import java.util.Arrays;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
-/**
- * Replacement text strategy for multiline case
- */
+/** Replacement text strategy for multiline case */
 class MultilineReplaceStrategy implements ReplaceStrategy {
   @Override
-  public boolean execute(ExtendedText extendedText, Range range, String newText, Location originalLocation) {
+  public boolean execute(
+      ExtendedText extendedText, Range range, String newText, Location originalLocation) {
     if (range.getEnd().getLine() != range.getStart().getLine()) {
       extendedText.delete(range);
       String[] newLines = MappingHelper.split(newText);
@@ -33,19 +34,25 @@ class MultilineReplaceStrategy implements ReplaceStrategy {
     return false;
   }
 
-  private void addLines(ExtendedText extendedText, int firstLine, String[] newLines, Location instantLocation) {
-    if (newLines.length == 1) {
-      extendedText.append(firstLine, new ExtendedTextLine(newLines[0], instantLocation, extendedText.getUri()));
-    } else if (newLines.length > 1) {
-      extendedText.append(firstLine, new ExtendedTextLine(newLines[0], instantLocation, extendedText.getUri()));
-      extendedText.insert(new Position(firstLine + 1, 0), new ExtendedTextLine(newLines[newLines.length - 1],
-          instantLocation, extendedText.getUri()));
-      for (int i = 1; i < newLines.length - 2; i++) {
-        extendedText.insert(firstLine + i, new ExtendedTextLine(newLines[i], instantLocation, extendedText.getUri()));
-      }
-    } else {
+  private void addLines(
+      ExtendedText extendedText, int firstLine, String[] newLines, Location instantLocation) {
+    if (doAppendToSameLine(newLines)) {
       extendedText.append(firstLine, extendedText.getLines().get(firstLine + 1));
       extendedText.delete(firstLine + 1);
+    } else {
+      extendedText.append(firstLine, new ExtendedTextLine(newLines[0], instantLocation));
+      if (newLines.length > 1) {
+        extendedText.insert(
+            new Position(firstLine + 1, 0),
+            new ExtendedTextLine(newLines[newLines.length - 1], instantLocation));
+        for (int i = 1; i < newLines.length - 2; i++) {
+          extendedText.insert(firstLine + i, new ExtendedTextLine(newLines[i], instantLocation));
+        }
+      }
     }
+  }
+
+  private static boolean doAppendToSameLine(String[] newLines) {
+    return newLines.length == 0 || Arrays.stream(newLines).allMatch(StringUtils::isEmpty);
   }
 }

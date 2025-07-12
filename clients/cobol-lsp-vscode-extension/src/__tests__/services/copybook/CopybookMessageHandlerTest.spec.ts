@@ -15,29 +15,20 @@
 import { SettingsService } from "../../../services/Settings";
 import * as vscode from "vscode";
 import { Utils } from "../../../services/util/Utils";
-import path = require("path");
-import { globSync } from "glob";
 import * as fs from "fs";
 import { CopybookDownloadService } from "../../../services/copybook/CopybookDownloadService";
+import path = require("path");
+import * as ProcessorGroups from "../../../services/ProcessorGroups";
+import * as fsUtils from "../../../services/util/FSUtils";
 
 vscode.workspace.getConfiguration = jest.fn().mockReturnValue({
   get: jest.fn().mockReturnValue("testProfile"),
 });
-
 Utils.getZoweExplorerAPI = jest.fn();
-jest.mock("glob");
-jest.mock("url", () => {
-  return {
-    URL: jest.fn().mockImplementation((x) => {
-      return { href: x };
-    }),
-  };
-});
-(globSync as any) = jest.fn().mockImplementation((x: any) => [x]);
-(fs.realpathSync.native as any) = jest.fn().mockImplementation((x: any) => x);
-(vscode.Uri.file as any) = jest.fn().mockImplementation((x: any) => {
-  return { fsPath: x, toString: jest.fn().mockReturnValue("file://" + x) };
-});
+
+jest
+  .spyOn(fs.realpathSync, "native")
+  .mockImplementation((x: fs.PathLike) => x.toString());
 
 describe("Test the copybook message handler", () => {
   beforeEach(() => {
@@ -45,10 +36,12 @@ describe("Test the copybook message handler", () => {
   });
   const downloaderNoApi = new CopybookDownloadService("/storagePath");
   it("checks local present copybooks are resolved", async () => {
-    SettingsService.getCopybookExtension = jest.fn().mockReturnValue([".cpy"]);
+    SettingsService.getCopybookExtension = jest
+      .fn()
+      .mockReturnValue(Promise.resolve([".cpy"]));
     SettingsService.getCopybookLocalPath = jest
       .fn()
-      .mockReturnValue(["/configured/path/from/setting"]);
+      .mockReturnValue(Promise.resolve(["/configured/path/from/setting"]));
 
     expect(
       await downloaderNoApi.resolveCopybookHandler(
@@ -69,8 +62,12 @@ describe("Test the copybook message handler", () => {
   });
 
   it("checks downloaded copybooks are resolved", async () => {
-    SettingsService.getCopybookExtension = jest.fn().mockReturnValue([".cpy"]);
-    SettingsService.getCopybookLocalPath = jest.fn().mockReturnValue([]);
+    SettingsService.getCopybookExtension = jest
+      .fn()
+      .mockReturnValue(Promise.resolve([".cpy"]));
+    SettingsService.getCopybookLocalPath = jest
+      .fn()
+      .mockReturnValue(Promise.resolve([]));
     SettingsService.getDsnPath = jest
       .fn()
       .mockReturnValue(["/configured/path"]);
@@ -95,8 +92,12 @@ describe("Test the copybook message handler", () => {
   });
 
   it("checks USS downloaded copybooks are resolved", async () => {
-    SettingsService.getCopybookExtension = jest.fn().mockReturnValue([".cpy"]);
-    SettingsService.getCopybookLocalPath = jest.fn().mockReturnValue([]);
+    SettingsService.getCopybookExtension = jest
+      .fn()
+      .mockReturnValue(Promise.resolve([".cpy"]));
+    SettingsService.getCopybookLocalPath = jest
+      .fn()
+      .mockReturnValue(Promise.resolve([]));
     SettingsService.getDsnPath = jest.fn().mockReturnValue([]);
     SettingsService.getUssPath = jest
       .fn()
@@ -178,18 +179,21 @@ describe("Test the copybook message handler", () => {
   };
 
   const unreachable = jest.fn();
-  const listMembers = jest.fn(async () => ["copybook"]);
-  const listElements = jest.fn(
-    async () =>
-      [
-        ["copybook", "abcdef0123456789"],
-        ["copybook2", "0123456789abcdef"],
-      ] as [string, string][],
+  const listMembers = jest.fn(async () => Promise.resolve(["copybook"]));
+  const listElements = jest.fn(async () =>
+    Promise.resolve([
+      ["copybook", "abcdef0123456789"],
+      ["copybook2", "0123456789abcdef"],
+    ] as [string, string][]),
   );
 
   it("checks E4E downloaded member copybooks are resolved", async () => {
     vscode.workspace.getConfiguration = jest.fn().mockReturnValue({
-      get: jest.fn().mockReturnValue("ENDEVOR_PROCESSOR"),
+      get: (key: string, defaultValue?: unknown) => {
+        if (key === "compiler") return defaultValue;
+        if (key === "preprocessors") return defaultValue;
+        return "ENDEVOR_PROCESSOR";
+      },
     });
     const downloader = new CopybookDownloadService("/storagePath", undefined, {
       isEndevorElement(uri: string) {
@@ -201,12 +205,14 @@ describe("Test the copybook message handler", () => {
       getMember: unreachable,
       getElement: unreachable,
       async getProfileInfo(uri) {
-        return uri === filename ? profile : Error("fail");
+        return uri === filename
+          ? Promise.resolve(profile)
+          : Promise.reject(Error("fail"));
       },
       async getConfiguration(uri, options) {
         return uri === filename && options.type === "COBOL"
-          ? datasetFirst
-          : Error("fail");
+          ? Promise.resolve(datasetFirst)
+          : Promise.reject(Error("fail"));
       },
     });
     const target = await downloader.resolveCopybookHandler(
@@ -238,7 +244,11 @@ describe("Test the copybook message handler", () => {
   });
   it("checks E4E downloaded element copybooks are resolved", async () => {
     vscode.workspace.getConfiguration = jest.fn().mockReturnValue({
-      get: jest.fn().mockReturnValue("ENDEVOR_PROCESSOR"),
+      get: (key: string, defaultValue?: unknown) => {
+        if (key === "compiler") return defaultValue;
+        if (key === "preprocessors") return defaultValue;
+        return "ENDEVOR_PROCESSOR";
+      },
     });
     const downloader = new CopybookDownloadService("/storagePath", undefined, {
       isEndevorElement(uri: string) {
@@ -250,12 +260,14 @@ describe("Test the copybook message handler", () => {
       getMember: unreachable,
       getElement: unreachable,
       async getProfileInfo(uri) {
-        return uri === filename ? profile : Error("fail");
+        return uri === filename
+          ? Promise.resolve(profile)
+          : Promise.reject(Error("fail"));
       },
       async getConfiguration(uri, options) {
         return uri === filename && options.type === "COBOL"
-          ? endevorFirst
-          : Error("fail");
+          ? Promise.resolve(endevorFirst)
+          : Promise.reject(Error("fail"));
       },
     });
     const target = await downloader.resolveCopybookHandler(
@@ -309,5 +321,95 @@ describe("Test the copybook message handler", () => {
       "dialectType",
     );
     expect(unreachable).not.toHaveBeenCalled();
+  });
+
+  it("checks copybooks search respects processor group definitions order", async () => {
+    SettingsService.getCopybookExtension = jest
+      .fn()
+      .mockReturnValue(Promise.resolve([""]));
+    SettingsService.getCopybookLocalPath = jest
+      .fn()
+      .mockReturnValue(Promise.resolve([]));
+    SettingsService.getDsnPath = jest
+      .fn()
+      .mockReturnValue(["/configured/path"]);
+
+    const zoweApi: IApiRegisterClient = {
+      getExplorerExtenderApi: unreachable,
+      getUssApi: unreachable,
+      getMvsApi: unreachable,
+      registeredApiTypes: unreachable,
+    };
+
+    const downloader = new CopybookDownloadService("/storagePath", zoweApi, {
+      isEndevorElement(_uri: string) {
+        return false;
+      },
+      onDidChangeElement: unreachable,
+      listMembers,
+      listElements,
+      getMember: unreachable,
+      getElement: unreachable,
+      async getProfileInfo(_uri) {
+        return Promise.resolve({
+          instance: "instance",
+          profile: "profile",
+        });
+      },
+      getConfiguration: unreachable,
+    });
+    SettingsService.getUssPath = jest.fn().mockReturnValue(["uss/path"]);
+    SettingsService.getDsnPath = jest.fn().mockReturnValue(["dsn/path"]);
+    downloader["dsnDownloader"]!.hasMember = jest.fn().mockResolvedValue(false);
+    downloader["ussDownloader"]!.hasMember = jest.fn().mockResolvedValue(true);
+    downloader["e4eDownloader"]!.hasElement = jest.fn().mockResolvedValue(true);
+    const searchSpy = jest.spyOn(fsUtils, "searchCopybookInExtensionFolder");
+    searchSpy.mockReturnValue(undefined);
+
+    const spyConfig = jest.spyOn(
+      ProcessorGroups,
+      "loadProcessorGroupCopybookPathsConfig",
+    );
+    spyConfig.mockResolvedValue([
+      "/libs",
+      { dataset: "procGroupDataset", profile: "procGroupProfile" },
+      {
+        environment: "environment",
+        system: "system",
+        subsystem: "subsystem",
+        stage: "1",
+        type: "copy",
+        profile: "instance@profile",
+      },
+      { uss: "ussFile", profile: "profile" },
+    ]);
+
+    await downloader.resolveCopybookHandler(
+      "cobolFileName",
+      "copybookName",
+      "dialectType",
+    );
+
+    expect(searchSpy).toHaveBeenNthCalledWith(
+      1,
+      "copybookName",
+      ["/libs"],
+      [""],
+      "/storagePath",
+    );
+    expect(searchSpy).toHaveBeenNthCalledWith(
+      2,
+      "copybookName",
+      [
+        "/storagePath/e4e/copybooks/instance.profile/environment/1/system/subsystem/copy/MAP",
+      ],
+      [""],
+      "/storagePath",
+    );
+  });
+  describe("Tests copybook download util", () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
   });
 });

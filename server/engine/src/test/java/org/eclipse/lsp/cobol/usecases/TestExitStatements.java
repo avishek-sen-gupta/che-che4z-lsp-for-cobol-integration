@@ -16,7 +16,12 @@ package org.eclipse.lsp.cobol.usecases;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.Test;
 
 /** This tests the exit statements */
@@ -90,25 +95,25 @@ public class TestExitStatements {
           + "            IF {$i} <= {$zltemp1}\n"
           + "               CONTINUE\n"
           + "             ELSE\n"
-          + "               EXIT PERFORM\n"
+          + "               EXIT PERFORM{|1}\n"
           + "             END-IF.\n"
           + "        END PROGRAM test1.";
 
   public static final String TEXT8 =
-          "        IDENTIFICATION DIVISION.\n"
-                  + "        PROGRAM-ID. test1.\n"
-                  + "        DATA DIVISION.\n"
-                  + "        WORKING-STORAGE SECTION.\n"
-                  + "        LOCAL-STORAGE SECTION.\n"
-                  + "        1 {$*i} PIC S9(9) COMP-5.\n"
-                  + "        1 {$*zltemp1} PIC S9(9) COMP-5.\n"
-                  + "        PROCEDURE DIVISION.\n"
-                  + "            IF {$i} <= {$zltemp1}\n"
-                  + "               CONTINUE\n"
-                  + "             ELSE\n"
-                  + "               EXIT METHOD\n"
-                  + "             END-IF.\n"
-                  + "        END PROGRAM test1.";
+      "        IDENTIFICATION DIVISION.\n"
+          + "        PROGRAM-ID. test1.\n"
+          + "        DATA DIVISION.\n"
+          + "        WORKING-STORAGE SECTION.\n"
+          + "        LOCAL-STORAGE SECTION.\n"
+          + "        1 {$*i} PIC S9(9) COMP-5.\n"
+          + "        1 {$*zltemp1} PIC S9(9) COMP-5.\n"
+          + "        PROCEDURE DIVISION.\n"
+          + "            IF {$i} <= {$zltemp1}\n"
+          + "               CONTINUE\n"
+          + "             ELSE\n"
+          + "               EXIT METHOD\n"
+          + "             END-IF.\n"
+          + "        END PROGRAM test1.";
 
   @Test
   void test() {
@@ -142,7 +147,18 @@ public class TestExitStatements {
 
   @Test
   void test7() {
-    UseCaseEngine.runTest(TEXT7, ImmutableList.of(), ImmutableMap.of());
+    UseCaseEngine.runTest(
+        TEXT7,
+        ImmutableList.of(),
+        ImmutableMap.of(
+            "1",
+            new Diagnostic(
+                new Range(new Position(11, 15), new Position(11, 27)),
+                "The EXIT PERFORM statement is outside of an inline PERFORM statement and will be"
+                    + " ignored",
+                DiagnosticSeverity.Warning,
+                ErrorSource.PARSING.getText())),
+        ImmutableList.of());
   }
 
   @Test

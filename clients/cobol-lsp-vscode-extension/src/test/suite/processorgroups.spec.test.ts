@@ -20,11 +20,17 @@ suite("Integration Test Suite: Processor Groups", function () {
   this.timeout(helper.TEST_TIMEOUT);
   this.slow(1000);
   suiteSetup(async function () {
-    helper.updateConfig("basic.json");
+    await helper.updateConfig("basic.json");
     await helper.activate();
   });
 
-  this.beforeEach(async () => {
+  this.afterEach(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
+    await helper.closeAllEditors();
+  });
+
+  this.afterAll(async function () {
+    this.timeout(helper.TEST_TIMEOUT);
     await helper.closeAllEditors();
   });
 

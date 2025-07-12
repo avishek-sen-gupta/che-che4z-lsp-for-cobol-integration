@@ -10,23 +10,8 @@ parser grammar CobolPreprocessor;
 options {tokenVocab = CobolPreprocessorLexer;}
 
 startRule
-   : .*? ((includeStatement | copyStatement | replaceAreaStart | replaceOffStatement | titleDirective | enterDirective
-   | controlDirective | linkageSection | plusplusIncludeStatement | procedureDivision | workingStorageSection)+ .*?)* EOF
-   ;
-
-// procedure devision for resolving predefined labels
-procedureDivision
-   : PROCEDURE DIVISION .*? DOT_FS
-   ;
-
-// linkage section for resolving predefined variables
-linkageSection
-   : LINKAGE SECTION DOT_FS
-   ;
-
-// working storage section for resolving speacal registers as variables
-workingStorageSection
-   : WORKING_STORAGE SECTION DOT_FS
+   : (includeStatement | copyStatement | replaceAreaStartOrOffStatement | titleDirective | enterDirective
+   | controlDirective | plusplusIncludeStatement | .)* EOF
    ;
 
 // copy statement
@@ -58,7 +43,7 @@ titleDirective
    ;
 
 enterDirective
-   : ENTER languageName? routineName? DOT_FS
+   : ENTER languageName? DOT_FS
    ;
 
 routineName
@@ -66,7 +51,7 @@ routineName
    ;
 
 languageName
-   : cobolWord
+   : cobolWord routineName?
    ;
 
 controlDirective
@@ -86,12 +71,8 @@ replacingPhrase
    : REPLACING replaceClause+
    ;
 
-replaceAreaStart
-   : REPLACE (replacePseudoText)+ DOT_FS
-   ;
-
-replaceOffStatement
-   : REPLACE OFF DOT_FS
+replaceAreaStartOrOffStatement
+   : REPLACE (replacePseudoText+ | OFF) DOT_FS
    ;
 
 replaceClause
@@ -107,11 +88,15 @@ replacePseudoText
    ;
 
 pseudoReplaceable
-   : (openingPseudoTextDelimiter ~DOUBLEEQUALCHAR*? closingPseudoTextDelimiter)
+   : (openingPseudoTextDelimiter pseudoTextContent closingPseudoTextDelimiter)
    ;
 
 pseudoReplacement
-   : (openingPseudoTextDelimiter ~DOUBLEEQUALCHAR*? closingPseudoTextDelimiter) | EMPTYPSEUDOTEXT
+   : openingPseudoTextDelimiter pseudoTextContent closingPseudoTextDelimiter
+   ;
+
+pseudoTextContent
+   : ~(DOUBLEEQUALCHAR2)*
    ;
 
 openingPseudoTextDelimiter
@@ -119,7 +104,7 @@ openingPseudoTextDelimiter
    ;
 
 closingPseudoTextDelimiter
-   : DOUBLEEQUALCHAR (COMMACHAR | SEMICOLON_FS)?
+   : DOUBLEEQUALCHAR2 (COMMACHAR | SEMICOLON_FS)?
    ;
 
 replaceable
@@ -152,9 +137,5 @@ cobolWord
 
 literal
    : NONNUMERICLITERAL | NUMERICLITERAL | INTEGERLITERAL | LEVEL_NUMBER |LEVEL_NUMBER_66 | LEVEL_NUMBER_77 | LEVEL_NUMBER_88
-   ;
-
-integerLiteral
-   : INTEGERLITERAL | LEVEL_NUMBER | LEVEL_NUMBER_66 | LEVEL_NUMBER_77 | LEVEL_NUMBER_88
    ;
 

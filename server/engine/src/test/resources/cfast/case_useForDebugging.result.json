@@ -16,7 +16,7 @@
     "children": [
       {
         "name": "INPUT-PROBLEM",
-        "snippet": "INPUT-PROBLEM SECTION.\r\n            Use For Debugging On Some-Routine.\r\n            DISPLAY \"EXCEPTION\".",
+        "snippet": "        INPUT-PROBLEM SECTION.\r\n            Use For Debugging On Some-Routine.\r\n            DISPLAY \"EXCEPTION\".",
         "type": "section",
         "location": {
           "uri": "fake/path",
@@ -61,7 +61,7 @@
         ]
       },
       {
-        "snippet": "Some-Routine.\r\n            DISPLAY \"SOME-ROUTINE\".",
+        "snippet": "        Some-Routine.\r\n            DISPLAY \"SOME-ROUTINE\".",
         "name": "SOME-ROUTINE",
         "type": "paragraph",
         "location": {

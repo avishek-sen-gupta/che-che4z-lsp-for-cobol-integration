@@ -24,44 +24,30 @@ import org.eclipse.lsp.cobol.common.symbols.VariableAccumulator;
 import org.eclipse.lsp.cobol.implicitDialects.cics.generator.CICSBulkImplicitVariablesGenerator;
 import org.eclipse.lsp.cobol.implicitDialects.cics.generator.CICSSRImplicitVariablesGenerator;
 
-import java.util.List;
-
 /** Enrich symbolic table with predefined variables */
 public class CICSImplicitVariablesProcessor implements Processor<SectionNode> {
 
   @Override
-  public void accept(SectionNode sectionNode, ProcessingContext processingContext) {
-    if (sectionNode.getSectionType() == SectionType.LINKAGE) {
-      VariableAccumulator variableAccumulator = processingContext.getVariableAccumulator();
-      ProgramNode programNode =
-          sectionNode
-              .getProgram()
-              .orElseThrow(
-                  () ->
-                      new RuntimeException(
-                          "Program for section " + sectionNode.getSectionType() + " not found"));
-        registerVariable(
-            variableAccumulator, programNode, CICSBulkImplicitVariablesGenerator.generate());
+  public void accept(SectionNode sectionNode, ProcessingContext ctx) {
+    final SectionType st = sectionNode.getSectionType();
+    final boolean lstor = st == SectionType.LINKAGE;
+    final boolean wstor = st == SectionType.WORKING_STORAGE;
+    if (!lstor && !wstor) return;
+
+    final VariableAccumulator variableAccumulator = ctx.getVariableAccumulator();
+    if (ctx.getCurrentProgramNode() == null) {
+      throw new RuntimeException("Program for section " + st + " not found");
     }
 
-    if (sectionNode.getSectionType() == SectionType.WORKING_STORAGE) {
-      VariableAccumulator variableAccumulator = processingContext.getVariableAccumulator();
-      ProgramNode programNode =
-          sectionNode
-              .getProgram()
-              .orElseThrow(
-                  () ->
-                      new RuntimeException(
-                          "Program for section " + sectionNode.getSectionType() + " not found"));
-        registerVariables(
-            variableAccumulator, programNode, CICSSRImplicitVariablesGenerator.generate());
+    final ProgramNode programNode = ctx.getCurrentProgramNode();
+
+    if (lstor)
+      registerVariable(
+          variableAccumulator, programNode, CICSBulkImplicitVariablesGenerator.generate());
+    if (wstor) {
+      for (VariableNode vn : CICSSRImplicitVariablesGenerator.generate())
+        registerVariable(variableAccumulator, programNode, vn);
     }
-  }
-
-
-  private void registerVariables(
-      VariableAccumulator variableAccumulator, ProgramNode programNode, List<VariableNode> nodes) {
-    nodes.forEach(n -> registerVariable(variableAccumulator, programNode, n));
   }
 
   private void registerVariable(

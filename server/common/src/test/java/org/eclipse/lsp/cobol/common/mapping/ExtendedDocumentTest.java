@@ -14,19 +14,17 @@
  */
 package org.eclipse.lsp.cobol.common.mapping;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import java.util.UUID;
+import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-
-/**
- * Test for ExtendedDocument
- */
+/** Test for ExtendedDocument */
 class ExtendedDocumentTest {
   private static final String TEXT =
       "        IDENTIFICATION DIVISION.\n"
@@ -36,10 +34,11 @@ class ExtendedDocumentTest {
           + "        COPY CPY.\n"
           + "        PROCEDURE DIVISION.";
 
-  private static final String COPYBOOK = "        COPYBOOK LINE 0\n"
-      + "        COPYBOOK LINE 1\n"
-      + "        COPYBOOK LINE 2\n"
-      + "        COPYBOOK LINE 3\n";
+  private static final String COPYBOOK =
+      "        COPYBOOK LINE 0\n"
+          + "        COPYBOOK LINE 1\n"
+          + "        COPYBOOK LINE 2\n"
+          + "        COPYBOOK LINE 3\n";
 
   private static final String ONE_LINE_COPY = "        COPYBOOK LINE 0";
 
@@ -68,16 +67,17 @@ class ExtendedDocumentTest {
   void testOneLineCopybook() {
     copybook = new ExtendedText(ONE_LINE_COPY, copybookUri);
 
-    Range statementRange = new Range(new Position(4, 8), new Position(4, 15));
+    Range statementRange = new Range(new Position(4, 8), new Position(4, 16));
     document.insertCopybook(statementRange, copybook);
-    assertEquals("        IDENTIFICATION DIVISION.\n"
-        + "        PROGRAM-ID. test1.\n"
-        + "        DATA DIVISION.\n"
-        + "        WORKING-STORAGE SECTION.\n"
-        + "        \n"
-        + "        COPYBOOK LINE 0\n"
-        + "        .\n"
-        + "        PROCEDURE DIVISION.",
+    assertEquals(
+        "        IDENTIFICATION DIVISION.\n"
+            + "        PROGRAM-ID. test1.\n"
+            + "        DATA DIVISION.\n"
+            + "        WORKING-STORAGE SECTION.\n"
+            + "        \n"
+            + "        COPYBOOK LINE 0\n"
+            + "        .\n"
+            + "        PROCEDURE DIVISION.",
         document.getCurrentText().toString());
   }
 
@@ -91,11 +91,15 @@ class ExtendedDocumentTest {
     assertFalse(document.isDirty());
 
     Location location = document.mapLocation(new Range(new Position(6, 8), new Position(6, 16)));
-    assertEquals(new Range(new Position(1, 8), new Position(1, 16)).toString(), location.getRange().toString());
+    assertEquals(
+        new Range(new Position(1, 8), new Position(1, 16)).toString(),
+        location.getRange().toString());
     assertEquals(copybookUri, location.getUri());
 
     location = document.mapLocation(new Range(new Position(10, 8), new Position(10, 16)));
-    assertEquals(new Range(new Position(5, 8), new Position(5, 16)).toString(), location.getRange().toString());
+    assertEquals(
+        new Range(new Position(5, 8), new Position(5, 16)).toString(),
+        location.getRange().toString());
     assertEquals(documentUri, location.getUri());
   }
 
@@ -108,13 +112,65 @@ class ExtendedDocumentTest {
     assertFalse(document.isDirty());
 
     Location location = document.mapLocation(new Range(new Position(6, 8), new Position(6, 16)));
-    assertEquals(new Range(new Position(1, 8), new Position(1, 16)).toString(), location.getRange().toString());
+    assertEquals(
+        new Range(new Position(1, 8), new Position(1, 16)).toString(),
+        location.getRange().toString());
     assertEquals(copybookUri, location.getUri());
 
     location = document.mapLocation(new Range(new Position(9, 8), new Position(9, 16)));
-    assertEquals(new Range(new Position(5, 8), new Position(5, 16)).toString(), location.getRange().toString());
+    assertEquals(
+        new Range(new Position(5, 8), new Position(5, 16)).toString(),
+        location.getRange().toString());
     assertEquals(documentUri, location.getUri());
   }
 
+  @Test
+  void testIsLineEmptyBetweenColumns() {
+    assertTrue(document.isLineEmptyBetweenColumns(0, 0, 8));
+    assertFalse(document.isLineEmptyBetweenColumns(0, 7, 100));
+    assertTrue(document.isLineEmptyBetweenColumns(1000, 0, 1));
+  }
 
+  @Test
+  void testGetBaseTextProperUri() {
+    document.insertCopybook(5, copybook);
+    Locality locality =
+        Locality.builder()
+            .uri(documentUri)
+            .range(new Range(new Position(3, 5), new Position(4, 8)))
+            .build();
+    String text = document.getBaseText(locality);
+
+    assertEquals("        WORKING-STORAGE SECTION.\r\n" + "        COPY CPY.", text);
+  }
+
+  @Test
+  void testGetBaseTextEdge() {
+    document.insertCopybook(5, copybook);
+    Locality locality =
+        Locality.builder()
+            .uri(documentUri)
+            .range(new Range(new Position(3, 5), new Position(5, 1)))
+            .build();
+    String text = document.getBaseText(locality);
+
+    assertEquals(
+        "        WORKING-STORAGE SECTION.\r\n"
+            + "        COPY CPY.\r\n"
+            + "        PROCEDURE DIVISION.",
+        text);
+  }
+
+  @Test
+  void testGetBaseTextWrongUri() {
+    document.insertCopybook(5, copybook);
+    Locality locality =
+        Locality.builder()
+            .uri("wrong")
+            .range(new Range(new Position(3, 5), new Position(4, 8)))
+            .build();
+    String text = document.getBaseText(locality);
+
+    assertEquals("", text);
+  }
 }

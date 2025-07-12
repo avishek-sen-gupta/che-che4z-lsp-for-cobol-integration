@@ -15,6 +15,7 @@
 package org.eclipse.lsp.cobol.service;
 
 import com.google.common.collect.ImmutableList;
+import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.util.*;
 import java.util.function.Predicate;
@@ -22,23 +23,29 @@ import java.util.stream.Collectors;
 import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
+import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
 import org.eclipse.lsp.cobol.service.utils.BuildOutlineTreeFromSyntaxTree;
 import org.eclipse.lsp4j.Diagnostic;
 
-/**
- * Provides document model management functionality
- */
+/** Provides document model management functionality */
 @Singleton
 @Slf4j
 public class DocumentModelService {
   private final Map<String, CobolDocumentModel> docs = new HashMap<>();
-  private final Map<String, List<Diagnostic>> diagnosticRepo = Collections.synchronizedMap(new HashMap<>());
+  private final Map<String, List<Diagnostic>> diagnosticRepo =
+      Collections.synchronizedMap(new HashMap<>());
+  private final SourceUnitGraph sourceUnitGraph;
+
+  @Inject
+  public DocumentModelService(SourceUnitGraph sourceUnitGraph) {
+    this.sourceUnitGraph = sourceUnitGraph;
+  }
 
   /**
    * Mark the document as opened and stores document text
    *
-   * @param uri        - document uri
-   * @param text       - document text
+   * @param uri - document uri
+   * @param text - document text
    * @param languageId
    */
   @Synchronized
@@ -59,12 +66,33 @@ public class DocumentModelService {
     return docs.get(uri);
   }
 
+  /***
+   * Returns all possible source models
+   * @param uri - document uri
+   * @return list of document models
+   */
+  @Synchronized
+  public Collection<CobolDocumentModel> findMainSource(String uri) {
+    if (sourceUnitGraph.isUserSuppliedCopybook(uri)) {
+      return sourceUnitGraph.getAllAssociatedFilesForACopybook(uri).stream()
+          .filter(a -> !sourceUnitGraph.isUserSuppliedCopybook(a))
+          .map(docs::get)
+          .collect(Collectors.toList());
+    }
+
+    if (docs.containsKey(uri) && docs.get(uri).isDocumentSynced()) {
+      return Collections.singletonList(docs.get(uri));
+    }
+
+    return Collections.emptyList();
+  }
+
   /**
    * Process analysis result and store diagnostics
    *
-   * @param uri            - document uri
+   * @param uri - document uri
    * @param analysisResult - analysis result
-   * @param text           - updated text
+   * @param text - updated text
    */
   @Synchronized
   public void processAnalysisResult(String uri, AnalysisResult analysisResult, String text) {
@@ -77,24 +105,9 @@ public class DocumentModelService {
     updateDiagnosticRepo(uri, analysisResult.getDiagnostics());
     CobolDocumentModel updatedModel = new CobolDocumentModel(uri, text, analysisResult);
     updatedModel.setLanguageId(document.getLanguageId());
-    updatedModel.setOutlineResult(BuildOutlineTreeFromSyntaxTree.convert(analysisResult.getRootNode(), uri));
+    updatedModel.setOutlineResult(
+        BuildOutlineTreeFromSyntaxTree.convert(analysisResult.getRootNode(), uri));
     docs.put(uri, updatedModel);
-  }
-
-  private void updateDiagnosticRepo(String currentUri, Map<String, List<Diagnostic>> diagnostics) {
-    LOG.debug("updateDiagnosticRepo " + currentUri + " " + diagnostics);
-    synchronized (diagnosticRepo) {
-      diagnostics.forEach((key, diagnosticList) -> {
-        if (key.equals(currentUri)) {
-          diagnosticRepo.put(currentUri, diagnosticList);
-        } else {
-          List<Diagnostic> oldList = diagnosticRepo.getOrDefault(key, Collections.emptyList());
-          List<Diagnostic> newList = new ArrayList<>(oldList);
-          newList.addAll(diagnosticList);
-          diagnosticRepo.put(key, newList);
-        }
-      });
-    }
   }
 
   /**
@@ -105,34 +118,22 @@ public class DocumentModelService {
   @Synchronized
   public void closeDocument(String uri) {
     Optional.ofNullable(docs.get(uri))
-            .ifPresent(
-                    d -> {
-                      d.setOpened(false);
-                      removeAllRelatedDiagnostics(d);
-                    });
+        .ifPresent(
+            d -> {
+              d.setOpened(false);
+              removeAllRelatedDiagnostics(d);
+            });
   }
 
-  private void removeAllRelatedDiagnostics(CobolDocumentModel documentModel) {
-    AnalysisResult analysisResult = documentModel.getAnalysisResult();
-    if (analysisResult == null || analysisResult.getDiagnostics() == null) {
-      return;
-    }
-    for (Map.Entry<String, List<Diagnostic>> entry : analysisResult.getDiagnostics().entrySet()) {
-      String uri = entry.getKey();
-      if (!diagnosticRepo.containsKey(uri)) {
-        continue;
-      }
-      List<Diagnostic> closedDiagnostics = entry.getValue();
-      List<Diagnostic> newDiagnostics = diagnosticRepo.get(uri).stream()
-              .filter(diagnosticsNotContains(closedDiagnostics))
-              .collect(Collectors.toList());
-      diagnosticRepo.put(uri, newDiagnostics);
-    }
-  }
-
-  private Predicate<Diagnostic> diagnosticsNotContains(List<Diagnostic> closedFileRelatedDiagnostics) {
-    // diagnostics address location is matched and not the value as the same diagnostics could be generated by diff files.
-    return dia -> closedFileRelatedDiagnostics.stream().noneMatch(d1 -> d1 == dia);
+  /**
+   * Updates the document with a new text
+   *
+   * @param uri - document uri
+   * @param text - document text
+   */
+  @Synchronized
+  public void changeDocument(String uri, String text) {
+    Optional.ofNullable(docs.get(uri)).ifPresent(d -> d.update(text));
   }
 
   /**
@@ -164,8 +165,8 @@ public class DocumentModelService {
   @Synchronized
   public boolean isDocumentSynced(String uri) {
     return Optional.ofNullable(docs.get(uri))
-            .map(CobolDocumentModel::isDocumentSynced)
-            .orElse(false);
+        .map(CobolDocumentModel::isDocumentSynced)
+        .orElse(false);
   }
 
   /**
@@ -173,7 +174,7 @@ public class DocumentModelService {
    * documents
    *
    * @return map of diagnostics where the key is a document uri and a value is a list of diagnostics
-   * for this document
+   *     for this document
    */
   @Synchronized
   public Map<String, List<Diagnostic>> getOpenedDiagnostic() {
@@ -190,5 +191,48 @@ public class DocumentModelService {
     }
 
     return result;
+  }
+
+  private void removeAllRelatedDiagnostics(CobolDocumentModel documentModel) {
+    AnalysisResult analysisResult = documentModel.getAnalysisResult();
+    if (analysisResult == null || analysisResult.getDiagnostics() == null) {
+      return;
+    }
+    for (Map.Entry<String, List<Diagnostic>> entry : analysisResult.getDiagnostics().entrySet()) {
+      String uri = entry.getKey();
+      if (!diagnosticRepo.containsKey(uri)) {
+        continue;
+      }
+      List<Diagnostic> closedDiagnostics = entry.getValue();
+      List<Diagnostic> newDiagnostics =
+          diagnosticRepo.get(uri).stream()
+              .filter(diagnosticsNotContains(closedDiagnostics))
+              .collect(Collectors.toList());
+      diagnosticRepo.put(uri, newDiagnostics);
+    }
+  }
+
+  private Predicate<Diagnostic> diagnosticsNotContains(
+      List<Diagnostic> closedFileRelatedDiagnostics) {
+    // diagnostics address location is matched and not the value as the same diagnostics could be
+    // generated by diff files.
+    return dia -> closedFileRelatedDiagnostics.stream().noneMatch(d1 -> d1 == dia);
+  }
+
+  private void updateDiagnosticRepo(String currentUri, Map<String, List<Diagnostic>> diagnostics) {
+    LOG.debug("updateDiagnosticRepo " + currentUri + " " + diagnostics);
+    synchronized (diagnosticRepo) {
+      diagnostics.forEach(
+          (key, diagnosticList) -> {
+            if (key.equals(currentUri)) {
+              diagnosticRepo.put(currentUri, diagnosticList);
+            } else {
+              List<Diagnostic> oldList = diagnosticRepo.getOrDefault(key, Collections.emptyList());
+              List<Diagnostic> newList = new ArrayList<>(oldList);
+              newList.addAll(diagnosticList);
+              diagnosticRepo.put(key, newList);
+            }
+          });
+    }
   }
 }

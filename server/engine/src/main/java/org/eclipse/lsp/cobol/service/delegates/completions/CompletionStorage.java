@@ -14,16 +14,17 @@
  */
 package org.eclipse.lsp.cobol.service.delegates.completions;
 
-import com.google.common.collect.ImmutableList;
-import lombok.extern.slf4j.Slf4j;
-import org.eclipse.lsp.cobol.service.settings.SettingsService;
+import static org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum.DIALECTS;
 
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-
-import static org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum.DIALECTS;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.eclipse.lsp.cobol.service.settings.SettingsService;
 
 /**
  * This class represents a storage for static completion content, e.g. keywords. It provides
@@ -31,7 +32,7 @@ import static org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum.DIAL
  */
 @Slf4j
 public abstract class CompletionStorage<T> {
-  private List<String> dialectType = ImmutableList.of();
+  @Getter private List<String> dialectType = ImmutableList.of();
   private Map<String, T> storage;
   private final SettingsService settingsService;
 
@@ -40,9 +41,15 @@ public abstract class CompletionStorage<T> {
     resetStorage();
   }
 
-  /** Updates the storage of keywords based on enabled dialects defined in user's settings */
-  public void updateStorage() {
-    this.settingsService.fetchTextConfiguration(DIALECTS.label).thenAccept(this::updateDialects);
+  /**
+   * Updates the storage of keywords based on enabled dialects defined in user's settings
+   *
+   * @return A CompletableFuture
+   */
+  public CompletableFuture<Void> updateStorage() {
+    return this.settingsService
+        .fetchTextConfiguration(DIALECTS.label)
+        .thenAccept(this::updateDialects);
   }
 
   protected abstract Map<String, T> getDataMap(List<String> dialectType);

@@ -15,12 +15,13 @@
 
 package org.eclipse.lsp.cobol.core.visitor;
 
+import static java.util.Comparator.comparingInt;
+import static java.util.stream.Collectors.toList;
+
+import java.util.List;
+import java.util.Optional;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.text.similarity.LevenshteinDistance;
-
-import java.util.Optional;
-
-import static java.util.Comparator.comparingInt;
 
 /**
  * Calculates a distance between a processing token and keyword from the list of suggestions using a
@@ -30,7 +31,10 @@ import static java.util.Comparator.comparingInt;
 public class MisspelledKeywordDistance {
 
   public static final KeywordSuggestions KEYWORDS = new KeywordSuggestions();
-  private static final LevenshteinDistance DISTANCE = LevenshteinDistance.getDefaultInstance();
+  private static final int DIST_LIMIT = 2;
+  private static final LevenshteinDistance DISTANCE = new LevenshteinDistance(DIST_LIMIT - 1);
+  private static final List<String> SORTED_KEYWORDS =
+      KEYWORDS.getSuggestions().stream().sorted(comparingInt(String::length)).collect(toList());
 
   /**
    * Calculate a distance between the given token and all the keywords and find the closest one.
@@ -39,11 +43,19 @@ public class MisspelledKeywordDistance {
    * @return the closest keyword or null if nothing found
    */
   public Optional<String> calculateDistance(String wrongToken) {
-    return KEYWORDS.getSuggestions().stream()
-        .map(item -> new Object[] {item, DISTANCE.apply(wrongToken, item)})
-        .sorted(comparingInt(o -> (int) o[1]))
-        .filter(item -> (int) item[1] < 2)
-        .map(item -> item[0].toString())
-        .findFirst();
+    int minDistance = DIST_LIMIT;
+    String keyword = null;
+    for (String s : SORTED_KEYWORDS) {
+      if (Math.abs(s.length() - wrongToken.length()) >= DIST_LIMIT) {
+        continue;
+      }
+      int distance = DISTANCE.apply(wrongToken, s);
+      if (distance < 0) continue;
+      if (minDistance > distance) {
+        minDistance = distance;
+        keyword = s;
+      }
+    }
+    return Optional.ofNullable(keyword);
   }
 }

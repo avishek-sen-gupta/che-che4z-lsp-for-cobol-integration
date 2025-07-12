@@ -43,25 +43,9 @@ class TestWithErrorCheck {
             "1",
             new Diagnostic(
                 new Range(),
-                    "A period was assumed before \"<EOF>\".",
+                "A period was assumed before \"<EOF>\".",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText())),
         CobolLanguageId.COBOL);
   }
-
-  @Test
-  void testHw() {
-    UseCaseEngine.runTest(
-        TEXT,
-        ImmutableList.of(),
-        ImmutableMap.of(
-            "1",
-            new Diagnostic(
-                new Range(),
-                "Unexpected end of file",
-                DiagnosticSeverity.Error,
-                ErrorSource.PARSING.getText())),
-        CobolLanguageId.EXPERIMENTAL_COBOL);
-  }
-
 }

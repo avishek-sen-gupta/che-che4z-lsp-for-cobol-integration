@@ -15,15 +15,14 @@
 package org.eclipse.lsp.cobol.service.utils;
 
 import com.google.common.collect.ImmutableList;
-import lombok.experimental.UtilityClass;
-import org.eclipse.lsp.cobol.common.model.tree.*;
-import org.eclipse.lsp.cobol.common.model.tree.variable.VariableNode;
-import org.eclipse.lsp.cobol.common.model.NodeSymbolType;
-import org.eclipse.lsp4j.DocumentSymbol;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import lombok.experimental.UtilityClass;
+import org.eclipse.lsp.cobol.common.model.NodeSymbolType;
+import org.eclipse.lsp.cobol.common.model.tree.*;
+import org.eclipse.lsp.cobol.common.model.tree.variable.VariableNode;
+import org.eclipse.lsp4j.DocumentSymbol;
 
 /** This class is used for converting nodes from Syntax tree to outline tree */
 @UtilityClass
@@ -89,7 +88,6 @@ public class BuildOutlineTreeFromSyntaxTree {
   }
 
   private DocumentSymbol convertFileEntry(FileEntryNode node) {
-    node.getLocality().getUri();
     return createDocumentSymbol(node.getFileName(), NodeSymbolType.FILE, node);
   }
 
@@ -102,7 +100,10 @@ public class BuildOutlineTreeFromSyntaxTree {
   }
 
   private DocumentSymbol convertProgramId(ProgramIdNode node) {
-    return createDocumentSymbol("PROGRAM-ID " + node.getProgramId(), NodeSymbolType.PROGRAM_ID, node);
+    return createDocumentSymbol(
+        node.getSubtype().subtypeName + "-ID " + node.getProgramId(),
+        NodeSymbolType.PROGRAM_ID,
+        node);
   }
 
   private DocumentSymbol convertDivision(DivisionNode node) {
@@ -124,12 +125,16 @@ public class BuildOutlineTreeFromSyntaxTree {
   }
 
   private DocumentSymbol convertProgram(ProgramNode node) {
-    String programName = "PROGRAM";
-    if (node.getProgramName() != null) programName += ": " + node.getProgramName();
-    return createDocumentSymbol(programName, NodeSymbolType.PROGRAM, node);
+    String subtype = node.getSubtype().subtypeName;
+    String name = node.getProgramName();
+    if (name != null) subtype += ": " + name;
+    return createDocumentSymbol(subtype, NodeSymbolType.PROGRAM, node);
   }
 
   private DocumentSymbol createDocumentSymbol(String name, NodeSymbolType type, Node treeNode) {
+    if (name == null || name.trim().isEmpty()) {
+      name = "UNKNOWN (" + type.name() + ")";
+    }
     return new DocumentSymbol(
         name,
         type.getSymbolKind(),

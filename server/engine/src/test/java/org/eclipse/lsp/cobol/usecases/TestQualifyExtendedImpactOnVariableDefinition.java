@@ -128,17 +128,23 @@ public class TestQualifyExtendedImpactOnVariableDefinition {
   }
 
   @Test
-  void whenQualifyExtendedOptionActiveFromConfigurationWithMultipleDefinitionThenConsider01LevelAsDefinition() {
-    AnalysisConfig analysisConfig = new AnalysisConfig(
+  void
+      whenQualifyExtendedOptionActiveFromConfigurationWithMultipleDefinitionThenConsider01LevelAsDefinition() {
+    AnalysisConfig analysisConfig =
+        new AnalysisConfig(
             CopybookProcessingMode.ENABLED,
-            ImmutableList.of(), true, ImmutableList.of(), ImmutableMap.of());
+            ImmutableList.of(),
+            true,
+                ImmutableMap.of(), false,
+            ImmutableList.of()
+        );
     analysisConfig.getCompilerOptions().add("QUALIFY(EXTEND)");
     UseCaseEngine.runTest(
-            TEXT_PROGRAM_WITH_NO_CD,
-            ImmutableList.of(),
-            ImmutableMap.of(),
-            ImmutableList.of("SOMETHING"),
-            analysisConfig);
+        TEXT_PROGRAM_WITH_NO_CD,
+        ImmutableList.of(),
+        ImmutableMap.of(),
+        ImmutableList.of("SOMETHING"),
+        analysisConfig);
   }
 
   @Test

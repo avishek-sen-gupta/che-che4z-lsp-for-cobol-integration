@@ -30,12 +30,13 @@ import org.junit.jupiter.api.Test;
 class TestExecCicsDoesNotFreezeAnalysis {
 
   private static final String TEXT =
-      "       IDENTIFICATION DIVISION.\n"
+      ""
+          + "       IDENTIFICATION DIVISION.\n"
           + "       PROGRAM-ID. HELLO-CICS.\n"
           + "       DATA DIVISION.\n"
           + "       WORKING-STORAGE SECTION.\n"
           + "       PROCEDURE DIVISION.\n"
-          + "           {EXEC|1} CICS\n";
+          + "           EXEC CICS{|1}{|2}\n";
 
   @Test
   void test() {
@@ -44,6 +45,12 @@ class TestExecCicsDoesNotFreezeAnalysis {
         ImmutableList.of(),
         ImmutableMap.of(
             "1",
+            new Diagnostic(
+                new Range(),
+                "Unexpected end of file",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText()),
+            "2",
             new Diagnostic(
                 new Range(),
                 "Missing token END-EXEC for the CICS EXEC block",

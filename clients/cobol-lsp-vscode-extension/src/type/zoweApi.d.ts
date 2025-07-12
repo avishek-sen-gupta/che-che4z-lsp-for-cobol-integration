@@ -38,13 +38,22 @@ interface ProfilesCache {
 }
 
 interface IUss {
-  getContents(dataSetName: string, options?: any): Promise<IZosFilesResponse>;
-  fileList(ussFilePath: string): Promise<IZosFilesResponse>;
+  getContents(
+    dataSetName: string,
+    options?: unknown,
+  ): Promise<IZosFilesResponse>;
+  fileList(ussFilePath: string): Promise<IZosFilesResponseFileList>;
 }
 
 interface IMvs {
-  getContents(dataSetName: string, options?: any): Promise<IZosFilesResponse>;
-  allMembers(dataSetName: string, options?: any): Promise<IZosFilesResponse>;
+  getContents(
+    dataSetName: string,
+    options?: unknown,
+  ): Promise<IZosFilesResponse>;
+  allMembers(
+    dataSetName: string,
+    options?: unknown,
+  ): Promise<IZosFilesResponseMemberList>;
 }
 
 interface IProfileLoaded {
@@ -54,10 +63,21 @@ interface IProfileLoaded {
   name: string;
 }
 
-interface IZosFilesResponse {
+interface IZosFilesResponseFileList {
   apiResponse: {
     items: Array<{
       name: string;
+      mode: string;
+      size: number;
+      uid: number;
+      user: string;
+    }>;
+  };
+}
+
+interface IZosFilesResponseMemberList {
+  apiResponse: {
+    items: Array<{
       member: string;
     }>;
   };

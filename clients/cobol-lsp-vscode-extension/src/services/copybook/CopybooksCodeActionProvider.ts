@@ -13,20 +13,20 @@
  */
 import * as vscode from "vscode";
 import { QUICKFIX_GOTOSETTINGS } from "../../constants";
-import { TelemetryService } from "../reporter/TelemetryService";
+import { registerEvent } from "../reporter";
 
 export class CopybooksCodeActionProvider implements vscode.CodeActionProvider {
-  public async provideCodeActions(
+  public provideCodeActions(
     _doc: vscode.TextDocument,
     _range: vscode.Range | vscode.Selection,
     context: vscode.CodeActionContext,
     _token: vscode.CancellationToken,
-  ): Promise<Array<vscode.Command | vscode.CodeAction>> {
+  ): Array<vscode.Command | vscode.CodeAction> {
     if (!this.shouldHaveCodeAction(context)) {
       return [];
     }
     // Telemetry should be collected only if shouldHaveCodeAction is true
-    TelemetryService.registerEvent(
+    registerEvent(
       "QuickFix for copybook activation",
       ["COBOL", "hover", "copybook", "quickfix"],
       "User try to understand the syntax error for a missing copybook",

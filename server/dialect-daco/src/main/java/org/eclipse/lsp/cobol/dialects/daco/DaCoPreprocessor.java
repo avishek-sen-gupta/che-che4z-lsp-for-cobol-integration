@@ -17,14 +17,13 @@ package org.eclipse.lsp.cobol.dialects.daco;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
 
-/**
- * Implements preprocess copybook functionality
- */
+/** Implements preprocess copybook functionality */
 @UtilityClass
 class DaCoPreprocessor {
 
   /**
    * Run preprocessor for copybook content
+   *
    * @param copybookContent is a copybook content
    * @return preprocessed text
    */
@@ -45,7 +44,7 @@ class DaCoPreprocessor {
   }
 
   private String preprocessLine(String line) {
-    if (line.length() > 0) {
+    if (!line.isEmpty()) {
       int len = Math.min(line.length(), 6);
       String result = StringUtils.repeat(" ", len);
       if (len < line.length()) {

@@ -12,15 +12,40 @@ options {tokenVocab = CobolLexer; superClass = MessageServiceParser;}
 startRule : compilationUnit EOF;
 
 compilationUnit
-   : programUnit+
+   : programOrFunctionUnit+
    ;
 
-programUnit
-   : identificationDivision environmentDivision? dataDivision? procedureDivision? programUnit* endProgramStatement?
+programOrFunctionUnit
+   : identificationDivision (programDetails | functionDetails)
+   ;
+
+programDetails
+   : programIdParagraph identificationDivisionBody* environmentDivision? dataDivision? procedureDivision? nestedProgramUnit* endProgramStatement?
+   // TODO: This rule requires abitrary long lookahead due to conflict with compilationUnit
+   //       It might be possible to parse all programs as peers and enforce nesting later on
+   // This is what the grammar should actually look like, but tests start failing.
+   // (
+   //    nestedProgramUnit+ endProgramStatement
+   //    |
+   //    endProgramStatement?
+   // )
+   ;
+
+nestedProgramUnit
+   : identificationDivision programDetails // The end should be unconditional, but tests start failing
    ;
 
 endProgramStatement
    : END PROGRAM programName DOT_FS
+   ;
+
+functionDetails
+   : functionIdParagraph identificationDivisionBody* environmentDivision? dataDivision? procedureDivision endFunctionStatement
+   // END is required by the compiler even though the documentation suggests it is optional
+   ;
+
+endFunctionStatement
+   : END FUNCTION programName DOT_FS
    ;
 
 commaSeparator: COMMACHAR | COMMASEPARATOR;
@@ -28,7 +53,7 @@ commaSeparator: COMMACHAR | COMMASEPARATOR;
 // --- identification division --------------------------------------------------------------------
 
 identificationDivision
-   : (IDENTIFICATION | ID) DIVISION dot_fs programIdParagraph identificationDivisionBody*
+   : (IDENTIFICATION | ID) DIVISION dot_fs
    ;
 
 identificationDivisionBody
@@ -39,6 +64,20 @@ identificationDivisionBody
 
 programIdParagraph
    : PROGRAM_ID DOT_FS? programName (IS? (COMMON | INITIAL | LIBRARY | DEFINITION | RECURSIVE) PROGRAM?)? DOT_FS?
+   ;
+
+functionIdParagraph
+   : FUNCTION_ID DOT_FS? programName
+     (AS literal)?
+     (IS? PROTOTYPE)?
+     // compiler accepts both orderings
+     (
+        ENTRY_NAME IS? (COMPAT|LONGUPPER|LONGMIXED) (ENTRY_INTERFACE IS? (STATIC|DYNAMIC|DLL))?
+        |
+        ENTRY_INTERFACE IS? (STATIC|DYNAMIC|DLL) (ENTRY_NAME IS? (COMPAT|LONGUPPER|LONGMIXED))?
+        |
+     )
+     DOT_FS?
    ;
 
 // - author paragraph ----------------------------------
@@ -117,11 +156,11 @@ classRepositoryClause
     ;
 
 functionRepositoryClause
-    : FUNCTION functionName | intrinsicClause
+    : FUNCTION (functionName+ INTRINSIC? | ALL INTRINSIC)
     ;
 
-intrinsicClause
-    : (functionName* | ALL) INTRINSIC
+functionReference
+    : FUNCTION functionName
     ;
 
 // - source computer paragraph ----------------------------------
@@ -449,7 +488,7 @@ recordContainsClauseFormat1
    ;
 
 recordContainsClauseFormat2
-   : IS? VARYING IN? SIZE? ((FROM? integerLiteral)? recordContainsTo? CHARACTERS?)? (DEPENDING ON? qualifiedDataName)?
+   : IS? VARYING IN? SIZE? (FROM? integerLiteral)? recordContainsTo? CHARACTERS? (DEPENDING ON? qualifiedDataName)?
    ;
 
 recordContainsClauseFormat3
@@ -584,7 +623,7 @@ dialectDescriptionEntry
 entryName
    : (FILLER | { validateLength(_input.LT(1).getText(), "Variable name", 30);
          validateAllowedVariableName(_input.LT(1).getText(), "INSERT",
-         "BIT", "CONDITION", "COPY", "CURSOR");} dataName)
+         "COPY");} dataName)
    ;
 
 dataGroupUsageClause
@@ -620,11 +659,12 @@ dataOccursSort
    ;
 
 dataPictureClause
-   : (PICTURE | PIC) PICTUREIS? pictureString+
+   : (PICTURE | PIC) PICTUREIS? pictureString
    ;
 
 pictureString
    : charString
+   | SINGLE_U_CHAR_BYTE_LENGTH IS? integerLiteral // this case specifically handles single U and BYTE-LENGTH clause
    ;
 
 dataDynamicLengthClause
@@ -749,7 +789,7 @@ procedureDivisionUsingParameter
    ;
 
 procedureDeclaratives
-   : DECLARATIVES dot_fs procedureDeclarative+ END DECLARATIVES dot_fs   ;
+   : DECLARATIVES dot_fs procedureDeclarative+ END DECLARATIVES dot_fs;
 
 procedureDeclarative
    : procedureSectionHeader dot_fs (useStatement dot_fs) paragraphs
@@ -759,23 +799,30 @@ procedureSectionHeader
    : sectionName SECTION integerLiteral?
    ;
 
+sectionOrParagraph
+   : (cobolWord | integerLiteral)
+         (
+             SECTION integerLiteral?
+         )?
+         dot_fs
+   ;
+
 procedureDivisionBody
-   : paragraphs procedureSection*
+   : (
+       ( sectionOrParagraph alteredGoTo? )
+       | sentence
+     )*
    ;
 
 // -- procedure section ----------------------------------
 
-procedureSection
-   : procedureSectionHeader dot_fs paragraphs
-   ;
-
 sentence
-   : statement * (endClause | dialectStatement)
+   : statement * endClause
    | dialectStatement
    ;
 
 paragraph
-   : paragraphDefinitionName dot_fs (alteredGoTo | sentence*)
+   : paragraphDefinitionName dot_fs alteredGoTo?
    ;
 
 paragraphs
@@ -783,21 +830,68 @@ paragraphs
    ;
 
 conditionalStatementCall
-   : statement | dialectStatement
+   : statement
    ;
 
 statement
-   : acceptStatement | addStatement | allocateStatement | alterStatement | callStatement | cancelStatement | closeStatement | computeStatement | continueStatement | deleteStatement |
-    disableStatement | displayStatement | divideStatement | enableStatement | entryStatement | evaluateStatement | exhibitStatement |
-    exitStatement | freeStatement | generateStatement | gobackStatement | goToStatement | ifStatement | initializeStatement |
-    initiateStatement | inspectStatement | mergeStatement | moveStatement | multiplyStatement | openStatement | performStatement | purgeStatement |
-    readStatement | readyResetTraceStatement | receiveStatement | releaseStatement | returnStatement | rewriteStatement | searchStatement | sendStatement |
-    serviceReloadStatement | serviceLabelStatement | setStatement | sortStatement | startStatement | stopStatement | stringStatement | subtractStatement |
-    terminateStatement | unstringStatement | writeStatement | xmlParseStatement | jsonStatement | mapStatement | nextSentence | genericOnClauseStatement | xmlGenerate
+   : acceptStatement
+   | addStatement
+   | allocateStatement
+   | alterStatement
+   | callStatement
+   | cancelStatement
+   | closeStatement
+   | computeStatement
+   | continueStatement
+   | deleteStatement
+   | disableStatement
+   | displayStatement
+   | divideStatement
+   | dialectStatement
+   | enableStatement
+   | entryStatement
+   | evaluateStatement
+   | exhibitStatement
+   | exitStatement
+   | freeStatement
+   | generateStatement
+   | gobackStatement
+   | goToStatement
+   | ifStatement
+   | initializeStatement
+   | initiateStatement
+   | inspectStatement
+   | mergeStatement
+   | moveStatement
+   | multiplyStatement
+   | openStatement
+   | performStatement
+   | purgeStatement
+   | readStatement
+   | readyResetTraceStatement
+   | receiveStatement
+   | releaseStatement
+   | returnStatement
+   | rewriteStatement
+   | searchStatement
+   | sendStatement
+   | serviceStatement
+   | setStatement
+   | sortStatement
+   | startStatement
+   | stopStatement
+   | stringStatement
+   | subtractStatement
+   | terminateStatement
+   | unstringStatement
+   | writeStatement
+   | jsonStatement
+   | xmlStatement
+   | dialectStatement
    ;
 
 xmlGenerate
-    : XML GENERATE xmlGenIdentifier1 FROM xmlGenIdentifier2
+    : GENERATE xmlGenIdentifier1 FROM xmlGenIdentifier2
     (COUNT IN? xmlGenIdentifier3)?
     (WITH? ENCODING integerLiteral)? (WITH? XML_DECLARATION)? (WITH? ATTRIBUTES)?
     (NAMESPACE IS? (xmlGenIdentifier4 | literal))? (NAMESPACE_PREFIX IS? (xmlGenIdentifier5 | literal))?
@@ -806,6 +900,19 @@ xmlGenerate
     (SUPPRESS ((xmlGenIdentifier8 when_phrase?) | generic_suppression_phrase)+)?
     onExceptionClause? notOnExceptionClause? END_XML?
     ;
+
+xmlParseStatement
+   : PARSE qualifiedDataName xmlEncoding? xmlNational? xmlValidating? xmlProcessinProcedure through? onExceptionClause? notOnExceptionClause? END_XML?
+   ;
+
+xmlStatement
+   : XML
+   (
+       xmlGenerate
+       |
+       xmlParseStatement
+   )
+   ;
 
 xmlGenIdentifier1: qualifiedDataName;
 
@@ -888,7 +995,7 @@ acceptStatement
    ;
 
 dialectStatement
-   : dialectNodeFiller | dialectIfStatment
+   : ZERO_WIDTH_SPACE | dialectIfStatment
    ;
 
 acceptFromDateStatement
@@ -954,7 +1061,7 @@ allocateStatement
 // alter statement
 
 alterStatement
-   : ALTER alterProceedTo+
+   : ALTER alterProceedTo (commaSeparator? alterProceedTo)*
    ;
 
 alterProceedTo
@@ -1159,7 +1266,12 @@ entryStatement
 // evaluate statement
 
 evaluateStatement
-   : EVALUATE evaluateSelect evaluateAlsoSelect* evaluateWhenPhrase+ evaluateWhenOther? END_EVALUATE?
+   : EVALUATE evaluateSelect evaluateAlsoSelect* evaluateWhenPhrase+ evaluateWhenOther?
+   (
+      END_EVALUATE
+      |
+      {_input.LA(1)==DOT_FS || _input.LA(1)==ELSE || _input.LA(1)==END_IF || _input.LA(1)==EOF}?
+   )
    ;
 
 evaluateSelect
@@ -1217,8 +1329,12 @@ freeStatement
 // exit statement
 
 exitStatement
-   : EXIT (PROGRAM | SECTION | PARAGRAPH | PERFORM CYCLE? | METHOD)?
+   : EXIT (PROGRAM | SECTION | PARAGRAPH | exitPerform | METHOD)?
    ;
+
+exitPerform
+    : PERFORM CYCLE?
+    ;
 
 // generate statement
 
@@ -1249,7 +1365,13 @@ dialectSectionBlock
    ;
 
 ifStatement
-   : IF (condition | dialectNodeFiller*) ifThen ifElse? END_IF?
+   : IF condition ifThen
+   (
+      ifElse
+      |
+      {_input.LA(1)!=ELSE}?
+   )
+   (END_IF | {_input.LA(1)==DOT_FS || _input.LA(1)==ELSE || _input.LA(1)==EOF}?)
    ;
 
 nextSentence
@@ -1475,7 +1597,7 @@ performStatement
    ;
 
 performInlineStatement
-   : performType? conditionalStatementCall*? (EXIT PERFORM CYCLE?)? END_PERFORM
+   : performType? conditionalStatementCall* END_PERFORM
    ;
 
 performProcedureStatement
@@ -1491,8 +1613,12 @@ performTimes
    ;
 
 performUntil
-   : performTestClause? UNTIL condition
+   : performTestClause? performUntilCondition
    ;
+
+performUntilCondition
+    : UNTIL (EXIT | condition)
+    ;
 
 performVarying
    : performTestClause performVaryingClause | performVaryingClause performTestClause?
@@ -1723,13 +1849,12 @@ sendingField
 
 // service statement
 
-serviceLabelStatement
-   : SERVICE LABEL
-   ;
-
-serviceReloadStatement
-   : SERVICE RELOAD generalIdentifier
-   ;
+serviceStatement
+   :
+   SERVICE
+   (
+      LABEL | RELOAD generalIdentifier
+   );
 
 // sort statement
 
@@ -1977,10 +2102,6 @@ writeNotAtEndOfPagePhrase
 
 // xml statement
 
-xmlParseStatement
-   : XML PARSE qualifiedDataName xmlEncoding? xmlNational? xmlValidating? xmlProcessinProcedure through? onExceptionClause? notOnExceptionClause? END_XML?
-   ;
-
 xmlEncoding
    : WITH? ENCODING  integerLiteral
    ;
@@ -2100,7 +2221,7 @@ generalIdentifier
    ;
 
 functionCall
-   : FUNCTION functionName (LPARENCHAR argument (COMMACHAR? argument)* RPARENCHAR)* referenceModifier?
+   : functionReference (LPARENCHAR argument (COMMACHAR? argument)* RPARENCHAR)* referenceModifier?
    ;
 
 referenceModifier
@@ -2116,8 +2237,10 @@ length
    ;
 
 argument
-   : arithmeticExpression
-   | TRAILING | LEADING
+   : ALL
+   | arithmeticExpression
+   | TRAILING
+   | LEADING
    ;
 
 // qualified data name ----------------------------------
@@ -2127,12 +2250,13 @@ qualifiedDataName
    ;
 
 tableCall
-   : LPARENCHAR (ALL | arithmeticExpression) (COMMACHAR? (ALL | arithmeticExpression))* RPARENCHAR
+   : LPARENCHAR argument (COMMACHAR? argument)* RPARENCHAR
    ;
 
 specialRegister
    : ADDRESS OF generalIdentifier
-   | LENGTH OF? generalIdentifier | LINAGE_COUNTER
+   | LENGTH OF? generalIdentifier
+   | LINAGE_COUNTER
    ;
 
 // in ----------------------------------
@@ -2310,7 +2434,9 @@ cobolWord
    ;
 
 allowedCobolKeywords
-   : CR | FIELD | MMDDYYYY | PRINTER | DAY_OF_WEEK
+   : AS | COMPAT| CR | DLL | FIELD | MMDDYYYY | PRINTER | DAY_OF_WEEK
+   | ENTRY_NAME | ENTRY_INTERFACE
+   | STATIC | LONGUPPER | LONGMIXED
    | REMARKS | RESUME | TIMER | TODAYS_DATE | TODAYS_NAME | YEAR | YYYYDDD | YYYYMMDD | WHEN_COMPILED
    | DISK | KEYBOARD | PORT | READER | REMOTE | VIRTUAL | LIBRARY | DEFINITION | PARSE | BOOL | ESCAPE | INITIALIZED
    | LOC | BYTITLE | BYFUNCTION | ABORT | ORDERLY | ASSOCIATED_DATA | ASSOCIATED_DATA_LENGTH
@@ -2328,7 +2454,7 @@ eater
     ;
 
 dot_fs
-    : DOT_FS | {notifyError("missing.period", _input.LT(1).getText());}
+    : DOT_FS
     ;
 
 //dialectNodeFiller

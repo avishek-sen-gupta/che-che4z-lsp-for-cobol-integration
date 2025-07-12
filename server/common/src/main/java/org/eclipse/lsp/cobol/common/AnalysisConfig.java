@@ -35,13 +35,16 @@ public class AnalysisConfig {
   CopybookProcessingMode copybookProcessingMode;
   List<String> dialects;
   boolean isCicsTranslatorEnabled;
+  boolean collectAstChanges;
   List<DialectRegistryItem> dialectRegistry;
   Map<String, JsonElement> dialectsSettings;
   List<String> compilerOptions = new ArrayList<>();
   boolean addCicsPlaceholder;
   boolean addDb2SqlPlaceholder;
+  // Map preprocessors name to list of directives
+  Map<String, List<String>> preprocessorsDirectives = new HashMap<>();
 
-    public AnalysisConfig(CopybookProcessingMode copybookProcessingMode, List<String> dialects, boolean isCicsTranslatorEnabled, List<DialectRegistryItem> dialectRegistry, Map<String, JsonElement> dialectsSettings, boolean addCicsPlaceholder, boolean addDb2SqlPlaceholder) {
+    public AnalysisConfig(CopybookProcessingMode copybookProcessingMode, List<String> dialects, boolean isCicsTranslatorEnabled, boolean collectAstChanges, List<DialectRegistryItem> dialectRegistry, Map<String, JsonElement> dialectsSettings, boolean addCicsPlaceholder, boolean addDb2SqlPlaceholder) {
         this.copybookProcessingMode = copybookProcessingMode;
         this.dialects = dialects;
         this.isCicsTranslatorEnabled = isCicsTranslatorEnabled;
@@ -49,10 +52,11 @@ public class AnalysisConfig {
         this.dialectsSettings = dialectsSettings;
         this.addCicsPlaceholder = addCicsPlaceholder;
         this.addDb2SqlPlaceholder = addDb2SqlPlaceholder;
+        this.collectAstChanges = collectAstChanges;
     }
 
-    public AnalysisConfig(CopybookProcessingMode copybookProcessingMode, List<String> dialects, boolean isCicsTranslatorEnabled, List<DialectRegistryItem> dialectRegistry, Map<String, JsonElement> dialectsSettings) {
-        this(copybookProcessingMode, dialects, isCicsTranslatorEnabled, dialectRegistry, dialectsSettings, false, false);
+    public AnalysisConfig(CopybookProcessingMode copybookProcessingMode, List<String> dialects, boolean isCicsTranslatorEnabled, boolean collectAstChanges, List<DialectRegistryItem> dialectRegistry, Map<String, JsonElement> dialectsSettings) {
+        this(copybookProcessingMode, dialects, isCicsTranslatorEnabled, collectAstChanges, dialectRegistry, dialectsSettings, false, false);
     }
 
     /**
@@ -64,11 +68,23 @@ public class AnalysisConfig {
    */
   public static AnalysisConfig defaultConfig(CopybookProcessingMode mode) {
     return new AnalysisConfig(
-            mode,
+        mode,
         ImmutableList.of(),
         true,
+        false,
         ImmutableList.of(),
         ImmutableMap.of("target-sql-backend", new Gson().toJsonTree(SQLBackend.DB2_SERVER)));
+  }
+
+  public static AnalysisConfig defaultConfig(
+      CopybookProcessingMode mode, boolean collectAstChanges) {
+    return new AnalysisConfig(
+        mode,
+        ImmutableList.of(),
+        true,
+            collectAstChanges,
+            ImmutableList.of(),
+            ImmutableMap.of("target-sql-backend", new Gson().toJsonTree(SQLBackend.DB2_SERVER)));
   }
 
   public static AnalysisConfig idmsConfig(String dialectJarPath, CopybookProcessingMode mode) {
@@ -76,6 +92,7 @@ public class AnalysisConfig {
             mode,
         ImmutableList.of("IDMS"),
         true,
+        false,
         ImmutableList.of(new DialectRegistryItem("IDMS", URI.create(String.format("file://%s", dialectJarPath)), "Some Description", "Some ID")),
         ImmutableMap.of("target-sql-backend", new Gson().toJsonTree(SQLBackend.DB2_SERVER)), true, true);
   }
@@ -85,6 +102,7 @@ public class AnalysisConfig {
             mode,
         ImmutableList.of(),
         true,
+        false,
         ImmutableList.of(),
         ImmutableMap.of("target-sql-backend", new Gson().toJsonTree(SQLBackend.DB2_SERVER)), true, true);
   }

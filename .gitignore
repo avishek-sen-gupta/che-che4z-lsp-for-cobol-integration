@@ -107,13 +107,18 @@ local.properties
 .tern-project
 
 # ANTLR plugin
+.antlr
 /server/engine/gen
 /server/dialect-idms/gen
 /server/dialect-daco/gen
 /server/test/gen
 /server/parser/gen
+<<<<<<< HEAD
 /server/parser/src/main/antlr4/org/eclipse/lsp/cobol/core/parser/gen/
 /server/dialect-idms/src/main/antlr4/org/eclipse/lsp/cobol/core/parser/gen/
+=======
+.antlr/
+>>>>>>> 2.4.1
 
 # TeXlipse plugin
 .texlipse
@@ -140,3 +145,4 @@ logs/app.log
 clients/cobol-lsp-vscode-extensiontest-report
 clients/cobol-lsp-vscode-extension/test-report.xml
 .scannerwork
+/server-delomboked

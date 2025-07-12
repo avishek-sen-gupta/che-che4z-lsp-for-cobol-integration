@@ -39,7 +39,7 @@ Integrating COBOL Language Support with the Zowe Explorer and Explorer for Endev
 
 Both Zowe Explorer and Explorer for Endevor are available as part of the [Code4z extension pack](https://marketplace.visualstudio.com/items?itemName=broadcomMFD.code4z-extension-pack). A Zowe Explorer `zosmf` or `zftp` profile with credentials and a connection URL is also required to retrieve copybooks from mainframe data sets.
 
-<a href="https://www.openmainframeproject.org/all-projects/zowe/conformance"><img alt="This extension is Zowe v2 conformant" src="https://artwork.openmainframeproject.org/other/zowe-conformant/zowev2/explorer/color/zowe-conformant-zowev2-explorer-color.png" width=20% height=20% /></a>
+<a href="https://www.openmainframeproject.org/all-projects/zowe/conformance"><img alt="This extension is Zowe v3 conformant" src="https://artwork.openmainframeproject.org/other/zowe-conformant/zowev3/explorer-vs-code/color/zowe-conformant-zowev3-explorer-vs-code-color.png" width=20% height=20% /></a>
 
 ## Features
 COBOL Language Support provides the following COBOL syntax awareness features:
@@ -57,14 +57,14 @@ Autocomplete speeds up the coding process by intuitively suggesting the most lik
 
 The autocomplete feature is only available in the main COBOL file, not in copybooks.
 
-![Autocomplete](/docs/images/CLSAutocorrect.gif)
+![Autocomplete](/docs/images/autocomplete3.gif)
 
 ### Syntax and Semantic Check for Code
-This feature checks for mistakes and errors in COBOL code. The syntax check feature reviews the whole content of the code and suggests fixes, through syntax and semantic analysis which returns diagnostics on the entire context of the code, not just keywords.
+This feature checks for mistakes and errors in COBOL code. The syntax check feature reviews the whole content of the code and suggests fixes, and the semantic analysis highlights incorrect names of variables, copybooks and paragraphs.
 
 This feature is also enabled for Datacom, CICS, and DB2 SQL keywords and variables.
 
-![Syntax check](/docs/images/CLSErrorHighlighting.gif)
+To disable the semantic check feature, open the COBOL Language Support extension settings and change **Analysis mode** to **BASIC**.
 
 ### Syntax Highlighting
 The extension enables syntax highlighting for COBOL code.
@@ -72,21 +72,21 @@ The extension enables syntax highlighting for COBOL code.
 ### Syntax Coloring
 Contrasting colors are used in displayed code for ease of identifying and distinguishing keywords, variables, paragraphs and sections.
 
-### Outline View and Breadcrumb View
-The extension enables outline view and breadcrumb view, which show the structure of elements within the program and allow easy navigation between them.
+### Outline View and Breadcrumbs
+The extension enables outline view and the breadcrumbs navigation bar at the top of the edit window, which show the structure of elements within the program and allow easy navigation between them.
 
 ### Code Snippets
 Before you write your COBOL code from scratch, search the snippet library for useful templates.
 
-1. Press `F1` to open the command palette.
-2. Type **Insert Snippet** and press enter.
+1. Press **F1** to open the command palette.
+2. Run the command **Snippets: Insert COBOL Snippet**.
 3. Select the snippet that you want to insert.
 
 ![Code snippets](/docs/images/Snippet.gif)
 
 You can also insert a code snippet by typing the name of the snippet in your code and clicking on the autocomplete text.
 
-The COBOL Language Support extension also supports user snippets. Add your custom snippets to the `COBOL.json` file in your user snippets folder.
+The COBOL Language Support extension also supports user snippets. Add your custom snippets to the `COBOL.json` file in your user snippets folder. To access your user snippets file, press **F1** to open the command pallette, and run the command **Snippets: Configure Snippets**.
 
 ### Smart Tab
 
@@ -145,16 +145,18 @@ To enable subroutine support, specify the paths of folders containing subroutine
 3. Under **Subroutine-manager: Paths-local**, specify the paths of the folders containing subroutines.
    - **Tip:** We recommend that you specify relative paths from the workspace root. To obtain the relative path of a folder in your workspace, right-click it in the folder tree and select **Copy Relative Path**.
    - The folders are searched in the order they are listed. If two folders contain a subroutine with the same file name, the one from the folder higher on the list is used.
-4. Open a program or project.  
+4. Open a file or folder.  
    Subroutine support features are now enabled.
 
 If you specify your subroutine folders using absolute paths or paths containing `../` or `./`, the subroutine folders are not watched for changes. You might need to resolve names of recently added files in your code manually.
 
 ## Copybook Support
 
-The COBOL Language Support extension supports copybooks used in your source code that are stored in a local folder in your workspace. If you have copybooks stored in mainframe data sets or USS directories, you can use a Zowe Explorer profile to automatically download them from the mainframe to your workspace.
+The COBOL Language Support extension automatically supports copybooks used in your source code that are stored in a folder in your workspace. 
 
-To enable copybook support, you specify the folders and data sets that contain copybooks used in your project in the workspace settings. When a copybook is used in the program, the folders and data sets are searched in the order they are listed for files and members that match the name of the copybook. If a copybook with the same file name is located in both a local folder and a remote location, the one in the local folder is used.
+If you have copybooks stored in mainframe data sets or USS directories, you can use a Zowe Explorer profile to automatically download them from the mainframe to your workspace. You specify the data sets that contain copybooks used in your project in the workspace settings. If you need to restrict copybook support to certain subfolders in your workspace, you can also specify local folders that contain copybooks in the workspace settings.
+
+When a copybook is used in the program, the folders and data sets are searched in the order they are listed for files and members that match the name of the copybook. If a copybook with the same file name is located in both a local folder that you specify in the workspace settings and a remote location, the one in the local folder is used.
 
 Copybook support features are disabled for files stored in the folder **.c4z/.extsrcs** in your workspace. If you also use the [Debugger for Mainframe](https://github.com/BroadcomMFD/debugger-for-mainframe) extension to debug your COBOL programs, you might have some files stored in this folder.
 
@@ -169,16 +171,22 @@ COBOL Language Support supports the following copybook types:
 
 ### Storing Copybooks Locally
 
-You can store your copybooks locally in folders in your workspace and specify those folder paths in your workspace extension settings.
+You can store your copybooks locally in folders in your workspace. Copybook support is enabled by default for the entire workspace. If you need to restrict copybook support to individual folders, specify the folder paths in your workspace extension settings.
 
 1. Open the COBOL Language Support extension settings.
 2. Switch from **User** to **Workspace**.
 3. Specify the paths of the folders containing copybooks under **Cpy-manager: Paths-local**.
    - **Tip:** We recommend that you specify relative paths from the workspace root. To obtain the relative path of a folder in your workspace, right-click it in the folder tree and select **Copy Relative Path**.
-   - You can use [Glob](https://www.npmjs.com/package/glob) wildcards, such as * to substitute one whole level of the path. For example, specifying the path `*/copybooks` searches all subfolders named "copybooks" in  subfolders of your workspace root, while the path `copybooks/*` searches all subfolders one level below the `copybooks` folder in the workspace root. For more information on available wildcards, see the [Glob Primer](https://www.npmjs.com/package/glob#Glob-Primer)
+   - You can use [Glob](https://www.npmjs.com/package/glob) wildcards, such as * to substitute one whole level of the path. For example, specifying the path `*/copybooks` searches all subfolders named "copybooks" in  subfolders of your workspace root, while the path `copybooks/*` searches all subfolders one level below the `copybooks` folder in the workspace root. For more information on available wildcards, see the [Glob Primer](https://www.npmjs.com/package/glob#Glob-Primer).
+   - You can also use the following VS Code predefined variables:
+     - **${fileBasenameNoExtension}**
+     - **${fileDirname}**
+     - **${fileDirnameBasename}**
+     - **${workspaceFolder}**
+     - For more information, see the [VS Code documentation](https://code.visualstudio.com/docs/editor/variables-reference#_predefined-variables).
    - The folders are searched in the order they are listed, or in alphabetical order if multiple paths are indexed by a wildcard. If two folders contain a copybook with the same file name, the one from the folder higher on the list is used.
 4. (Optional) Under **Cpy-manager: Copybook-extensions**, specify the file extensions used for your copybooks. The default supported file extensions are `.cpy` and `.copy`.
-5. Open a program or project.  
+5. Open a file or folder.  
    Copybook support features are now enabled.
 
 If you specify your copybook folders using absolute paths or paths containing `../` or `./`, the copybook folders are not watched for changes. You might need to resolve names of recently added copybooks in your code manually.
@@ -197,11 +205,13 @@ You can also set up automatic copybook retrieval from the mainframe to download 
 6. Under **Cpy-manager: Profiles**, enter the name of your Zowe Explorer profile.
 7. (Optional) Under **Cpy-manager: Copybook-extensions**, specify the file extensions used for your copybooks. The default supported file extensions are `.cpy` and `.copy`.
 8. (Optional) Under **Cpy-manager: Copybook-file-encoding**, specify the file encoding used in your copybooks. COBOL Language Support converts copybooks that it downloads from the mainframe from the specified encoding to UTF-8.
-9. Open a program or project.  
-   All copybooks used in the program or project which are not stored locally are downloaded from the mainframe data sets and USS directories that you specified in steps 4 and 5.  
+9. Open a file or folder.  
+   All copybooks used in the program which are not stored locally are downloaded from the mainframe data sets and USS directories that you specified in steps 4 and 5.  
    Copybook support features are now enabled.
 
 Copybooks that you retrieve from mainframe data sets are stored in your VS Code global storage folder. 
+
+Changes you make to copybooks that you retrieve from mainframe data sets are not saved back to the mainframe. To edit the content of your copybooks, we recommend that you use Zowe Explorer.
 
 We recommend that you refresh your copybooks from time to time. To refresh your copybooks, press **F1** and run the command **Clear downloaded copybooks**. This command clears the global storage folder so that copybooks are downloaded again from the mainframe.
 
@@ -246,23 +256,39 @@ The Find All References and Go To Definition functionalities are extended to wor
 
 ## Processor Groups
 
-Use processor groups to link programs with specific dialects, SQL backend settings, copybook extensions, compiler options, and local folders containing copybooks. You define processor groups in a `proc_grps.json` file and associate processor groups with programs in a `pgm_conf.json` file. Create both of these files in a `/.cobolplugin` folder in your workspace root.
+Use processor groups to link programs with specific dialects, SQL backend settings, copybook extensions, compiler options, and local and remote locations that contain copybooks. You define processor groups in a `proc_grps.json` file and associate processor groups with programs in a `pgm_conf.json` file. Create both of these files in a `/.cobolplugin` folder in your workspace root.
 
 The `proc_grps.json` file is formatted as an array of JSON elements, with one JSON per processor group. Each processor group can contain the following elements:
 
 - **"name":** (string)  
     - Specify a name for the processor group.
 - (Optional) **"libs":** (array)  
-    - Specify libraries that contain copybooks as either absolute or relative local paths. These libraries are used to search for copybooks in programs linked with this processor group, and take priority over the local copybook libraries that you specify in the extension settings.
+    - Specify local folders, mainframe data sets, USS files, and Endevor locations that contain copybooks. Specify local folders as either absolute or relative local paths. These libraries are used to search for copybooks in programs linked with this processor group, and take priority over the copybook libraries that you specify in the extension settings.
+    - Specify local folders as a string.
+    - Specify remote locations as JSON elements. Use one JSON element per remote location. Specify either the **"dataset"** or **"uss"** parameter, and optionally a **"profile"**. Use one JSON element per remote location.
+        - **"dataset":** (string)
+            - Specify the full DSN of a PDS that contains copybooks.
+        - **"uss":** (string)
+            - Specify a full USS path that contains copybooks.
+        - (Optional) **"profile":** (string)
+            - Specify the name of a Zowe profile. If you do not include this parameter, the Zowe profile specified in the extension settings is used. 
+    - Specify Endevor locations as JSON elements containing the following parameters. Use one JSON element per Endevor location.
+        - (Optional) **"profile":** (string)
+            - If you use more than one Endevor connection or inventory location, specify the name of a connection or inventory location or profile in this parameter. If you only use one Endevor connection and inventory location, you can omit this parameter.
+        - **"environment":** (string)
+        - **"stage":** (string)
+        - **"system":** (string)
+        - **"subsystem":** (string)
+        - **"type":** (string)
 - (Optional) **"copybook-extensions":** (array)  
     - Specify copybook extensions that you use for the programs linked with this processor groups. These copybook extensions take priority over extensions that you specify in the extension settings.
 - (Optional) **"compiler-options":** (array)  
     - Specify compiler directives that you want to apply to the programs linked with this processor group. Currently the following directives are supported:
         - QUALIFY(*EXTEND|COMPAT*)
-		- XMLPARSE(*XMLSS|COMPAT*)
+        - XMLPARSE(*XMLSS|COMPAT*)
 	- For more information on COBOL compiler options, see the [IBM Enterprise COBOL documentation](https://www.ibm.com/docs/en/cobol-zos/6.3?topic=guide-enterprise-cobol-compiler-options).
 - (Optional) **"preprocessor":** (array)
-	- Specify dialect and SQL preprocessors that you want to apply to the programs linked with this processor group. See the [Preprocessors](#preprocessors) section below for further information.
+    - Specify dialect and SQL preprocessors that you want to apply to the programs linked with this processor group. See the [Preprocessors](#preprocessors) section below for further information.
 
 ### Preprocessors
 
@@ -286,7 +312,23 @@ A dialect preprocessor can be used to enable a COBOL dialect for a particular pr
 - **"name":** (string)
     - Specify the name of a dialect.
 - (Optional) **"libs":** (array)
-    - Specify libraries that contain copybooks written in the specified dialect as either absolute or relative local paths. These libraries are used to search for copybooks in programs linked with this processor group, and take priority over the local copybook libraries that you specify in the extension settings.
+    - Specify local folders, mainframe data sets, USS files, and Endevor locations that contain copybooks written in the specified dialect as either absolute or relative local paths. These libraries are used to search for copybooks in programs linked with this processor group, and take priority over the local copybook libraries that you specify in the extension settings.
+    - Specify local folders as a string.
+    - Specify remote locations as JSON elements. Use one JSON element per remote location. Specify either the **"dataset"** or **"uss"** parameter, and optionally a **"profile"**. Use one JSON element per remote location.
+        - **"dataset":** (string)
+            - Specify the full DSN of a PDS that contains copybooks.
+        - **"uss":** (string)
+            - Specify a full USS path that contains copybooks.
+        - (Optional) **"profile":** (string)
+            - Specify the name of a Zowe profile. If you do not include this parameter, the Zowe profile specified in the extension settings is used. 
+    - Specify Endevor locations as JSON elements containing the following parameters. Use one JSON element per Endevor location.
+        - (Optional) **"profile":** (string)
+            - If you use more than one Endevor connection or inventory location, specify the name of a connection or inventory location or profile in this parameter. If you only use one Endevor connection and inventory location, you can omit this parameter.
+        - **"environment":** (string)
+        - **"stage":** (string)
+        - **"system":** (string)
+        - **"subsystem":** (string)
+        - **"type":** (string)
  
 ### Program configuration file
 
@@ -308,15 +350,15 @@ Each element contains the following parameters:
 - **"pgroup":** (string)
     - Specify the name of a procecssor group that is defined in `proc_grps.json`.
    
-### Example
+### Example Processor Group Configuration
 
 Using the example `pgm_conf.json` file above, the following `proc_grps.json` example enables the following:
 
-- Copybooks from libraries LIB1 and LIB2, with the extensions ".cpy" and ".copy", are used with PROGRAM1.
+- Copybooks from local folders LIB1 and LIB2, with the extensions ".cpy" and ".copy", and from Endevor location PRD/2/SYS3/SUB4/COBCPY, are used with PROGRAM1. The Explorer for Endevor inventory location "inv1" is used to retrieve the dependencies from Endevor.
 - The QUALIFY(EXTEND) and XMLPARSE(COMPAT) compiler options are enabled for PROGRAM1.
-- The IDMS dialect is enabled for PROGRAM2, and IDMS copybooks from LIB3 and LIB4 are used with PROGRAM2.
+- The IDMS dialect is enabled for PROGRAM2, and IDMS copybooks from local folders LIB3 and LIB4 are used with PROGRAM2.
 - The DB2 SQL server is enabled for PROGRAM2. 
-- Non-IDMS copybooks from libraries LIB5 and LIB6 are used with PROGRAM2. 
+- Non-IDMS copybooks from USS path /remote/uss/folder, and mainframe data set HLQ.DSN.COBCOPY, are used with PROGRAM2. The Zowe profile "prof1" is used to download the copybooks from the mainframe data set, while the default profile in the extension settings is used to download the copybooks from the USS file.
 
 ```
 {
@@ -324,7 +366,15 @@ Using the example `pgm_conf.json` file above, the following `proc_grps.json` exa
         {
             "name": "GROUP1",
             "libs": [
-                "LIB1", "LIB2"
+                "LIB1", "LIB2",
+                       {
+                            "profile": "inv1",
+                            "environment": "PRD",
+                            "stage": "2",
+                            "system": "SYS3",
+                            "subsystem": "SUB4",
+                            "type": "COBCPY"
+                        }
             ],
             "copybook-extensions": [
                 ".cpy", ".copy"
@@ -348,8 +398,14 @@ Using the example `pgm_conf.json` file above, the following `proc_grps.json` exa
                 }
             ],
             "libs": [
-                "LIB5", "LIB6"
-                ]
+                        {
+                            "uss": "/remote/uss/folder"
+                        },
+                        {
+                            "dataset": "HLQ.DSN.COBCOPY",
+                            "profile": "prof1"
+                        }
+                ],
         }
     ]
 }
@@ -370,39 +426,7 @@ These values are ordered from returning the least information ("ERROR"; errors o
 
 To view troubleshooting logs, open the output panel and select **COBOL Language Support** from the drop-down menu.
 
-## Technical Assistance and Support for COBOL Language Support
+## Known Issues
 
-The COBOL Language Support extension is made available to customers on the Visual Studio Code Marketplace in accordance with the terms and conditions contained in the provided End-User License Agreement (EULA).
-
-If you are on active support for Brightside, you get technical assistance and support in accordance with the terms, guidelines, details, and parameters that are located within the Broadcom [Working with Support](https://support.broadcom.com/external/content/release-announcements/CA-Support-Policies/6933) guide.
-
-This support generally includes:
-
-* Telephone and online access to technical support
-* Ability to submit new incidents 24x7x365
-* 24x7x365 continuous support for Severity 1 incidents
-* 24x7x365 access to Broadcom Support
-* Interactive remote diagnostic support
-* Technical support cases must be submitted to Broadcom in accordance with guidance provided in “Working with Support”.
-
-Note: To receive technical assistance and support, you must remain compliant with “Working with Support”, be current on all applicable licensing and maintenance requirements, and maintain an environment in which all computer hardware, operating systems, and third party software associated with the affected Broadcom software are on the releases and version levels from the manufacturer that Broadcom designates as compatible with the software. Changes you elect to make to your operating environment could detrimentally affect the performance of Broadcom software and Broadcom shall not be responsible for these effects or any resulting degradation in performance of the Broadcom software. Severity 1 cases must be opened via telephone and elevations of lower severity incidents to Severity 1 status must be requested via telephone.
-
-## Privacy Notice
-The extensions for Visual Studio Code developed by Broadcom Inc., including its corporate affiliates and subsidiaries, ("Broadcom") are provided free of charge, but in order to better understand and meet its users’ needs, Broadcom may collect, use, analyze and retain anonymous users’ metadata and interaction data, (collectively, “Usage Data”) and aggregate such Usage Data with similar Usage Data of other Broadcom customers. Please find more detailed information in [License and Service Terms & Repository](https://www.broadcom.com/company/legal/licensing).
-
-This data collection uses built-in Microsoft VS Code Telemetry, which can be disabled, at your sole discretion, if you do not want to send Usage Data.
-
-The current release of COBOL Language Support collects anonymous data for the following events:
-* Activation of this VS Code extension
-* Problem interaction
-* Quick Fix
-* Invalid ZOWE credentials
-* ZOWE connection issues
-* Java version issues
-
-Each such event is logged with the following information:
-* Event time
-* Operating system and version
-* Country or region
-* Anonymous user and session ID
-* Version numbers of Microsoft VS Code and COBOL Language Support
+- If you do not have Java on your workstation, COBOL Language Support uses the native binary (engine.exe) to execute. If your environment does not allow engine.exe to execute, contact your system administrator to add an exception for engine.exe.
+- Double-byte character sets and the DBCS compiler option are not supported.

@@ -3,14 +3,22 @@
     "name": "[Ljava.lang.Object;"
   },
   {
-    "name":"[Ljava.lang.String;"
+    "name": "[Ljava.lang.String;"
   },
   {
-    "name":"ch.qos.logback.core.ConsoleAppender",
-    "queryAllPublicMethods":true,
-    "methods":[
-      {"name":"<init>","parameterTypes":[] },
-      {"name":"setTarget","parameterTypes":["java.lang.String"] }
+    "name": "ch.qos.logback.core.ConsoleAppender",
+    "queryAllPublicMethods": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      },
+      {
+        "name": "setTarget",
+        "parameterTypes": [
+          "java.lang.String"
+        ]
+      }
     ]
   },
   {
@@ -1297,32 +1305,6 @@
     ]
   },
   {
-    "name": "org.eclipse.lsp.cobol.service.delegates.completions.CopybookCompletion",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "org.eclipse.lsp.cobol.service.delegates.completions.CopybookNameCompletion",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "org.eclipse.lsp.cobol.service.copybooks.CopybookNameService"
-        ]
-      }
-    ]
-  },
-  {
     "name": "org.eclipse.lsp.cobol.service.delegates.completions.KeywordCompletion",
     "allDeclaredFields": true,
     "queryAllDeclaredMethods": true,
@@ -1375,20 +1357,6 @@
         "name": "<init>",
         "parameterTypes": [
           "org.eclipse.lsp.cobol.core.engine.symbols.SymbolsRepository"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "org.eclipse.lsp.cobol.service.delegates.completions.SubroutineCompletion",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "org.eclipse.lsp.cobol.common.SubroutineService"
         ]
       }
     ]
@@ -3756,6 +3724,12 @@
       {
         "name": "shutdown",
         "parameterTypes": []
+      },
+      {
+        "name": "setTrace",
+        "parameterTypes": [
+          "org.eclipse.lsp4j.SetTraceParams"
+        ]
       }
     ]
   },
@@ -3840,6 +3814,15 @@
         "parameterTypes": [
           "org.eclipse.lsp4j.ReferenceParams"
         ]
+      }
+    ]
+  },
+  {
+    "name": "org.eclipse.lsp4j.DidChangeConfigurationParams",
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
       }
     ]
   },
@@ -3929,5 +3912,19 @@
         "parameterTypes": []
       }
     ]
+  },
+  {
+    "name": "org.eclipse.lsp4j.SetTraceParams",
+    "allDeclaredFields": true,
+    "methods": [
+      {
+        "name": "<init>",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.common.copybook.CopyBookDTO",
+    "allDeclaredFields": true
   }
 ]

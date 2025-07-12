@@ -47,6 +47,7 @@ import org.eclipse.lsp.cobol.service.delegates.actions.FindCopybookCommand;
 import org.eclipse.lsp.cobol.service.delegates.communications.Communications;
 import org.eclipse.lsp.cobol.service.delegates.communications.ServerCommunications;
 import org.eclipse.lsp.cobol.service.delegates.completions.*;
+import org.eclipse.lsp.cobol.service.delegates.formations.CapitalFormation;
 import org.eclipse.lsp.cobol.service.delegates.formations.Formation;
 import org.eclipse.lsp.cobol.service.delegates.formations.Formations;
 import org.eclipse.lsp.cobol.service.delegates.formations.TrimFormation;
@@ -100,7 +101,8 @@ public class ServiceModule extends AbstractModule {
   }
 
   private void bindHoverActions() {
-    Multibinder<HoverProvider> hoverProviderMultibinder = newSetBinder(binder(), HoverProvider.class);
+    Multibinder<HoverProvider> hoverProviderMultibinder =
+        newSetBinder(binder(), HoverProvider.class);
     hoverProviderMultibinder.addBinding().to(VariableHover.class);
     hoverProviderMultibinder.addBinding().to(CopybookHoverProvider.class);
   }
@@ -109,6 +111,7 @@ public class ServiceModule extends AbstractModule {
     bind(Formations.class);
     Multibinder<Formation> formationBinding = newSetBinder(binder(), Formation.class);
     formationBinding.addBinding().to(TrimFormation.class);
+    formationBinding.addBinding().to(CapitalFormation.class);
   }
 
   private void bindCompletions() {
@@ -118,9 +121,6 @@ public class ServiceModule extends AbstractModule {
     completionBinding.addBinding().to(ParagraphCompletion.class);
     completionBinding.addBinding().to(SectionCompletion.class);
     completionBinding.addBinding().to(KeywordCompletion.class);
-    completionBinding.addBinding().to(CopybookCompletion.class);
-    completionBinding.addBinding().to(SubroutineCompletion.class);
-    completionBinding.addBinding().to(CopybookNameCompletion.class);
 
     bind(CompletionStorage.class).annotatedWith(named("Keywords")).to(Keywords.class);
   }

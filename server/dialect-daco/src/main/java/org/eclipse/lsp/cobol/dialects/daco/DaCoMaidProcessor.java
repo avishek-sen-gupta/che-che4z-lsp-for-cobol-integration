@@ -39,6 +39,7 @@ import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
 import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.message.MessageService;
+import org.eclipse.lsp.cobol.common.message.MessageTemplate;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.CopyNode;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
@@ -65,7 +66,8 @@ public class DaCoMaidProcessor {
 
   private final Pattern dataDescriptionEntryWithCopyFromPattern =
       Pattern.compile(
-          "^(?<indent>\\s*)(?<lvl>\\d+)\\s+(?!copy maid)(?<entryName>\\w+(-\\w+)?)?.*(?<copyfrom>COPY-FROM)\\s+(?<protoSuffix>\\w+)\\..*$",
+          "^(?<indent>\\s*)(?<lvl>\\d+)\\s+(?!copy"
+              + " maid)(?<entryName>\\w+(-\\w+)?)?.*(?<copyfrom>COPY-FROM)\\s+(?<protoSuffix>\\w+)\\..*$",
           Pattern.MULTILINE | Pattern.CASE_INSENSITIVE);
   private final Pattern copyMaidPattern =
       Pattern.compile(
@@ -107,7 +109,7 @@ public class DaCoMaidProcessor {
         }
         Matcher copyFrom = dataDescriptionEntryWithCopyFromPattern.matcher(line);
         if (copyFrom.find()) {
-          dacoNodes.add(createCopyFromNode(copyFrom, lineNumber, context));
+          dacoNodes.add(createCopyFromNode(copyFrom, lineNumber, context, errors));
         }
       } else if (dataDivisionPattern.matcher(line).find()) {
         state = DaCoMaidProcessingState.DATA_DIVISION;
@@ -119,17 +121,15 @@ public class DaCoMaidProcessor {
   }
 
   private Node createCopyFromNode(
-      Matcher copyFrom, int lineNumber, DialectProcessingContext context) {
+      Matcher copyFrom,
+      int lineNumber,
+      DialectProcessingContext context,
+      List<SyntaxError> errors) {
     String entryName = copyFrom.group("entryName");
-    if (!DaCoHelper.extractSuffix(entryName).isPresent()) {
-      // TODO: an error
-      return null;
-    }
-    Optional<String> newSuffix = DaCoHelper.extractSuffix(entryName);
     String prototypeName =
         entryName.substring(0, entryName.length() - 2) + copyFrom.group("protoSuffix");
     int startChar = copyFrom.start("copyfrom");
-    int endChar = copyFrom.end("protoSuffix") - 1;
+    int endChar = copyFrom.end("protoSuffix");
     Range range = new Range(new Position(lineNumber, startChar), new Position(lineNumber, endChar));
     int len = endChar - startChar;
     String newString = String.join("", Collections.nCopies(len, " "));
@@ -137,7 +137,22 @@ public class DaCoMaidProcessor {
 
     Location originalLocation = context.getExtendedDocument().mapLocation(range);
     Locality locality =
-        Locality.builder().uri(originalLocation.getUri()).range(originalLocation.getRange()).build();
+        Locality.builder()
+            .uri(originalLocation.getUri())
+            .range(originalLocation.getRange())
+            .build();
+
+    Optional<String> newSuffix = DaCoHelper.extractSuffix(entryName);
+    if (!newSuffix.isPresent()) {
+      errors.add(
+          SyntaxError.syntaxError()
+              .errorSource(ErrorSource.DIALECT)
+              .severity(ErrorSeverity.ERROR)
+              .messageTemplate(
+                  MessageTemplate.of("GrammarPreprocessorListener.cannotRetrieveMaidSuffix"))
+              .location(locality.toOriginalLocation())
+              .build());
+    }
 
     return new DaCoCopyFromNode(
         locality, prototypeName, newSuffix.orElse(""), Integer.parseInt(copyFrom.group("lvl")));
@@ -199,14 +214,19 @@ public class DaCoMaidProcessor {
       Range nameRange,
       List<SyntaxError> errors) {
     Locality statementLocality =
-        Locality.builder().uri(context.getExtendedDocument().getUri()).range(statementRange).build();
+        Locality.builder()
+            .uri(context.getExtendedDocument().getUri())
+            .range(statementRange)
+            .build();
 
-    Locality nameLocality = Locality.builder().uri(context.getExtendedDocument().getUri()).range(nameRange).build();
+    Locality nameLocality =
+        Locality.builder().uri(context.getExtendedDocument().getUri()).range(nameRange).build();
 
     CopybookName copybookName =
         new CopybookName(
             makeCopybookFileName(startingLevel, layoutId, layoutUsage), DaCoDialect.NAME);
-    ResultWithErrors<CopybookModel> resolvedCopybook = copybookService.resolve(
+    ResultWithErrors<CopybookModel> resolvedCopybook =
+        copybookService.resolve(
             copybookName.toCopybookId(context.getExtendedDocument().getUri()),
             copybookName,
             context.getExtendedDocument().getUri(),
@@ -228,8 +248,7 @@ public class DaCoMaidProcessor {
       errors.addAll(resolvedCopybook.getErrors());
       checkWrkSuffix(cbNode, layoutUsage, errors);
       String suffix = calculateSuffix(layoutUsage, cbNode);
-      parseCopybookContent(copybookModel, startingLevel, suffix)
-          .forEach(cbNode::addChild);
+      parseCopybookContent(copybookModel, startingLevel, suffix).forEach(cbNode::addChild);
     } else {
       SyntaxError error =
           SyntaxError.syntaxError()
@@ -264,8 +283,8 @@ public class DaCoMaidProcessor {
           SyntaxError.syntaxError()
               .errorSource(ErrorSource.DIALECT)
               .severity(ErrorSeverity.ERROR)
-              .suggestion(
-                  messageService.getMessage("GrammarPreprocessorListener.cannotRetrieveMaidSuffix"))
+              .messageTemplate(
+                  MessageTemplate.of("GrammarPreprocessorListener.cannotRetrieveMaidWrkSuffix"))
               .location(node.getLocality().toOriginalLocation())
               .build();
       errors.add(error);
@@ -288,11 +307,15 @@ public class DaCoMaidProcessor {
     VariableParser parser = new VariableParser(tokens);
     parser.removeErrorListeners();
     parser.addErrorListener(listener);
-    parser.setErrorHandler(new CobolErrorStrategy(messageService));
+    parser.setErrorHandler(new DaCoErrorStrategy(messageService));
     parser.addParseListener(treeListener);
 
     DaCoCopybookVisitor visitor =
-        new DaCoCopybookVisitor(copybookModel.getUri(), startingLevel, suffix, copybookModel.getCopybookId().toString());
+        new DaCoCopybookVisitor(
+            copybookModel.getUri(),
+            startingLevel,
+            suffix,
+            copybookModel.getCopybookId().toString());
     ParserRuleContext ctx = parser.dataDescriptionEntries();
     return visitor.visit(ctx);
   }

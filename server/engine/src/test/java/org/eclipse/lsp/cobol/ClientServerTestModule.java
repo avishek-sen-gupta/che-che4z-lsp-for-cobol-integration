@@ -51,6 +51,7 @@ import org.eclipse.lsp.cobol.service.delegates.actions.FindCopybookCommand;
 import org.eclipse.lsp.cobol.service.delegates.communications.Communications;
 import org.eclipse.lsp.cobol.service.delegates.communications.ServerCommunications;
 import org.eclipse.lsp.cobol.service.delegates.completions.*;
+import org.eclipse.lsp.cobol.service.delegates.formations.CapitalFormation;
 import org.eclipse.lsp.cobol.service.delegates.formations.Formation;
 import org.eclipse.lsp.cobol.service.delegates.formations.Formations;
 import org.eclipse.lsp.cobol.service.delegates.formations.TrimFormation;
@@ -73,7 +74,6 @@ public class ClientServerTestModule extends AbstractModule {
   private static final String PATH_TO_TEST_RESOURCES = "filesToTestPath";
   private static final String RESOURCE_FILE_LOCATION = "resourceFileLocation";
   private static final String RESOURCE_BUNDLE_MESSAGE = "resourceBundles/messages";
-
 
   @Override
   protected void configure() {
@@ -101,14 +101,14 @@ public class ClientServerTestModule extends AbstractModule {
     bind(Occurrences.class).to(ElementOccurrences.class);
     bind(CFASTBuilder.class).to(CFASTBuilderImpl.class);
     bind(CopybookIdentificationService.class)
-            .annotatedWith(Names.named("contentStrategy"))
-            .to(CopybookIdentificationServiceBasedOnContent.class);
+        .annotatedWith(Names.named("contentStrategy"))
+        .to(CopybookIdentificationServiceBasedOnContent.class);
     bind(CopybookIdentificationService.class)
-            .annotatedWith(Names.named("suffixStrategy"))
-            .to(CopybookIdentificationBasedOnExtension.class);
+        .annotatedWith(Names.named("suffixStrategy"))
+        .to(CopybookIdentificationBasedOnExtension.class);
     bind(CopybookIdentificationService.class)
-            .annotatedWith(Names.named("combinedStrategy"))
-            .to(CopybookIdentificationCombinedStrategy.class);
+        .annotatedWith(Names.named("combinedStrategy"))
+        .to(CopybookIdentificationCombinedStrategy.class);
     bind(DialectDiscoveryService.class).to(DialectDiscoveryFolderService.class);
 
     bindHoverActions();
@@ -118,7 +118,8 @@ public class ClientServerTestModule extends AbstractModule {
   }
 
   private void bindHoverActions() {
-    Multibinder<HoverProvider> hoverProviderMultibinder = newSetBinder(binder(), HoverProvider.class);
+    Multibinder<HoverProvider> hoverProviderMultibinder =
+        newSetBinder(binder(), HoverProvider.class);
     hoverProviderMultibinder.addBinding().to(VariableHover.class);
     hoverProviderMultibinder.addBinding().to(CopybookHoverProvider.class);
   }
@@ -127,6 +128,7 @@ public class ClientServerTestModule extends AbstractModule {
     bind(Formations.class);
     Multibinder<Formation> formationBinding = newSetBinder(binder(), Formation.class);
     formationBinding.addBinding().to(TrimFormation.class);
+    formationBinding.addBinding().to(CapitalFormation.class);
   }
 
   private void bindCompletions() {
@@ -136,7 +138,6 @@ public class ClientServerTestModule extends AbstractModule {
     completionBinding.addBinding().to(ParagraphCompletion.class);
     completionBinding.addBinding().to(SectionCompletion.class);
     completionBinding.addBinding().to(KeywordCompletion.class);
-    completionBinding.addBinding().to(CopybookCompletion.class);
 
     bind(CompletionStorage.class).annotatedWith(named("Keywords")).to(Keywords.class);
   }
