@@ -830,7 +830,7 @@ paragraphs
    ;
 
 conditionalStatementCall
-   : statement
+   : statement | dialectStatement
    ;
 
 statement
