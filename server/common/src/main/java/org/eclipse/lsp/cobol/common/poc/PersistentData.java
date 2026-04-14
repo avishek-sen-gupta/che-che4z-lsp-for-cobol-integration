@@ -8,6 +8,14 @@ import java.util.List;
 import java.util.Objects;
 
 // TODO: Inject this. This is super ugly!
+/**
+ * NOT THREAD-SAFE. This class uses unprotected static mutable state (counter, trees list).
+ * smojol parses files sequentially — this is a deliberate architectural constraint.
+ * Do NOT parallelize calls to ParsePipeline in the same JVM without replacing this class
+ * with a scoped, thread-local equivalent first.
+ *
+ * @see <a href="../../../../../../../../../../COBOL-LSP-INTEGRATION.md">COBOL-LSP-INTEGRATION.md</a>
+ */
 public class PersistentData {
     public static int counter = 0;
 
