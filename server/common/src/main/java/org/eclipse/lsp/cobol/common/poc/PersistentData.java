@@ -57,4 +57,20 @@ public class PersistentData {
         return ((AnnotatedParserRuleContext) Objects.requireNonNull(getDialectNode(displayOperand))).dialect;
     }
 
+    /** Returns the number of IDMS parse trees currently registered. */
+    public static int treeCount() {
+        return trees.size();
+    }
+
+    /**
+     * Resets all static state. Intended for use in tests only.
+     * Must be called in {@code @BeforeEach} when tests need to assert exact extraction counts
+     * or IDs, since the counter and trees list accumulate across tests in the same JVM.
+     */
+    public static void reset() {
+        counter = 0;
+        tree = null;
+        trees.clear();
+    }
+
 }

@@ -1,0 +1,307 @@
+/*
+ * Copyright (c) 2022 Broadcom.
+ * The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *    Broadcom, Inc. - initial API and implementation
+ *
+ */
+package org.eclipse.lsp.cobol.dialects.idms.usecases;
+
+import com.google.common.collect.ImmutableList;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.eclipse.lsp.cobol.common.AnalysisResult;
+import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
+import org.eclipse.lsp.cobol.common.poc.PersistentData;
+import org.eclipse.lsp.cobol.dialects.idms.IdmsDialect;
+import org.eclipse.lsp.cobol.dialects.idms.utils.Fixtures;
+import org.eclipse.lsp.cobol.test.engine.UseCase;
+import org.eclipse.lsp.cobol.test.engine.UseCaseUtils;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * Verifies the smojol-fork extraction mechanism: after IDMS dialect preprocessing, each DML
+ * statement is replaced by a {@code _DIALECT_ N .} placeholder, and the original IDMS parse
+ * tree node is registered in {@link PersistentData} under the key {@code "IDMS-N"}.
+ *
+ * <p>These tests verify the <em>extraction</em> half of the pipeline (che4z side).
+ * The <em>reinjection</em> half ({@code DialectIntegratorListener}) is tested separately
+ * in {@code IdmsDialectIntegrationTest} in the smojol-toolkit module.
+ */
+class TestPersistentDataExtraction {
+
+  private static final String BOILERPLATE =
+      "        IDENTIFICATION DIVISION.\n"
+          + "        PROGRAM-ID. EXTRACTTEST.\n"
+          + "        DATA DIVISION.\n"
+          + "        WORKING-STORAGE SECTION.\n"
+          + "        PROCEDURE DIVISION.\n";
+
+  @BeforeEach
+  void resetPersistentData() {
+    PersistentData.reset();
+  }
+
+  // ---------- single-statement extraction ----------
+
+  @Test
+  void singleFinishStatementProducesOneExtraction() {
+    String source = BOILERPLATE + "            FINISH.\n";
+    analyze(source);
+
+    assertEquals(1, PersistentData.counter,
+        "Expected exactly one extraction for a single FINISH statement");
+  }
+
+  @Test
+  void extractedNodeIsRetrievableFromPersistentData() {
+    String source = BOILERPLATE + "            FINISH.\n";
+    analyze(source);
+
+    ParseTree node = PersistentData.getDialectNode("IDMS-1");
+    assertNotNull(node, "getDialectNode(\"IDMS-1\") must return the extracted IDMS node");
+  }
+
+  @Test
+  void extractedNodeHasIdmsDialectAnnotation() {
+    String source = BOILERPLATE + "            FINISH.\n";
+    analyze(source);
+
+    LocalisedDialect dialect = PersistentData.dialect("IDMS-1");
+    assertEquals(LocalisedDialect.IDMS, dialect,
+        "Extracted IDMS node must carry LocalisedDialect.IDMS");
+  }
+
+  // ---------- multi-statement extraction ----------
+
+  @Test
+  void threeIdmsStatementsProduceThreeExtractions() {
+    String source =
+        BOILERPLATE
+            + "            BIND RUN-UNIT.\n"
+            + "            READY.\n"
+            + "            FINISH.\n";
+    analyze(source);
+
+    assertEquals(3, PersistentData.counter,
+        "Expected three extractions for BIND + READY + FINISH");
+  }
+
+  @Test
+  void allExtractedNodesAreRetrievable() {
+    String source =
+        BOILERPLATE
+            + "            BIND RUN-UNIT.\n"
+            + "            READY.\n"
+            + "            FINISH.\n";
+    analyze(source);
+
+    for (int id = 1; id <= 3; id++) {
+      assertNotNull(PersistentData.getDialectNode("IDMS-" + id),
+          "Expected node for IDMS-" + id + " to be present in PersistentData");
+    }
+  }
+
+  @Test
+  void allExtractedNodesHaveIdmsDialect() {
+    String source =
+        BOILERPLATE
+            + "            BIND RUN-UNIT.\n"
+            + "            READY.\n"
+            + "            FINISH.\n";
+    analyze(source);
+
+    for (int id = 1; id <= 3; id++) {
+      assertEquals(LocalisedDialect.IDMS, PersistentData.dialect("IDMS-" + id),
+          "Node IDMS-" + id + " must carry LocalisedDialect.IDMS");
+    }
+  }
+
+  // ---------- interleaved COBOL + IDMS ----------
+
+  @Test
+  void onlyIdmsStatementsAreExtractedNotCobol() {
+    // Source has 2 MOVE statements (pure COBOL) and 2 IDMS statements
+    String source =
+        BOILERPLATE
+            + "            MOVE 0 TO WS-X\n"
+            + "            FIND CALC EMPLOYEE-RECORD\n"
+            + "            MOVE 1 TO WS-X\n"
+            + "            FINISH.\n";
+    analyze(source);
+
+    // Only FIND and FINISH should have been extracted
+    assertEquals(2, PersistentData.counter,
+        "Expected exactly 2 extractions (FIND + FINISH); MOVE statements must not be extracted");
+  }
+
+  @Test
+  void resetClearsTreesListBetweenAnalysisCalls() {
+    String source = BOILERPLATE + "            FINISH.\n";
+
+    // First analysis call — multiple dialects (IDMS, CICS, DB2) each add their tree,
+    // so treeCount() > 0 after one analysis.
+    analyze(source);
+    int treesAfterFirst = PersistentData.treeCount();
+    assertTrue(treesAfterFirst > 0,
+        "After first analysis, trees list must be non-empty");
+
+    // reset() must bring the count back to zero so a subsequent analysis starts clean.
+    PersistentData.reset();
+    assertEquals(0, PersistentData.treeCount(),
+        "After reset(), trees list must be empty");
+
+    // Second analysis call — must populate the list again with the same count.
+    analyze(source);
+    int treesAfterSecond = PersistentData.treeCount();
+    assertEquals(treesAfterFirst, treesAfterSecond,
+        "A fresh analysis after reset() must produce the same tree count as the first analysis");
+  }
+
+  // ---------- IF statement extraction (Issue 2 investigation) ----------
+
+  /**
+   * Grammar: {@code ifStatement : IF idmsIfCondition}
+   * {@code idmsIfCondition : (idms_db_entity_name idmsIfEmpty) | (idmsIfMember)}
+   *
+   * <p>The IDMS visitor overrides {@code visitIdmsIfCondition}, which calls
+   * {@code replaceWithMetadata} on the condition node. There is no {@code visitIfStatement}
+   * override, so the outer {@code ifStatement} wrapper is NOT extracted — only the condition
+   * node produces one entry. This test verifies that an {@code IF <entity> EMPTY} statement
+   * produces exactly one extraction, confirming that double-extraction does NOT occur for
+   * this grammar path.
+   */
+  @Test
+  void idmsIfEmptyConditionProducesExactlyOneExtraction() {
+    // WORKING-STORAGE variables needed so the COBOL semantic analyzer recognises
+    // the identifiers; the extraction counter is set during IDMS preprocessing
+    // (before COBOL analysis), so it is not affected by semantic errors.
+    String source =
+        "        IDENTIFICATION DIVISION.\n"
+            + "        PROGRAM-ID. IFTEST.\n"
+            + "        DATA DIVISION.\n"
+            + "        WORKING-STORAGE SECTION.\n"
+            + "        01 IX-EMP PIC X.\n"
+            + "        01 MT-FLAG PIC X.\n"
+            + "        PROCEDURE DIVISION.\n"
+            + "            IF IX-EMP EMPTY MOVE 'X' TO MT-FLAG.\n";
+    analyze(source);
+
+    assertEquals(1, PersistentData.counter,
+        "IF <entity> EMPTY must produce exactly one extraction "
+            + "(visitIdmsIfCondition called once; no double-extraction)");
+  }
+
+  /**
+   * Mirror of {@link #idmsIfEmptyConditionProducesExactlyOneExtraction} for the MEMBER form:
+   * {@code idmsIfMember : NOT? idms_db_entity_name MEMBER}.
+   */
+  @Test
+  void idmsIfMemberConditionProducesExactlyOneExtraction() {
+    String source =
+        "        IDENTIFICATION DIVISION.\n"
+            + "        PROGRAM-ID. IFTEST.\n"
+            + "        DATA DIVISION.\n"
+            + "        WORKING-STORAGE SECTION.\n"
+            + "        01 IX-EMP PIC X.\n"
+            + "        01 MT-FLAG PIC X.\n"
+            + "        PROCEDURE DIVISION.\n"
+            + "            IF NOT IX-EMP MEMBER MOVE 'X' TO MT-FLAG.\n";
+    analyze(source);
+
+    assertEquals(1, PersistentData.counter,
+        "IF NOT <entity> MEMBER must produce exactly one extraction "
+            + "(visitIdmsIfCondition called once; no double-extraction)");
+  }
+
+  /**
+   * Grammar: {@code idmsIfStatement : inquireMapIfStatement}
+   * {@code inquireMapIfStatement : INQUIRE MAP idms_map_name IF inqMapIfPhrase}
+   *
+   * <p>The visitor overrides {@code visitIdmsIfStatement}, which calls {@code replaceWithMetadata}
+   * on the whole {@code inquireMapIfStatement} context. {@code inqMapIfPhrase} is NOT
+   * {@code idmsIfCondition}, so {@code visitIdmsIfCondition} is NOT triggered. Exactly one
+   * extraction must occur.
+   */
+  @Test
+  void inquireMapIfProducesExactlyOneExtraction() {
+    String source =
+        BOILERPLATE
+            + "            INQUIRE MAP EMPMAP IF INPUT CHANGED.\n";
+    analyze(source);
+
+    assertEquals(1, PersistentData.counter,
+        "INQUIRE MAP <name> IF INPUT CHANGED must produce exactly one extraction "
+            + "(visitIdmsIfStatement called once; visitIdmsIfCondition must NOT fire for inqMapIfPhrase)");
+  }
+
+  /**
+   * Both a plain {@code IF <condition>} (handled by {@code visitIdmsIfCondition}) and an
+   * {@code INQUIRE MAP <name> IF ...} (handled by {@code visitIdmsIfStatement}) are present.
+   * Because they are siblings in the {@code idmsRules} grammar alternative, neither triggers
+   * the other. The combined extraction count must be exactly 2.
+   */
+  @Test
+  void idmsIfConditionAndInquireMapIfTogetherProduceTwoExtractions() {
+    String source =
+        "        IDENTIFICATION DIVISION.\n"
+            + "        PROGRAM-ID. IFTEST.\n"
+            + "        DATA DIVISION.\n"
+            + "        WORKING-STORAGE SECTION.\n"
+            + "        01 IX-EMP PIC X.\n"
+            + "        01 MT-FLAG PIC X.\n"
+            + "        PROCEDURE DIVISION.\n"
+            + "            IF IX-EMP EMPTY MOVE 'X' TO MT-FLAG.\n"
+            + "            INQUIRE MAP EMPMAP IF INPUT CHANGED.\n";
+    analyze(source);
+
+    assertEquals(2, PersistentData.counter,
+        "One IF <condition> + one INQUIRE MAP IF must produce exactly 2 extractions; "
+            + "if the count differs from 2, double-extraction or missed extraction has occurred");
+  }
+
+  /**
+   * Verifies that after an IDMS IF extraction, the extracted node is retrievable from
+   * {@code PersistentData} under the expected key. Complements
+   * {@link #idmsIfEmptyConditionProducesExactlyOneExtraction} by checking both counter and
+   * lookup.
+   */
+  @Test
+  void idmsIfConditionNodeIsRetrievableFromPersistentData() {
+    String source =
+        "        IDENTIFICATION DIVISION.\n"
+            + "        PROGRAM-ID. IFTEST.\n"
+            + "        DATA DIVISION.\n"
+            + "        WORKING-STORAGE SECTION.\n"
+            + "        01 IX-EMP PIC X.\n"
+            + "        01 MT-FLAG PIC X.\n"
+            + "        PROCEDURE DIVISION.\n"
+            + "            IF IX-EMP EMPTY MOVE 'X' TO MT-FLAG.\n";
+    analyze(source);
+
+    ParseTree node = PersistentData.getDialectNode("IDMS-1");
+    assertNotNull(node,
+        "getDialectNode(\"IDMS-1\") must return the extracted IDMS IF condition node");
+  }
+
+  // ---------- helper ----------
+
+  private static AnalysisResult analyze(String source) {
+    UseCase useCase =
+        UseCase.builder()
+            .text(source)
+            .copybook(Fixtures.subschemaCopy(""))
+            .dialects(ImmutableList.of(IdmsDialect.NAME))
+            .build();
+    return UseCaseUtils.analyze(useCase);
+  }
+}
