@@ -303,7 +303,7 @@ recordKeyClause
    ;
 
 alternateRecordKeyClause
-   : ALTERNATE RECORD KEY? IS? qualifiedDataName passwordClause? (WITH? DUPLICATES)?
+   : ALTERNATE (RECORD KEY? | KEY) IS? qualifiedDataName passwordClause? (WITH? DUPLICATES)?
    ;
 
 passwordClause
