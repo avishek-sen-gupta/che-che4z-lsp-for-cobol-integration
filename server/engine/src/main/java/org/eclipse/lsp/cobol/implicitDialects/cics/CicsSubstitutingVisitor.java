@@ -39,6 +39,7 @@ import org.eclipse.lsp.cobol.common.model.tree.StopNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.QualifiedReferenceNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableUsageNode;
 import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
+import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.implicitDialects.cics.nodes.ExecCicsHandleNode;
 import org.eclipse.lsp.cobol.implicitDialects.cics.nodes.ExecCicsNode;
@@ -230,6 +231,7 @@ class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
   }
 
     private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
+        PersistentData.record(ctx, LocalisedDialect.CICS);
         String contextTextReference = PersistentData.next();
         ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
         ctx.getCustomData().put("DIALECT", "CICS");

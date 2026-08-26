@@ -19,6 +19,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
 import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
+import org.eclipse.lsp.cobol.common.poc.PersistentData.Fragment;
 import org.eclipse.lsp.cobol.dialects.idms.IdmsDialect;
 import org.eclipse.lsp.cobol.dialects.idms.utils.Fixtures;
 import org.eclipse.lsp.cobol.test.engine.UseCase;
@@ -291,6 +292,57 @@ class TestPersistentDataExtraction {
     ParseTree node = PersistentData.getDialectNode("IDMS-1");
     assertNotNull(node,
         "getDialectNode(\"IDMS-1\") must return the extracted IDMS IF condition node");
+  }
+
+  // ---------- positional fragment recording ----------
+
+  @Test
+  void singleFinishStatementRecordsOnePositionalFragment() {
+    String source = BOILERPLATE + "            FINISH.\n";
+    analyze(source);
+
+    assertEquals(1, PersistentData.fragmentCount(),
+        "Expected exactly one recorded fragment for a single FINISH statement");
+  }
+
+  @Test
+  void recordedFragmentCarriesIdmsDialectAndAParseTree() {
+    String source = BOILERPLATE + "            FINISH.\n";
+    analyze(source);
+
+    // FINISH sits on line 7 (BOILERPLATE + subschema copy header + statement), indented 12 columns.
+    Fragment fragment = PersistentData.fragmentAt(7, 12);
+    assertNotNull(fragment, "A fragment must cover the FINISH statement at 7:12");
+    assertEquals(LocalisedDialect.IDMS, fragment.dialect);
+    assertNotNull(fragment.tree, "The recorded fragment must carry the IDMS parse tree");
+    assertTrue(fragment.tree.getText().toUpperCase().contains("FINISH"),
+        "The recorded tree must be the IDMS statement, got: " + fragment.tree.getText());
+  }
+
+  @Test
+  void threeIdmsStatementsRecordThreeFragments() {
+    String source =
+        BOILERPLATE
+            + "            BIND RUN-UNIT.\n"
+            + "            READY.\n"
+            + "            FINISH.\n";
+    analyze(source);
+
+    assertEquals(3, PersistentData.fragmentCount(),
+        "Expected three recorded fragments for BIND + READY + FINISH");
+  }
+
+  @Test
+  void fragmentCountMatchesExtractionCountSoBothMechanismsAgree() {
+    String source =
+        BOILERPLATE
+            + "            BIND RUN-UNIT.\n"
+            + "            READY.\n"
+            + "            FINISH.\n";
+    analyze(source);
+
+    assertEquals(PersistentData.counter, PersistentData.fragmentCount(),
+        "Every marker-injecting substitution must also record a positional fragment");
   }
 
   // ---------- helper ----------

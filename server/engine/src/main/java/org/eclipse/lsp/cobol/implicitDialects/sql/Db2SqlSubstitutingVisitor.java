@@ -35,6 +35,7 @@ import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.variable.*;
 import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
+import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.core.visitor.VisitorHelper;
 import org.eclipse.lsp.cobol.implicitDialects.cics.MarkerDb2SqlVisitor;
@@ -499,6 +500,7 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
     }
 
     private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
+        PersistentData.record(ctx, LocalisedDialect.DB2_SQL);
         String contextTextReference = PersistentData.next();
         ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
         ctx.getCustomData().put("DIALECT", "IDMS");

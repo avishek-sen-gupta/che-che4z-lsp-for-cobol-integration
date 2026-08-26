@@ -33,6 +33,7 @@ import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.SectionType;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
+import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.common.model.tree.SectionNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.QualifiedReferenceNode;
@@ -50,7 +51,6 @@ import org.eclipse.lsp4j.Range;
  */
 class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
   private static final String IF = "_IF_ ";
-  private static final String SCHEMA_SECTION = "_SCHEMA_ ";
   private final DialectProcessingContext context;
   @Getter private int extractions = 0;
 
@@ -192,7 +192,9 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
 
   @Override
   public List<Node> visitSchemaSection(SchemaSectionContext ctx) {
-    replaceWithMetadata(ctx, SCHEMA_SECTION + " ");
+    // No substitution here: schemaSection is a direct child of idmsSections, which
+    // visitIdmsSections has already substituted and recorded. Substituting again would
+    // create a second fragment with the same start position.
     return addTreeNode(ctx, locality -> new SectionNode(locality, SectionType.SCHEMA));
   }
 
@@ -261,6 +263,7 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
       replaceWithMetadata(ctx, "");
     }
     private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
+        PersistentData.record(ctx, LocalisedDialect.IDMS);
         String contextTextReference = PersistentData.next();
         ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
         ctx.getCustomData().put("DIALECT", "IDMS");
