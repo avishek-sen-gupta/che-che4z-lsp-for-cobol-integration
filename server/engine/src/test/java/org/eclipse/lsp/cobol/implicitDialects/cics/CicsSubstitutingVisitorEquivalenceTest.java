@@ -52,6 +52,24 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
 class CicsSubstitutingVisitorEquivalenceTest {
 
   private static final String URI = "file:///cics.cbl";
+
+  /**
+   * Every EXEC CICS block below is here to span one of the four upstream behaviours the fork's
+   * copy had silently lost, so that re-introducing the copy fails a test instead of only being
+   * described in a commit message:
+   *
+   * <ul>
+   *   <li>{@code SEND TEXT} — a plain, well-formed block; the baseline.
+   *   <li>{@code ABEND ... CANCEL} — {@code cics_abend} handling. The copy produced
+   *       {@code ExecCicsNode} here where upstream produces {@code ExecCicsAbendNode}.
+   *   <li>{@code READ FILE(...)} with neither INTO nor SET and no RIDFLD — mandatory/exclusive
+   *       option validation in {@code CICSOptionsCheckUtility}, reached from
+   *       {@code CICSVisitor.visitChildren}. The copy overrode {@code visitChildren} without it
+   *       and dropped both diagnostics.
+   *   <li>a trailing block with no {@code END-EXEC} — the {@code cicsParser.missingEndExec}
+   *       diagnostic, which the copy never emitted.
+   * </ul>
+   */
   private static final String TEXT =
       "        IDENTIFICATION DIVISION.\n"
           + "        PROGRAM-ID. CICSTEST.\n"
@@ -59,7 +77,10 @@ class CicsSubstitutingVisitorEquivalenceTest {
           + "        WORKING-STORAGE SECTION.\n"
           + "        01 WS-MSG PIC X(10).\n"
           + "        PROCEDURE DIVISION.\n"
-          + "            EXEC CICS SEND TEXT FROM(WS-MSG) END-EXEC.\n";
+          + "            EXEC CICS SEND TEXT FROM(WS-MSG) END-EXEC.\n"
+          + "            EXEC CICS ABEND ABCODE('1234') CANCEL END-EXEC.\n"
+          + "            EXEC CICS READ FILE('FILE1') END-EXEC.\n"
+          + "            EXEC CICS LINK PROGRAM('PGM1')\n";
 
   private CopybookService copybookService;
   private MessageService messageService;
@@ -147,6 +168,12 @@ class CicsSubstitutingVisitorEquivalenceTest {
     DialectProcessingContext substitutingContext = freshContext();
     run(CICSVisitorBuilder.SUBSTITUTING, substitutingContext);
 
+    // toString() reads baseText, which only picks up substitutions on commit. Without these two
+    // calls the assertion would compare "blanked in place" against "blanked at all" rather than
+    // comparing the resulting documents.
+    originalContext.getExtendedDocument().commitTransformations();
+    substitutingContext.getExtendedDocument().commitTransformations();
+
     assertEquals(
         originalContext.getExtendedDocument().toString(),
         substitutingContext.getExtendedDocument().toString(),
@@ -154,18 +181,32 @@ class CicsSubstitutingVisitorEquivalenceTest {
   }
 
   @Test
-  void substitutingVisitorRecordsOneFragmentForTheExecBlock() {
+  void substitutingVisitorRecordsOneFragmentPerExecBlock() {
     PersistentData.reset();
     run(CICSVisitorBuilder.SUBSTITUTING, freshContext());
 
+    // Exact, not a lower bound: an exact count is what makes a lost anchor fail loudly.
     assertEquals(
-        1,
+        4,
         PersistentData.fragmentCount(),
-        "One EXEC CICS block must record exactly one positional fragment");
-    PersistentData.Fragment fragment = PersistentData.fragmentAt(7, 12);
+        "Each of the four EXEC CICS blocks must record exactly one positional fragment");
+
+    // Every block must be reachable by document position, which is the whole premise of
+    // positional correlation. Coordinates are ANTLR's: 1-based line, 0-based column.
+    assertFragmentAt(7, "SEND");
+    assertFragmentAt(8, "ABEND");
+    assertFragmentAt(9, "READ");
+    assertFragmentAt(10, "LINK");
+  }
+
+  private static void assertFragmentAt(int line, String expectedToken) {
+    PersistentData.Fragment fragment = PersistentData.fragmentAt(line, 12);
     assertTrue(
-        fragment != null && fragment.tree.getText().toUpperCase().contains("SEND"),
-        "The recorded fragment must be the EXEC CICS parse tree");
+        fragment != null && fragment.tree.getText().toUpperCase().contains(expectedToken),
+        "The fragment recorded at line "
+            + line
+            + " must be the EXEC CICS parse tree containing "
+            + expectedToken);
   }
 
   @Test
