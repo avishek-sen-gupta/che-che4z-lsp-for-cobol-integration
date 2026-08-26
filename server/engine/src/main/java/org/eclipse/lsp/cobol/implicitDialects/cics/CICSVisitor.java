@@ -71,7 +71,7 @@ import org.eclipse.lsp4j.Range;
  */
 @Slf4j
 // @AllArgsConstructor
-class CICSVisitor extends ErrorHandlingCICSVisitor {
+class CICSVisitor extends CICSParserBaseVisitor<List<Node>> {
 
   private final DialectProcessingContext context;
   private final MessageService messageService;

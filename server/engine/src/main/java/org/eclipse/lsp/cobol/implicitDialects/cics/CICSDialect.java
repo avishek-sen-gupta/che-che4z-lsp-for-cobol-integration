@@ -65,7 +65,7 @@ public class CICSDialect implements CobolDialect {
 
   @Override
   public ResultWithErrors<DialectOutcome> processText(DialectProcessingContext context) {
-    ErrorHandlingCICSVisitor cicsVisitor = visitorBuilder.visitor(context, messageService);
+    CICSVisitor cicsVisitor = visitorBuilder.visitor(context, messageService);
 
     List<SyntaxError> parseError = new ArrayList<>();
 
