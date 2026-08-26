@@ -26,6 +26,8 @@ import org.eclipse.lsp.cobol.test.engine.UseCase;
 import org.eclipse.lsp.cobol.test.engine.UseCaseUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * The <em>reinjection</em> half ({@code DialectIntegratorListener}) is tested separately
  * in {@code IdmsDialectIntegrationTest} in the smojol-toolkit module.
  */
+@Execution(ExecutionMode.SAME_THREAD)
 class TestPersistentDataExtraction {
 
   private static final String BOILERPLATE =
