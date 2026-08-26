@@ -501,11 +501,7 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
 
     private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
         PersistentData.record(ctx, LocalisedDialect.DB2_SQL);
-        String contextTextReference = PersistentData.next();
-        ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
-        ctx.getCustomData().put("DIALECT", "IDMS");
-        String terminator = ".".equals(ctx.stop.getText()) ? "" : ".";
-        addReplacementContext(ctx, String.format("%s_DIALECT_ %s %s", staticPrefix, contextTextReference, terminator));
+        addReplacementContext(ctx, staticPrefix);
         extractions++;
     }
 }

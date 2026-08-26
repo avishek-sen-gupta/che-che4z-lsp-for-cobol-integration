@@ -86,19 +86,19 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
 
     @Override
   public List<Node> visitIdmsSections(IdmsSectionsContext ctx) {
-      replaceWithMetadata(ctx);
+      replaceWithMetadata(ctx, "");
         return visitChildren(ctx);
   }
 
   @Override
   public List<Node> visitIdmsIfStatement(IdmsIfStatementContext ctx) {
-      replaceWithMetadata(ctx, IF + " ");
+      replaceWithMetadata(ctx, IF);
       return visitChildren(ctx);
   }
 
   @Override
   public List<Node> visitIdmsIfCondition(IdmsIfConditionContext ctx) {
-      replaceWithMetadata(ctx);
+      replaceWithMetadata(ctx, "");
       return visitChildren(ctx);
   }
 
@@ -259,16 +259,9 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
     context.getExtendedDocument().replace(DialectUtils.constructRange(ctx), newText);
   }
 
-    private void replaceWithMetadata(AnnotatedParserRuleContext ctx) {
-      replaceWithMetadata(ctx, "");
-    }
     private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
         PersistentData.record(ctx, LocalisedDialect.IDMS);
-        String contextTextReference = PersistentData.next();
-        ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
-        ctx.getCustomData().put("DIALECT", "IDMS");
-        String terminator = ".".equals(ctx.stop.getText()) ? "" : ".";
-        addReplacementContext(ctx, String.format("%s_DIALECT_ %s %s", staticPrefix, contextTextReference, terminator));
+        addReplacementContext(ctx, staticPrefix);
         extractions++;
     }
 

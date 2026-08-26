@@ -11,7 +11,7 @@
  * Contributors:
  *   Broadcom - initial API and implementation
  */
-
+    
 lexer grammar CobolLexer;
 
 @header {
@@ -482,7 +482,6 @@ DELIMITER       : D E L I M I T E R ;
 DEPENDING       : D E P E N D I N G ;
 DESCENDING     : D E S C E N D I N G ;
 DETAIL: D E T A I L;
-DIALECT_MARKER_LITERAL : D I A L E C T;
 DISABLE : D I S A B L E;
 DISK : D I S K;
 DISPLAY         : D I S P L A Y ;
@@ -731,7 +730,6 @@ ROUNDED                : R O U N D E D ;
 RUN                    : R U N ;
 SAME                   : S A M E ;
 SAVE : S A V E;
-SCHEMA                 : S C H E M A ;
 SD                     : S D ;
 SEARCH                 : S E A R C H ;
 SECTION                : S E C T I O N ;
@@ -873,8 +871,6 @@ SLASHCHAR : '/';
 // Special IF for dialect
 UNDERSCORECHAR : '_';
 DIALECT_IF: UNDERSCORECHAR I F UNDERSCORECHAR;
-DIALECT_SCHEMA_SECTION: UNDERSCORECHAR SCHEMA UNDERSCORECHAR;
-DIALECT_MARKER: UNDERSCORECHAR DIALECT_MARKER_LITERAL UNDERSCORECHAR;
 
 // Dialect filler
 ZERO_WIDTH_SPACE: '\u200B' ('\u200B' | [ ])*;
@@ -911,6 +907,7 @@ fragment NULLTERMINATED : Z '"' (~["\n\r] | '""' | '\'')* '"' | Z '\'' (~['\n\r]
 fragment STRINGLITERAL : '"' (~["\n\r] | '""' | '\'')* '"' | '\'' (~['\n\r] | '\'\'' | '"')* '\'';
 fragment UNTRMSTRINGLITERAL : '"' (~["\n\r] | '""' | '\'')* | '\'' (~['\n\r] | '\'\'' | '"')*;
 fragment DBCSLITERAL : [GN] '"' (~["\n\r] | '""' | '\'')* '"' | [GN] '\'' (~['\n\r] | '\'\'' | '"')* '\'';
+
 fragment OCT_DIGIT        : [0-8] ;
 fragment DIGIT: OCT_DIGIT | [9];
 

@@ -52,7 +52,6 @@ import org.eclipse.lsp4j.Range;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 import static java.util.Optional.ofNullable;
@@ -64,7 +63,6 @@ import static org.antlr.v4.runtime.Lexer.HIDDEN;
  */
 @Slf4j
 class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
-  private static final java.util.logging.Logger LOGGER = Logger.getLogger(CicsSubstitutingVisitor.class.getName());
   private final DialectProcessingContext context;
   private final MessageService messageService;
 
@@ -232,22 +230,7 @@ class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
 
     private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
         PersistentData.record(ctx, LocalisedDialect.CICS);
-        String contextTextReference = PersistentData.next();
-        ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
-        ctx.getCustomData().put("DIALECT", "CICS");
-        String terminator = ".".equals(ctx.stop.getText()) ? "." : "";
-        String prefix = String.format("%s_DIALECT_ %s %s", staticPrefix, contextTextReference, terminator);
-//        addReplacementContext(ctx, prefix);
-      String replacedDialectText = context
-              .getExtendedDocument()
-              .toString()
-              .substring(ctx.start.getStartIndex(), ctx.stop.getStopIndex() + 1);
-      LOGGER.info(String.format("Replaced dialect text number [%s] : %s\n", contextTextReference, replacedDialectText));
-      String newText =
-                prefix
-                        + replacedDialectText
-                        .replaceAll("[^ \n]", CobolDialect.FILLER);
-        context.getExtendedDocument().replace(constructRange(ctx), newText);
+        addReplacementContext(ctx, staticPrefix);
         extractions++;
     }
 
@@ -269,8 +252,6 @@ class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
     getAllTerminalNodes(ctx)
         .forEach(
             node -> {
-//                String contextTextReference = PersistentData.next();
-//                ctx.getCustomData().put("IDMS-" + contextTextReference, new Object());
                 context
                         .getExtendedDocument()
                         .replace(
