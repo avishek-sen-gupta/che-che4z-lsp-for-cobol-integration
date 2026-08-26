@@ -39,7 +39,6 @@ import org.eclipse.lsp.cobol.common.processor.ProcessorDescription;
 import org.eclipse.lsp.cobol.common.utils.ImplicitCodeUtils;
 import org.eclipse.lsp.cobol.common.utils.KeywordsUtils;
 import org.eclipse.lsp.cobol.common.utils.PredefinedCopybooks;
-import org.eclipse.lsp.cobol.implicitDialects.cics.MarkerDb2SqlVisitor;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2DataAndProcedureDivisionNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2DeclareVariableNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2ProcedureDivisionNode;
@@ -83,7 +82,7 @@ public class Db2SqlDialect implements CobolDialect {
   @Override
   public ResultWithErrors<DialectOutcome> processText(DialectProcessingContext context) {
     boolean isSqlProcessingEnabled = getSqlProcessingEnabled(context);
-    MarkerDb2SqlVisitor db2SqlVisitor =
+    Db2SqlVisitor db2SqlVisitor =
         visitorBuilder.visitor(context, messageService, copybookService, isSqlProcessingEnabled);
 
     List<SyntaxError> parseError = new ArrayList<>();

@@ -17,7 +17,6 @@ package org.eclipse.lsp.cobol.implicitDialects.sql;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
 import org.eclipse.lsp.cobol.common.message.MessageService;
-import org.eclipse.lsp.cobol.implicitDialects.cics.MarkerDb2SqlVisitor;
 
 /**
  * Db2SqlVisitorBuilder
@@ -29,9 +28,9 @@ public interface Db2SqlVisitorBuilder {
      * @param messageService
      * @param copybookService
      * @param isSqlProcessingEnabled
-     * @return MarkerDb2SqlVisitor
+     * @return Db2SqlVisitor
      */
-    MarkerDb2SqlVisitor visitor(DialectProcessingContext context, MessageService messageService, CopybookService copybookService, boolean isSqlProcessingEnabled);
+    Db2SqlVisitor visitor(DialectProcessingContext context, MessageService messageService, CopybookService copybookService, boolean isSqlProcessingEnabled);
     Db2SqlVisitorBuilder ORIGINAL = Db2SqlVisitor::new;
     Db2SqlVisitorBuilder SUBSTITUTING = Db2SqlSubstitutingVisitor::new;
 }
