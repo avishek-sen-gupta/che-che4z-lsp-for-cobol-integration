@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as assert from "assert";
@@ -244,7 +244,7 @@ suite("Integration Test Suite", function () {
     );
     assert.strictEqual(
       diagnostics[0].message,
-      "Variable CHILD1 is not defined",
+      "Variable CHILD1 does not exist in structure PARENT",
     );
     helper.assertRangeIsEqual(
       diagnostics[1].range,
@@ -252,7 +252,7 @@ suite("Integration Test Suite", function () {
     );
     assert.strictEqual(
       diagnostics[1].message,
-      "Variable CHILD2 is not defined",
+      "Variable CHILD2 does not exist in structure PARENT",
     );
   })
     .timeout(helper.TEST_TIMEOUT)
@@ -694,4 +694,216 @@ suite("Integration Test Suite", function () {
     const diagnostics = vscode.languages.getDiagnostics(editor.document.uri);
     assert.strictEqual(diagnostics.length, 0);
   });
+
+  test("Hover works for paragarphs", async () => {
+    await helper.updateConfig("basic.json");
+    const editor = await helper.showDocument(path.join("HOVER_PARA.CBL"));
+    await helper.sleep(1000);
+    const hoverResults_para1 = await helper.getHoverContent(
+      editor,
+      new vscode.Position(5, 10),
+    );
+    assert.strictEqual(hoverResults_para1[0].contents.length, 1);
+    assert.strictEqual(
+      normalizeLineEndings(
+        (hoverResults_para1[0].contents[0] as vscode.MarkdownString).value,
+      ),
+      normalizeLineEndings(`\`\`\`cobol
+       PARAG1.
+           DISPLAY 'PARAG1'.
+           PERFORM PARAG3.
+           PERFORM PARAG2.
+
+\`\`\``),
+    );
+
+    const hoverResults_perform_para2: vscode.Hover[] =
+      await helper.getHoverContent(editor, new vscode.Position(7, 22));
+    assert.strictEqual(hoverResults_perform_para2?.length, 1);
+    assert.strictEqual(hoverResults_perform_para2[0].contents.length, 1);
+    assert.strictEqual(
+      normalizeLineEndings(
+        (hoverResults_perform_para2[0].contents[0] as vscode.MarkdownString)
+          .value,
+      ),
+      normalizeLineEndings(`\`\`\`cobol
+       PARAG3.
+           DISPLAY 'PARAG3'.
+
+\`\`\`
+
+_NOTE: multiple versions exist due to replac(e/ing) or multiple use of same copybook_`),
+    );
+
+    const hoverResults_perform_para3: vscode.Hover[] =
+      await helper.getHoverContent(editor, new vscode.Position(8, 19));
+    assert.strictEqual(hoverResults_perform_para3?.length, 1);
+    assert.strictEqual(hoverResults_perform_para3[0].contents.length, 1);
+    assert.strictEqual(
+      normalizeLineEndings(
+        (hoverResults_perform_para3[0].contents[0] as vscode.MarkdownString)
+          .value,
+      ),
+      normalizeLineEndings(`\`\`\`cobol
+       PARAG2.
+           DISPLAY 'PARAG2'.
+
+\`\`\`
+
+_NOTE: multiple versions exist due to replac(e/ing) or multiple use of same copybook_`),
+    );
+
+    const hoverResults_perform_para4: vscode.Hover[] =
+      await helper.getHoverContent(editor, new vscode.Position(11, 10));
+    assert.strictEqual(hoverResults_perform_para4?.length, 1);
+    assert.strictEqual(hoverResults_perform_para4[0].contents.length, 1);
+    assert.strictEqual(
+      normalizeLineEndings(
+        (hoverResults_perform_para4[0].contents[0] as vscode.MarkdownString)
+          .value,
+      ),
+      normalizeLineEndings(`\`\`\`cobol
+       S010 SECTION.
+           display 'section S010'.
+
+\`\`\``),
+    );
+
+    //Goto copybook
+    helper.moveCursor(editor, new vscode.Position(9, 16));
+
+    await vscode.commands.executeCommand("editor.action.revealDefinition");
+    let editor_copybook: vscode.TextEditor | undefined;
+    await helper.waitFor(() => {
+      editor_copybook = vscode.window.activeTextEditor;
+      return !!editor_copybook && editor_copybook !== editor;
+    });
+    const hover_copybook: vscode.Hover[] = await helper.getHoverContent(
+      editor_copybook!,
+      new vscode.Position(0, 10),
+    );
+
+    assert.strictEqual(hover_copybook?.length, 1);
+    assert.strictEqual(hover_copybook[0].contents.length, 1);
+    const hoverContent = (
+      hover_copybook[0].contents[0] as vscode.MarkdownString
+    ).value;
+    assert.ok(
+      hoverContent.includes(`\`\`\`cobol
+       PARAG3.
+           DISPLAY 'PARAG3'.
+
+\`\`\``),
+    );
+    assert.ok(
+      hoverContent.includes(`\`\`\`cobol
+       PARAG2.
+           DISPLAY 'PARAG2'.
+
+\`\`\``),
+    );
+
+    assert.ok(
+      hoverContent.includes(
+        `_NOTE: multiple versions exist due to replac(e/ing) or multiple use of same copybook_`,
+      ),
+    );
+  });
+
+  test("hover over copybook - in a nested structure", async () => {
+    await helper.updateConfig("basic.json");
+    const editor = await helper.showDocument("HOVER_COPYBOOK_NESTED.CBL");
+    await helper.sleep(1000);
+    const hoverResults_repl = await helper.getHoverContent(
+      editor,
+      new vscode.Position(8, 24),
+    );
+    assert.strictEqual(hoverResults_repl[0].contents.length, 1);
+    assert.strictEqual(
+      normalizeLineEndings(
+        (hoverResults_repl[0].contents[0] as vscode.MarkdownString).value,
+      ),
+      normalizeLineEndings(`
+\`\`\`cobol
+
+       05 ABC-ID. 
+\`\`\`
+`),
+    );
+    // go to COPYBOOK definition of STRUCT
+    helper.moveCursor(editor, new vscode.Position(11, 26));
+
+    await vscode.commands.executeCommand("editor.action.revealDefinition");
+    let editor_copybook: vscode.TextEditor | undefined;
+    await helper.waitFor(() => {
+      editor_copybook = vscode.window.activeTextEditor;
+      return !!editor_copybook && editor_copybook !== editor;
+    });
+
+    const hoverResults_var = await helper.getHoverContent(
+      editor_copybook!,
+      new vscode.Position(1, 17),
+    );
+
+    assert.strictEqual(hoverResults_var[0].contents.length, 1);
+    assert.strictEqual(
+      normalizeLineEndings(
+        (hoverResults_var[0].contents[0] as vscode.MarkdownString).value,
+      ),
+      normalizeLineEndings(`
+\`\`\`cobol
+
+       05 ABC-ID. 
+\`\`\`
+`),
+    );
+  });
+
+  test("goto/find refences in a copybook", async () => {
+    const editor = await helper.showDocument("HOVER_COPYBOOK_NESTED.CBL");
+    await helper.sleep(1000);
+
+    // see definition of `SOME` var
+    const var_locations: vscode.Location[] =
+      await vscode.commands.executeCommand(
+        "vscode.executeReferenceProvider",
+        editor.document.uri,
+        new vscode.Position(9, 26),
+      );
+    assert.strictEqual(var_locations.length, 1);
+
+    // goto STRUCT copybook
+    helper.moveCursor(editor, new vscode.Position(11, 26));
+
+    await vscode.commands.executeCommand("editor.action.revealDefinition");
+    let editor_copybook: vscode.TextEditor | undefined;
+    await helper.waitFor(() => {
+      editor_copybook = vscode.window.activeTextEditor;
+      return !!editor_copybook && editor_copybook !== editor;
+    });
+    const prevCopybookUri = editor_copybook?.document.uri;
+
+    // goto REPL1 copybook
+    helper.moveCursor(editor_copybook!, new vscode.Position(1, 16));
+    await vscode.commands.executeCommand("editor.action.revealDefinition");
+    await helper.waitFor(() => {
+      editor_copybook = vscode.window.activeTextEditor;
+      return (
+        !!editor_copybook && editor_copybook.document.uri !== prevCopybookUri
+      );
+    });
+
+    // find all refences for ABC-ID
+    // helper.moveCursor(editor_copybook!, new vscode.Position(1, 14));
+    const locations: vscode.Location[] = await vscode.commands.executeCommand(
+      "vscode.executeReferenceProvider",
+      editor_copybook!.document.uri,
+      new vscode.Position(1, 14),
+    );
+    assert.strictEqual(locations.length, 1);
+  });
 });
+
+function normalizeLineEndings(str: string) {
+  return str.replace(/\r\n/g, "\n");
+}

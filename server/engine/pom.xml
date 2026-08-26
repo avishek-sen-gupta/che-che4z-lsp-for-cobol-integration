@@ -11,7 +11,7 @@
 ~ SPDX-License-Identifier: EPL-2.0
 ~
 ~ Contributors:
-~ Broadcom, Inc. - initial API and implementation
+~ Broadcom - initial API and implementation
 ~
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
@@ -34,17 +34,17 @@
         <antlr.version>4.13.2</antlr.version>
         <awaitility.version>3.0.0</awaitility.version>
         <commons.io.version>2.14.0</commons.io.version>
-        <commons.lang.version>3.12.0</commons.lang.version>
-        <commons.text.version>1.10.0</commons.text.version>
+        <commons.lang.version>3.18.0</commons.lang.version>
+        <commons.text.version>1.14.0</commons.text.version>
         <concurrentunit.version>0.4.6</concurrentunit.version>
         <exclude.tests>nothing.to.exclude</exclude.tests>
         <google.guava.version>33.2.1-jre</google.guava.version>
-        <guice.version>4.2.2</guice.version>
+        <guice.version>4.2.3</guice.version>
         <java.version>8</java.version>
         <junit-jupiter.version>5.11.2</junit-jupiter.version>
         <junit.platform.version>1.6.0</junit.platform.version>
         <logback.classic.version>1.5.7</logback.classic.version>
-        <lombok.version>1.18.36</lombok.version>
+        <lombok.version>1.18.38</lombok.version>
         <lsp4j.version>0.14.0</lsp4j.version>
         <picocli.version>4.7.5</picocli.version>
         <maven.antlr4.plugin.version>4.13.2</maven.antlr4.plugin.version>
@@ -270,6 +270,11 @@
                                 <manifest>
                                     <mainClass>org.eclipse.lsp.cobol.LangServerBootstrap</mainClass>
                                 </manifest>
+                                <manifestEntries>
+                                    <Build-Time>${maven.build.timestamp}</Build-Time>
+                                    <Version>${env.CLIENT_DETAIL}</Version>
+                                    <Commit>${env.GIT_SHA}</Commit>
+                                </manifestEntries>
                             </archive>
                             <descriptorRefs>
                                 <descriptorRef>jar-with-dependencies</descriptorRef>
@@ -477,6 +482,7 @@
                                 <buildArg>--report-unsupported-elements-at-runtime</buildArg>
                                 <buildArg>--verbose</buildArg>
                                 <buildArg>--no-fallback</buildArg>
+                                <buildArg>-march=compatibility</buildArg>
                             </buildArgs>
                             <agent>
                                 <options>
@@ -518,6 +524,7 @@
                                 <buildArg>--report-unsupported-elements-at-runtime</buildArg>
                                 <buildArg>--verbose</buildArg>
                                 <buildArg>--no-fallback</buildArg>
+                                <buildArg>-march=compatibility</buildArg>
                             </buildArgs>
                             <agent>
                                 <options>

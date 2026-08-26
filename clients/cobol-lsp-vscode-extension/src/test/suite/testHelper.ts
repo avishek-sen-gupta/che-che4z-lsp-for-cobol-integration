@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as assert from "assert";
 import * as vscode from "vscode";
@@ -39,6 +39,12 @@ export async function activate() {
   )!;
   if (daco && !daco.isActive) {
     await daco.activate();
+  }
+  const sample = vscode.extensions.getExtension(
+    "BroadcomMFD.cobol-language-support-for-sample-dialect",
+  )!;
+  if (sample && !sample.isActive) {
+    await sample.activate();
   }
 }
 
@@ -419,6 +425,25 @@ export function hasDiagnosticMatches(
 ) {
   const diagnostics = vscode.languages.getDiagnostics(uri);
   assert.ok(diagnostics.some(predicate));
+}
+
+export async function getHoverContent(
+  editor: vscode.TextEditor,
+  position: vscode.Position,
+) {
+  let hoverResults: vscode.Hover[] | undefined = [];
+  await waitFor(async () => {
+    hoverResults = await vscode.commands.executeCommand(
+      "vscode.executeHoverProvider",
+      editor.document.uri,
+      position,
+    );
+    if (hoverResults === undefined) {
+      return false;
+    }
+    return hoverResults.length > 0;
+  });
+  return hoverResults;
 }
 
 export type Mutable<T> = { -readonly [P in keyof T]: T[P] };

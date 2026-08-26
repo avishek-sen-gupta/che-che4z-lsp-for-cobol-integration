@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 lexer grammar TechnicalLexer;
@@ -25,6 +25,7 @@ COLONCHAR : ':';
 COMMACHAR : ',';
 COMMENTTAG : '*>';
 DOLLARCHAR : '$';
+POUNDCHAR : '£';
 DOUBLEQUOTE : '"';
 DOUBLEEQUALCHAR : '==';
 DOUBLEMORETHANCHAR : '>>';

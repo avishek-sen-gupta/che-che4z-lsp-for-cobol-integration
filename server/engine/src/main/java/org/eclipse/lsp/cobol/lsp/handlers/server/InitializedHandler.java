@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers.server;
@@ -24,7 +24,6 @@ import org.eclipse.lsp.cobol.common.utils.LogLevelUtils;
 import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
 import org.eclipse.lsp.cobol.service.AnalysisService;
 import org.eclipse.lsp.cobol.service.WatcherService;
-import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
 import org.eclipse.lsp.cobol.service.delegates.completions.Keywords;
 import org.eclipse.lsp.cobol.service.settings.SettingsService;
 import org.eclipse.lsp.cobol.service.settings.layout.CodeLayoutStore;
@@ -33,7 +32,6 @@ import org.eclipse.lsp4j.InitializedParams;
 /** LSP Initialized Handler */
 public class InitializedHandler {
   private final WatcherService watchingService;
-  private final CopybookNameService copybookNameService;
   private final Keywords keywords;
   private final SettingsService settingsService;
   private final LocaleStore localeStore;
@@ -45,7 +43,6 @@ public class InitializedHandler {
   @Inject
   public InitializedHandler(
       WatcherService watchingService,
-      CopybookNameService copybookNameService,
       Keywords keywords,
       SettingsService settingsService,
       LocaleStore localeStore,
@@ -54,7 +51,6 @@ public class InitializedHandler {
       CodeLayoutStore codeLayoutStore,
       ErrorFinalizerService errorFinalizerService) {
     this.watchingService = watchingService;
-    this.copybookNameService = copybookNameService;
     this.keywords = keywords;
     this.settingsService = settingsService;
     this.localeStore = localeStore;
@@ -74,7 +70,6 @@ public class InitializedHandler {
     getLocaleFromClient();
     getLogLevelFromClient();
     getCobolProgramLayout();
-    copybookNameService.collectLocalCopybookNames();
     keywords.updateStorage();
     messageService.reloadMessages();
     notifyConfiguredCopybookExtensions();

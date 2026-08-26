@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 lexer grammar Db2SqlLexer;
 channels{COMMENTS}
@@ -74,7 +74,7 @@ DOUBLEDIGIT_1: '01';
 SINGLEDIGITLITERAL : DIGIT;
 INTEGERLITERAL : DIGIT+;
 IDENTIFIER : [\p{Alnum}\p{General_Category=Other_Letter}] [-_\p{Alnum}\p{General_Category=Other_Letter}]*;
-
+QUOTED_STRING: SINGLE_QUOTED_STRINGLITERAL | DOUBLE_QUOTED_STRINGLITERAL;
 NUMERICLITERAL : (PLUSCHAR | MINUSCHAR)? DIGIT* (DOT_FS | COMMACHAR) DIGIT+ (('e' | 'E') (PLUSCHAR | MINUSCHAR)? DIGIT+)?;
 // whitespace, line breaks, comments, ...
 NEWLINE : '\r'? '\n' -> channel(HIDDEN);
@@ -83,6 +83,13 @@ WS : [ \t\f]+ -> channel(HIDDEN);
 // treat all the non-processed tokens as errors
 ERRORCHAR : . ;
 
+fragment SINGLE_QUOTED_STRINGLITERAL :
+	'\'' (~['\n\r] | '\'\'' | '"')* '\''
+;
+
+fragment DOUBLE_QUOTED_STRINGLITERAL :
+	'"' (~["\n\r] | '""' | '\'')* '"'
+;
 
  fragment DIGIT: [0-9];
  // case insensitive chars

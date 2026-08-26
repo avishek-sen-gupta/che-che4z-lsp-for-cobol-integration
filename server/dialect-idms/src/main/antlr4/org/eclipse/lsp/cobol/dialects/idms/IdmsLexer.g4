@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 lexer grammar IdmsLexer;
@@ -29,6 +29,7 @@ ALARM : A L A R M;
 ALL: A L L;
 ALPHANUMERIC: A L P H A N U M E R I C;
 ALWAYS : A L W A Y S;
+AND: A N D;
 ANY: A N Y;
 AREA: A R E A;
 AT: A T;
@@ -60,6 +61,7 @@ COMMIT: C O M M I T;
 COMP_3 : C O M P MINUSCHAR '3';
 COMP: C O M P;
 CONNECT: C O N N E C T;
+CONTAINS: C O N T A I N S;
 CONTENTS : C O N T E N T S;
 CONTINUE : C O N T I N U E;
 CONTROL: C O N T R O L;
@@ -105,6 +107,7 @@ END: E N D;
 ENDPAGE : E N D P A G E;
 ENDRPT : E N D R P T;
 ENQUEUE : E N Q U E U E;
+EQ: E Q;
 ERASE: E R A S E;
 ERROR: E R R O R;
 EVENT : E V E N T;
@@ -128,7 +131,9 @@ FREE: F R E E;
 FROM: F R O M;
 FUNCTION: F U N C T I O N;
 GET : G E T;
+GE: G E;
 GREEN : G R E E N;
+GT: G T;
 HEADER: H E A D E R;
 HIGH_VALUE: H I G H MINUSCHAR V A L U E;
 HIGH_VALUES : H I G H MINUSCHAR V A L U E S;
@@ -171,6 +176,8 @@ LIST: L I S T;
 LITERALS: L I T E R A L S;
 LOADLIB : L O A D L I B;
 LR: L R;
+LT: L T;
+LE: L E;
 LOAD: L O A D;
 LOCATION : L O C A T I O N;
 LOCK: L O C K;
@@ -181,6 +188,7 @@ LOW_VALUE: L O W MINUSCHAR V A L U E;
 LOW_VALUES : L O W MINUSCHAR V A L U E S;
 LTERM: L T E R M;
 MANUAL: M A N U A L;
+MATCHES: M A T C H E S;
 MAP : M A P;
 MAP_CONTROL : M A P MINUSCHAR C O N T R O L;
 MAX: M A X;
@@ -195,6 +203,7 @@ MODULE : M O  D U L E;
 MOVE: M O V E;
 NAME: N A M E;
 NATIVE: N A T I V E;
+NE: N E;
 NEW: N E W;
 NEWPAGE : N E W P A G E;
 NEXT : N E X T;
@@ -235,6 +244,7 @@ OF: O F;
 ONLY: O N L Y;
 ON: O N;
 OPTIONAL: O P T I O N A L;
+OR: O R;
 OUTIN : O U T I N;
 OUT: O U T;
 OUTPUT: O U T P U T;
@@ -353,6 +363,7 @@ VERSION : V E R S I O N;
 WAIT: W A I T;
 WCC: W C C;
 WHEN_COMPILED : W H E N MINUSCHAR C O M P I L E D;
+WHERE: W H E R E;
 WHITE : W H I T E;
 WITHIN : W I T H I N;
 WITH: W I T H;
@@ -381,6 +392,6 @@ PICTURECHARSGROUP2: PICTURECharAcceptedOneTime+;
 WS2 : [ \t\f]+ -> channel(HIDDEN);
 LParIntegralRPar: LPARENCHAR INTEGERLITERAL RPARENCHAR;
 fragment PICTUREPeriodAcceptables: ('0'|'9'|B|Z|CR|DB|ASTERISKCHAR|COMMACHAR|MINUSCHAR|PLUSCHAR|SLASHCHAR);
-fragment PICTURECharAcceptedMultipleTime: (A|G|N|P|X|DOLLARCHAR|PICTUREPeriodAcceptables);
+fragment PICTURECharAcceptedMultipleTime: (A|G|N|P|X|DOLLARCHAR|POUNDCHAR|PICTUREPeriodAcceptables);
 fragment PICTURECharAcceptedOneTime: (V|E|S|CR|DB);
 

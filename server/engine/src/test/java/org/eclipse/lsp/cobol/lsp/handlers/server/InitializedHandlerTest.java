@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers.server;
@@ -32,7 +32,6 @@ import org.eclipse.lsp.cobol.core.engine.dialects.DialectService;
 import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
 import org.eclipse.lsp.cobol.service.AnalysisService;
 import org.eclipse.lsp.cobol.service.WatcherService;
-import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
 import org.eclipse.lsp.cobol.service.delegates.completions.Keywords;
 import org.eclipse.lsp.cobol.service.settings.SettingsService;
 import org.eclipse.lsp.cobol.service.settings.SettingsServiceImpl;
@@ -48,7 +47,6 @@ class InitializedHandlerTest {
     SettingsService settingsService = mock(SettingsServiceImpl.class);
     WatcherService watchingService = mock(WatcherService.class);
     LocaleStore localeStore = mock(LocaleStore.class);
-    CopybookNameService copybookNameService = mock(CopybookNameService.class);
     MessageService messageService = mock(MessageService.class);
     Keywords keywords = mock(Keywords.class);
 
@@ -68,7 +66,6 @@ class InitializedHandlerTest {
     InitializedHandler initializedHandler =
         new InitializedHandler(
             watchingService,
-            copybookNameService,
             keywords,
             settingsService,
             localeStore,

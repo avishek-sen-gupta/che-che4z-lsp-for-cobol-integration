@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -49,7 +49,7 @@ class MessageServiceParserTest {
     when(localeMock.getApplicationLocale()).thenReturn(Locale.ENGLISH);
     MessageService messageService =
         new PropertiesMessageService(
-            "resourceBundles/test", localeMock, settingsService, workingFolderService);
+            "resourceBundles/test", localeMock, settingsService, workingFolderService, () -> null);
     CobolErrorStrategy errorStrategy = mock(CobolErrorStrategy.class);
     when(mockParser.getErrorHandler()).thenReturn(errorStrategy);
     when(errorStrategy.getMessageService()).thenReturn(messageService);

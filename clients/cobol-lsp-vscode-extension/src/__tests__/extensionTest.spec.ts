@@ -9,11 +9,10 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
-import { fetchCopybookCommand } from "../commands/FetchCopybookCommand";
 import { gotoCopybookSettings } from "../commands/OpenSettingsCommand";
 import { initSmartTab } from "../commands/SmartTabCommand";
 import { activate } from "../extension";
@@ -21,13 +20,11 @@ import { CopybooksCodeActionProvider } from "../services/copybook/CopybooksCodeA
 import { LanguageClientService } from "../services/LanguageClientService";
 import { SnippetCompletionProvider } from "../services/snippetcompletion/SnippetCompletionProvider";
 import { Utils } from "../services/util/Utils";
-import { registerEvent } from "../services/reporter";
+import { telemetryEvent } from "../services/reporter";
 
 jest.mock("../commands/SmartTabCommand");
-jest.mock("../commands/FetchCopybookCommand");
 jest.mock("../commands/OpenSettingsCommand");
 jest.mock("../services/LanguageClientService");
-jest.mock("../services/copybook/CopybookDownloadService");
 jest.mock("../commands/ClearCopybookCacheCommand");
 
 jest.mock("../services/Settings", () => ({
@@ -40,6 +37,7 @@ jest.mock("../services/Settings", () => ({
     getSnippetsForCobol: jest.fn().mockReturnValue(Promise.resolve([])),
     getDialects: jest.fn().mockReturnValue([]),
     getMaxVMCount: jest.fn().mockReturnValue(-1),
+    getAnalysisMode: jest.fn().mockReturnValue("ADVANCED"),
   },
 }));
 
@@ -52,7 +50,7 @@ jest.mock("../services/reporter");
 
 const context = {
   subscriptions: [],
-  globalStorageUri: { fsPath: "/storagePath" },
+  globalStorageUri: vscode.Uri.parse("scheme:/storagePath"),
 } as unknown as vscode.ExtensionContext;
 
 beforeEach(() => {
@@ -63,7 +61,7 @@ beforeEach(() => {
 describe("Check plugin extension for cobol starts successfully.", () => {
   test("start extension", async () => {
     await activate(context);
-    expect(registerEvent).toHaveBeenCalledWith(
+    expect(telemetryEvent).toHaveBeenCalledWith(
       "log",
       ["bootstrap", "experiment-tag"],
       "Extension activation event was triggered",
@@ -71,7 +69,6 @@ describe("Check plugin extension for cobol starts successfully.", () => {
 
     expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(12);
 
-    expect(fetchCopybookCommand).toHaveBeenCalled();
     expect(gotoCopybookSettings).toHaveBeenCalled();
     expect(initSmartTab).toHaveBeenCalled();
 
@@ -118,7 +115,7 @@ describe("Check plugin extension for cobol fails.", () => {
 
   test("start fails.", async () => {
     await activate(context);
-    expect(registerEvent).toHaveBeenCalledWith(
+    expect(telemetryEvent).toHaveBeenCalledWith(
       "log",
       ["bootstrap", "experiment-tag"],
       "Extension activation event was triggered",

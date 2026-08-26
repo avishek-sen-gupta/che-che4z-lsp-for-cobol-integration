@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import {
   CFASTNode,
@@ -29,6 +29,7 @@ import {
   XmlParse,
   ExitPerform,
   InlinePerform,
+  CicsAbend,
 } from "../model/cfast";
 import {
   CobolInstruction,
@@ -54,6 +55,7 @@ import {
   FallThruDiagnosticChecker,
   ExitParagraph,
   ConditionExit,
+  CicsAbendInstruction,
 } from "./instructions";
 import { VmContext } from "./vm";
 import { ConditionInfo, ListingUtils } from "./utils";
@@ -83,7 +85,7 @@ abstract class Placeholder implements CobolInstruction {
 class GotoPlaceholder extends Placeholder {
   constructor(
     node: CFASTNode,
-    public target: string,
+    public target: ProcedureName
   ) {
     super(node);
   }
@@ -488,8 +490,7 @@ export class ProgramListing {
     }
 
     if (node.type === "goto") {
-      const target = (node as Goto).targetName[0];
-      this.instructions.push(new GotoPlaceholder(node, target));
+      this.instructions.push(new GotoPlaceholder(node, this.getTargetProcedureFromNode((node as Goto))));
       return;
     }
 
@@ -578,17 +579,16 @@ export class ProgramListing {
       performInfo.endCycleIndex = this.instructions.length;
 
       if (performInfo.performUntilType === "UNTIL_CONDITION") {
-        this.instructions.push(
-          new ConditionEntry(
-            undefined,
-            [this.instructions.length + 1],
-            this.instructions.length + 2,
+        const initialNode = this.instructions[performInfo.position].getInitialNode();
+        this.instructions[performInfo.position] = new ConditionEntry(
+            initialNode,
+            [performInfo.position + 1],
+            this.instructions.length + 1,
             false,
             [],
-          ),
-        );
+          );
         this.instructions.push(new JumpInstruction(performInfo.position + 1));
-        this.instructions.push(new ConditionExit());
+        this.instructions.push(new ConditionExit(node));
       } else if (performInfo.performUntilType === "UNTIL_EXIT") {
         this.instructions.push(new JumpInstruction(performInfo.position + 1));
         this.instructions.push(new SimpleCobolInstruction());
@@ -640,7 +640,7 @@ export class ProgramListing {
         new RestoreProgramUnit(this.symbolTable.getCurrentProgramUnit()),
       );
       if (cicsHandle.handleType === "LABEL") {
-        this.instructions.push(new GotoPlaceholder(node, cicsHandle.value));
+        this.instructions.push(new GotoPlaceholder(node, this.getTargetProcedureFromNode(cicsHandle)));
       } else {
         this.instructions.push(new SimpleCobolInstruction(node));
       }
@@ -657,6 +657,14 @@ export class ProgramListing {
       return;
     }
 
+    if (node.type === "execcicsabend") {
+      const execCicsAbend = node as CicsAbend;
+      this.instructions.push(
+        new CicsAbendInstruction(node, execCicsAbend.cancel),
+      );
+      return;
+    }
+
     if (node.type === "execwhenever") {
       const whenever = node as SqlWhenever;
       this.instructions.push(
@@ -666,7 +674,7 @@ export class ProgramListing {
         new RestoreProgramUnit(this.symbolTable.getCurrentProgramUnit()),
       );
       if (whenever.wheneverType === "GOTO") {
-        this.instructions.push(new GotoPlaceholder(node, whenever.value));
+        this.instructions.push(new GotoPlaceholder(node, this.getTargetProcedureFromNode(whenever)));
       } else {
         this.instructions.push(new SimpleCobolInstruction(node));
       }
@@ -702,13 +710,46 @@ export class ProgramListing {
     this.instructions.push(new SimpleCobolInstruction(node));
   }
 
+private getTargetProcedureFromNode(node: Goto | CicsHandleAbend | SqlWhenever): ProcedureName {
+  let target: string;
+
+  switch (node.type) {
+    case "goto":
+      target = node.targetName[0];
+      break;
+    case "execcicshandle":
+    case "execwhenever":
+      target = node.value;
+      break;
+    default:
+      throw new Error(`Unexpected node type: ${(node as any).type}`);
+  }
+
+  let inSection: string | undefined;
+
+  if (node.parent?.type === "section") {
+    const section = node.parent as Section; 
+    
+    const hasMatchingParagraph = section.children?.some(
+      e => e.type === "paragraph" && (e as Paragraph).name === target
+    );
+
+    if (hasMatchingParagraph) {
+      inSection = section.name;
+    }
+  }
+
+  return { 
+    inSection, 
+    name: target 
+  };
+}
+
   private processPlaceholders() {
     for (let i = 0; i < this.instructions.length; i++) {
       if (this.instructions[i] instanceof GotoPlaceholder) {
         const placeholder = this.instructions[i] as GotoPlaceholder;
-        const result = this.symbolTable.getProcedurePositionByName({
-          name: placeholder.target,
-        });
+        const result = this.symbolTable.getProcedurePositionByName(placeholder.target);
         if (result) {
           this.instructions[i] = new GotoInstruction(
             placeholder.getInitialNode(),

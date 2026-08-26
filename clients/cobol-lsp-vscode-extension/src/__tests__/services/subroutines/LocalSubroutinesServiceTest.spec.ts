@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import { listLocalSubroutines } from "../../../services/subroutines/LocalSubroutinesService";
@@ -27,8 +27,8 @@ describe("LocalSubroutinesService tests", () => {
     jest
       .spyOn(vscode.workspace, "findFiles")
       .mockImplementation((pattern: vscode.GlobPattern) => {
-        if (pattern instanceof Object && "base" in pattern) {
-          const files = folderContent[pattern.base] ?? [];
+        if (pattern instanceof Object && "baseUri" in pattern) {
+          const files = folderContent[pattern.baseUri.toString()] ?? [];
           return Promise.resolve(files.map(vscode.Uri.file));
         }
         return Promise.resolve([]);
@@ -38,7 +38,7 @@ describe("LocalSubroutinesService tests", () => {
     jest.restoreAllMocks();
   });
 
-  describe("listLocalCopybooks", () => {
+  describe("listLocalSubroutines", () => {
     describe("returns array of names of copybooks stored in local directories", () => {
       beforeAll(() => {
         configurationValues = {

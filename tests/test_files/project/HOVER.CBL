@@ -9,7 +9,7 @@
       * SPDX-License-Identifier: EPL-2.0                             *
       *                                                              *
       * Contributors:                                                *
-      *   Broadcom, Inc. - initial API and implementation            *
+      *   Broadcom - initial API and implementation            *
       ****************************************************************
 000010 IDENTIFICATION DIVISION.
 000020 PROGRAM-ID.            VARIABLES.

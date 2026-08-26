@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.preprocessor.delegates.copybooks;
@@ -17,6 +17,7 @@ package org.eclipse.lsp.cobol.core.preprocessor.delegates.copybooks;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -140,6 +141,17 @@ class CopybookPreprocessorService {
     }
   }
 
+  CompletableFuture<Runnable> prefetchCopybook(CobolPreprocessor.CopySourceContext copySource) {
+    final CopybookName copybookName = getCopybookName(copySource);
+
+    return copybookService.prefetch(
+        copybookName.toCopybookId(programDocumentUri),
+        copybookName,
+        programDocumentUri,
+        currentDocument.getUri(),
+        preprocessor);
+  }
+
   private void prepareReplacements(ParserRuleContext ctx) {
     if (!(ctx instanceof CobolPreprocessor.CopyStatementContext)) {
       return;
@@ -238,7 +250,9 @@ class CopybookPreprocessorService {
         new PreprocessorContext(
             programDocumentUri, copybookDocument, copybookConfig, hierarchy, copybooks, languageId);
     List<SyntaxError> copybookErrors = new LinkedList<>();
-    grammarPreprocessor.preprocess(copybookContext, preprocessor).unwrap(copybookErrors::addAll);
+    grammarPreprocessor
+        .preprocess(copybookContext, preprocessor, true)
+        .unwrap(copybookErrors::addAll);
 
     errors.addAll(copybookErrors);
     List<SyntaxError> distinct = errors.stream().distinct().collect(Collectors.toList());

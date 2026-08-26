@@ -9,8 +9,16 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
+
+export type EventDto = {
+  eventName: string;
+  message: string;
+} | {
+  errorName: string;
+  message: string;
+};
 
 export type DiagnosticDto = {
   range: RangeDto;

@@ -8,7 +8,7 @@
 # SPDX-License-Identifier: EPL-2.0
 #
 # Contributors:
-#   Broadcom, Inc. - initial API and implementation
+#   Broadcom - initial API and implementation
 target/
 coverage/
 .nyc_output/
@@ -113,12 +113,9 @@ local.properties
 /server/dialect-daco/gen
 /server/test/gen
 /server/parser/gen
-<<<<<<< HEAD
 /server/parser/src/main/antlr4/org/eclipse/lsp/cobol/core/parser/gen/
 /server/dialect-idms/src/main/antlr4/org/eclipse/lsp/cobol/core/parser/gen/
-=======
 .antlr/
->>>>>>> 2.4.1
 
 # TeXlipse plugin
 .texlipse
@@ -147,3 +144,5 @@ clients/cobol-lsp-vscode-extension/test-report.xml
 .scannerwork
 /server-delomboked
 **/gen
+/server/.run
+/clients/sample-dialect-support/.vscode

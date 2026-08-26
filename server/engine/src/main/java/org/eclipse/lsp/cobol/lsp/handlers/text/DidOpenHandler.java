@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers.text;
@@ -21,7 +21,7 @@ import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
 import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.lsp.events.notifications.DidOpenNotification;
 import org.eclipse.lsp.cobol.lsp.handlers.HandlerUtility;
-import org.eclipse.lsp.cobol.service.WatcherService;
+import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 
 /** LSP DidOpen Handler */
@@ -29,34 +29,37 @@ import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 public class DidOpenHandler {
 
   private final AsyncAnalysisService asyncAnalysisService;
-  private final WatcherService watcherService;
+  private final SourceUnitGraph sourceUnitGraph;
 
   @Inject
-  public DidOpenHandler(AsyncAnalysisService asyncAnalysisService, WatcherService watcherService) {
+  public DidOpenHandler(
+      AsyncAnalysisService asyncAnalysisService, SourceUnitGraph sourceUnitGraph) {
     this.asyncAnalysisService = asyncAnalysisService;
-    this.watcherService = watcherService;
+    this.sourceUnitGraph = sourceUnitGraph;
   }
 
   /**
    * Handle didOpen LSP request.
    *
    * @param params didOpen parameters.
-   * @param eventSource
    */
-  public void didOpen(DidOpenTextDocumentParams params, SourceUnitGraph.EventSource eventSource) {
+  public void didOpen(DidOpenTextDocumentParams params) {
     String uri = params.getTextDocument().getUri();
     if (!HandlerUtility.isUriSupported(uri)) {
       return;
     }
-    watcherService.addRuntimeWatchers(uri);
-    asyncAnalysisService.openDocument(
-        uri, params.getTextDocument().getText(), params.getTextDocument().getLanguageId());
+    final CobolDocumentModel model =
+        asyncAnalysisService.openDocument(
+            uri, params.getTextDocument().getText(), params.getTextDocument().getLanguageId());
+
+    if (this.asyncAnalysisService.isCopybook(uri, params.getTextDocument().getText())
+        || this.sourceUnitGraph.isUserSuppliedCopybook(uri)) {
+      asyncAnalysisService.republishDiagnostics();
+      return;
+    }
+
     asyncAnalysisService.scheduleAnalysis(
-        uri,
-        params.getTextDocument().getText(),
-        params.getTextDocument().getVersion(),
-        true,
-        eventSource);
+        model, params.getTextDocument().getVersion(), true, false);
   }
 
   /**

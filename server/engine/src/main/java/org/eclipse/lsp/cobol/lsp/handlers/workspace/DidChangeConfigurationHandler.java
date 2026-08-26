@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers.workspace;
@@ -18,6 +18,7 @@ import static java.util.stream.Collectors.toList;
 import static org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum.*;
 
 import com.google.inject.Inject;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -30,7 +31,6 @@ import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
 import org.eclipse.lsp.cobol.lsp.DisposableLSPStateService;
 import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.service.WatcherService;
-import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
 import org.eclipse.lsp.cobol.service.delegates.completions.Keywords;
 import org.eclipse.lsp.cobol.service.settings.SettingsService;
 import org.eclipse.lsp.cobol.service.settings.layout.CodeLayoutStore;
@@ -41,7 +41,6 @@ import org.eclipse.lsp4j.DidChangeConfigurationParams;
 public class DidChangeConfigurationHandler {
   private final DisposableLSPStateService disposableLSPStateService;
   private final SettingsService settingsService;
-  private final CopybookNameService copybookNameService;
   private final WatcherService watchingService;
   private final LocaleStore localeStore;
   private final Keywords keywords;
@@ -55,7 +54,6 @@ public class DidChangeConfigurationHandler {
   public DidChangeConfigurationHandler(
       DisposableLSPStateService disposableLSPStateService,
       SettingsService settingsService,
-      CopybookNameService copybookNameService,
       WatcherService watchingService,
       LocaleStore localeStore,
       Keywords keywords,
@@ -66,7 +64,6 @@ public class DidChangeConfigurationHandler {
       ErrorFinalizerService errorFinalizerService) {
     this.disposableLSPStateService = disposableLSPStateService;
     this.settingsService = settingsService;
-    this.copybookNameService = copybookNameService;
     this.watchingService = watchingService;
     this.localeStore = localeStore;
     this.keywords = keywords;
@@ -95,21 +92,23 @@ public class DidChangeConfigurationHandler {
     settingsService
         .fetchConfiguration(COBOL_PROGRAM_LAYOUT.label)
         .thenAccept(codeLayoutStore.updateCodeLayout());
-    settingsService
-        .fetchConfiguration(ANALYSIS_MODE.label)
-        .thenAccept(errorFinalizerService::updateDiagnosticsLevel);
-    copybookNameService.collectLocalCopybookNames();
     reanalyseIfRequired();
   }
 
   private void reanalyseIfRequired() {
     List<String> prevDialects = keywords.getDialectType();
+    CompletableFuture<Boolean> analysisModeFuture =
+        settingsService
+            .fetchConfiguration(ANALYSIS_MODE.label)
+            .thenApply(errorFinalizerService::updateDiagnosticsLevel);
     CompletableFuture<Boolean> copybookFolderFuture =
-        copybookNameService
-            .copybookLocalFolders(null)
+        this.copybookLocalFolders(null)
             .thenApply(
                 localFolders -> {
                   List<String> watchingFolders = watchingService.getWatchingFolders();
+                  // TODO: remove below patch when proper solution exists
+                  // client doesnt return locale path to server now.
+                  if (localFolders.isEmpty() && watchingFolders.isEmpty()) return true;
                   if (!new HashSet<>(watchingFolders).equals(new HashSet<>(localFolders))) {
                     acceptSettingsChange(localFolders);
                     return true;
@@ -124,6 +123,7 @@ public class DidChangeConfigurationHandler {
                     !new HashSet<>(prevDialects).equals(new HashSet<>(keywords.getDialectType())));
     copybookFolderFuture
         .thenCombine(dialectFuture, (b1, b2) -> b1 || b2)
+        .thenCombine(analysisModeFuture, (b1, b2) -> b1 || b2)
         .thenAccept(
             shouldReAnalyse -> {
               if (shouldReAnalyse) {
@@ -135,6 +135,30 @@ public class DidChangeConfigurationHandler {
                 }
               }
             });
+  }
+
+  private CompletableFuture<List<String>> copybookLocalFolders(String documentUri) {
+    List<CompletableFuture<List<String>>> copybookLocalFolders = new ArrayList<>();
+    copybookLocalFolders.add(
+        settingsService.fetchTextConfigurationWithScope(documentUri, CPY_LOCAL_PATHS.label));
+    return settingsService
+        .fetchTextConfigurationWithScope(documentUri, DIALECTS.label)
+        .thenAccept(
+            dialects ->
+                dialects.forEach(
+                    dialect ->
+                        copybookLocalFolders.add(
+                            settingsService.fetchTextConfigurationWithScope(
+                                documentUri, "cobol-lsp.dialect.libs", dialect))))
+        .thenCompose(
+            c ->
+                CompletableFuture.allOf(copybookLocalFolders.toArray(new CompletableFuture<?>[0]))
+                    .thenApply(
+                        v ->
+                            copybookLocalFolders.stream()
+                                .map(CompletableFuture::join)
+                                .flatMap(List::stream)
+                                .collect(toList())));
   }
 
   private void acceptSettingsChange(List<String> localFolders) {

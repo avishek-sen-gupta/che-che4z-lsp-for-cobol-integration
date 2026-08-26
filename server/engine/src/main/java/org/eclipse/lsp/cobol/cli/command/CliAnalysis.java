@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.cli.command;
@@ -222,7 +222,7 @@ public class CliAnalysis implements Callable<Integer> {
 
     @CommandLine.Option(
         names = {"-ce", "--copybook-extension"},
-        description = "List of copybook paths.")
+        description = "List of copybook extensions.")
     private String[] cpyExt = {"", ".cpy"};
   }
 

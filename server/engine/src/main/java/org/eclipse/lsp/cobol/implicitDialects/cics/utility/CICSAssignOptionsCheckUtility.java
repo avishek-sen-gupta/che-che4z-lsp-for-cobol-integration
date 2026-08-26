@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.implicitDialects.cics.utility;
@@ -94,6 +94,7 @@ public class CICSAssignOptionsCheckUtility extends CICSOptionsCheckBaseUtility {
           put(CICSLexer.NEXTTRANSID, ErrorSeverity.ERROR);
           put(CICSLexer.NUMTAB, ErrorSeverity.ERROR);
           put(CICSLexer.OPCLASS, ErrorSeverity.ERROR);
+          put(CICSLexer.OPERATION, ErrorSeverity.ERROR);
           put(CICSLexer.OPERKEYS, ErrorSeverity.ERROR);
           put(CICSLexer.OPID, ErrorSeverity.ERROR);
           put(CICSLexer.OPSECURITY, ErrorSeverity.ERROR);

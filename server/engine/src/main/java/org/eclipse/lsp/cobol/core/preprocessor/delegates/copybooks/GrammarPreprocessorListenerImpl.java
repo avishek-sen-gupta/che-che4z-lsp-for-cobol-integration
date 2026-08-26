@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.preprocessor.delegates.copybooks;
@@ -20,6 +20,8 @@ import static org.eclipse.lsp.cobol.core.CobolPreprocessor.*;
 import com.google.inject.Inject;
 import com.google.inject.assistedinject.Assisted;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -75,6 +77,10 @@ public class GrammarPreprocessorListenerImpl extends CobolPreprocessorBaseListen
             replacingService,
             preprocessor,
             context.getLanguageId());
+  }
+
+  public Function<CopySourceContext, CompletableFuture<Runnable>> getPrefetcher() {
+    return preprocessorService::prefetchCopybook;
   }
 
   /**

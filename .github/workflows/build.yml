@@ -8,7 +8,7 @@
 # SPDX-License-Identifier: EPL-2.0
 #
 # Contributors:
-#   Broadcom, Inc. - initial API and implementation
+#   Broadcom - initial API and implementation
 
 name: build
 env:
@@ -67,6 +67,7 @@ jobs:
         with:
           args: "-i"
           skip-commit: true
+          release-name: v1.25.0
       - name: Print diffs
         run: git --no-pager diff --exit-code       
   zipSources:
@@ -88,11 +89,39 @@ jobs:
       - name: Install dependencies for DaCo dialect
         working-directory: clients/daco-dialect-support
         run: NODE_ENV=production npm ci
+      - name: Install dependencies for Sample dialect
+        working-directory: clients/sample-dialect-support
+        run: NODE_ENV=production npm ci
       - uses: actions/upload-artifact@v4
         with:
           name: clients-for-bd-scan
           path: clients/**
           if-no-files-found: error
+  build-info:
+    runs-on: ubuntu-latest
+    outputs:
+      client-details: ${{ steps.BUILD_ID.outputs.client-details }}
+      latest_sha: ${{ steps.BUILD_ID.outputs.latest_sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: set build id
+        id: BUILD_ID
+        working-directory: clients/cobol-lsp-vscode-extension
+        run: |
+          is_pr="${{ github.event_name == 'pull_request' }}"
+          is_manual="${{ github.event.inputs.include_build_number == 'true' }}"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          DETAILS="$PACKAGE_VERSION"
+          if [[ "$is_pr" == "true" || "$is_manual" == "true" ]]; then
+            if [[ "$is_pr" == "true" ]]; then
+              ID="pr-${{ github.event.pull_request.number }}"
+            else
+              ID="${{ github.run_number }}"
+            fi
+            DETAILS="${DETAILS}+${ID}"
+          fi
+          echo "latest_sha=${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}" >> $GITHUB_OUTPUT
+          echo "client-details=$DETAILS" >> $GITHUB_OUTPUT
 
   generateNativeConfig:
     runs-on: ubuntu-latest
@@ -119,6 +148,7 @@ jobs:
 
   buildPlatformIndependedPart:
     runs-on: ubuntu-latest
+    needs: build-info
     steps:
       - uses: actions/checkout@v4
         with:
@@ -129,6 +159,9 @@ jobs:
           java-version: '11'
           cache: 'maven'
       - name: Build Server and Dialects Jars
+        env: 
+          CLIENT_DETAIL: ${{ needs.build-info.outputs.client-details }}
+          GIT_SHA: ${{ needs.build-info.outputs.latest_sha }}
         working-directory: server
         run: mvn clean verify --no-transfer-progress
       - name: Upload performance data
@@ -170,11 +203,23 @@ jobs:
         run: |
           npm ci
           npm run test
+      - name: Unit Test Sample Dialect extension
+        working-directory: clients/sample-dialect-support
+        run: |
+          npm ci
+          npm run test
       - name: Unit Test COBOL LS extension
         working-directory: clients/cobol-lsp-vscode-extension
         run: |
           npm ci
           npm run test
+      - name: update version with PR or build number
+        if: github.event_name == 'pull_request' || github.event.inputs.include_build_number == 'true'
+        working-directory: clients/cobol-lsp-vscode-extension
+        env:
+          BUILD_ID: ${{github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_number }}
+        run: |
+          node -e "const fs=require('fs');const fileName='./package.json';var content=require(fileName);content.version=content.version+'\+'+'${{ env.BUILD_ID }}';fs.writeFileSync(fileName,JSON.stringify(content,null,2));"
       - name: Package default COBOL LS vsix
         working-directory: clients/cobol-lsp-vscode-extension
         run: |
@@ -196,6 +241,12 @@ jobs:
           cp ../../server/dialect-daco/target/dialect-daco.jar ./server/jar
           npm run package -- --baseContentUrl "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/"
           cp *.vsix ../../.
+      - name: Package Sample Dialect vsix
+        working-directory: clients/sample-dialect-support
+        run: |
+          npm ci
+          npm run package -- --baseContentUrl "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/"
+          cp *.vsix ../../.
       - name: Upload IDMS vsix
         uses: actions/upload-artifact@v4
         with:
@@ -208,6 +259,12 @@ jobs:
           if-no-files-found: warn
           name: vsix-daco-dialect
           path: 'cobol-language-support-for-daco*.vsix'
+      - name: Upload Sample Dialect vsix
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: vsix-sample-dialect
+          path: 'cobol-language-support-for-sample-dialect*.vsix'
       - name: Upload COBOL LS default vsix
         uses: actions/upload-artifact@v4
         with:
@@ -222,9 +279,9 @@ jobs:
           cp ../../server/engine/target/server.jar ./server/jar
           npm run build
           xvfb-run -a npm exec c8 -- --reporter=lcovonly --allowExternal --exclude="**/test/**" --exclude=".vscode-test/**" --exclude=".vscode-test-web/**" -- npm run test:integration
-      - name: SonarCloud Scan
+      - name: SonarQube Scan
         if: github.ref == 'refs/heads/development'
-        uses: sonarsource/sonarcloud-github-action@49e6cd3b187936a73b8280d59ffd9da69df63ec9
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -242,6 +299,13 @@ jobs:
         run: |
           npm ci
           npm run test:web
+      - name: update version with PR or build number
+        if: github.event_name == 'pull_request' || github.event.inputs.include_build_number == 'true'
+        working-directory: clients/cobol-lsp-vscode-extension
+        env:
+          BUILD_ID: ${{github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_number }}
+        run: |
+          node -e "const fs=require('fs');const fileName='./package.json';var content=require(fileName);content.version=content.version+'\+'+'${{ env.BUILD_ID }}';fs.writeFileSync(fileName,JSON.stringify(content,null,2));"
       - name: Package COBOL LS vsix for Web
         working-directory: clients/cobol-lsp-vscode-extension
         run: |
@@ -265,12 +329,12 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             container: alpine:3.17
-          - os: macos-13
+          - os: macos-15-intel
             arch: x64
           - os: macos-14
             arch: arm64
     runs-on: ${{ matrix.os }}
-    needs: [generateNativeConfig]
+    needs: [generateNativeConfig, build-info]
     steps:
       # Generate environment variable
       - shell: pwsh
@@ -332,10 +396,16 @@ jobs:
           rm server/engine/src/main/resources/META-INF/native-image/session-*/jni-config.json
         shell: bash
       - name: Build with Maven
+        env: 
+          CLIENT_DETAIL: ${{ needs.build-info.outputs.client-details }}
+          GIT_SHA: ${{ needs.build-info.outputs.latest_sha }}
         working-directory: server
         if: matrix.os != 'ubuntu-latest' || matrix.arch != 'x64'
         run: mvn -e -B -Pnative -DskipTests clean package
       - name: Build with Maven for Linux
+        env: 
+          CLIENT_DETAIL: ${{ needs.build-info.outputs.client-details }}
+          GIT_SHA: ${{ needs.build-info.outputs.latest_sha }}
         if: matrix.os == 'ubuntu-latest' && matrix.arch == 'x64'
         working-directory: server
         run: mvn -e -B -Plinux-native -DskipTests clean package
@@ -357,6 +427,24 @@ jobs:
           path: server/engine/target/engine
           if-no-files-found: error
 
+  checkJava8:
+    name: Check Java 8 compatibility
+    runs-on: ubuntu-latest
+    needs: [buildPlatformIndependedPart]
+    steps:
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: jar
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - name: Print java version
+        run: java -version
+      - name: Run JAR
+        run: java -jar server.jar --help
+
   packageNative:
     strategy:
       fail-fast: false
@@ -367,7 +455,7 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             container: alpine:3.17
-          - os: macos-13
+          - os: macos-15-intel
             arch: x64
           - os: macos-14
             arch: arm64
@@ -471,6 +559,14 @@ jobs:
           unzip -j dialects-daco/*.vsix extension/dist/extension.js extension/dist/extension.js.map -d clients/daco-dialect-support/dist/
           unzip -j dialects-daco/*.vsix extension/server/jar/dialect-daco.jar -d clients/daco-dialect-support/server/jar
         shell: bash
+      - name: Retrieve Sample dialect
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix-sample-dialect
+          path: dialects-sample
+      - name: Restore Sample dist folder
+        run: |
+          unzip -j dialects-sample/*.vsix extension/dist/extension.js extension/dist/extension.js.map -d clients/sample-dialect-support/dist/
       - name: Run extension unit tests
         run: npm run test
         working-directory: clients/cobol-lsp-vscode-extension

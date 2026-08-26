@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common;
@@ -21,6 +21,7 @@ import lombok.Value;
 @Value
 public class DialectRegistryItem {
   String name;
+  int protocolVersion;
   URI uri;
   String description;
   String extensionId;

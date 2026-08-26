@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -110,7 +110,9 @@ public class CopyIdmsAdjustmentProcessor {
             .severity(WARNING)
             .errorSource(ErrorSource.DIALECT)
             .relatedInformation(
-                new DiagnosticRelatedInformation(sourceLocality.toLocation(), "Copy IDMS source"))
+                Collections.singletonList(
+                    new DiagnosticRelatedInformation(
+                        sourceLocality.toLocation(), "Copy IDMS source")))
             .build());
   }
 }

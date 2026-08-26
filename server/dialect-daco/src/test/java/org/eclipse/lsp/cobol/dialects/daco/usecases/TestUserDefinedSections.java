@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.usecases;
@@ -20,6 +20,8 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.util.Map;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 import org.eclipse.lsp.cobol.dialects.daco.DaCoDialect;
 import org.eclipse.lsp.cobol.dialects.daco.utils.DialectConfigs;
@@ -83,9 +85,11 @@ class TestUserDefinedSections {
             CopybookProcessingMode.ENABLED,
             ImmutableList.of("DaCo", "IDMS"),
             true,
-                dialectConfig, false,
-            ImmutableList.of()
-        );
+            false,
+            SqlProcessing.ENABLED,
+            SqlDecimalComma.DISABLED,
+            ImmutableList.of(),
+            dialectConfig);
     UseCaseEngine.runTestForDiagnostics(
         TEXT_GOTO, ImmutableList.of(), ImmutableMap.of(), ImmutableList.of(), analysisConfig);
   }

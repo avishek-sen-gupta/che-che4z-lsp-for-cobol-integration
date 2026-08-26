@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -647,6 +647,7 @@ class UseCasePreprocessorListener extends UseCasePreprocessorBaseListener {
               it.getSource(),
               ofNullable(it.getCode()).map(Either::getLeft).orElse(null));
       diagnostic.setRelatedInformation(it.getRelatedInformation());
+      diagnostic.setTags(it.getTags());
       diagnostics.get(documentUri).add(diagnostic);
     };
   }

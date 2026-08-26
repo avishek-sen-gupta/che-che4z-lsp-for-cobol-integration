@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
@@ -18,9 +18,16 @@ import {
   COPYBOOK_CACHE_CLEARED_INFO,
   COPYBOOKS_FOLDER,
   E4E_FOLDER,
-  ZOWE_FOLDER,
+  TAR_FOLDER,
+  ZOWE_FSP_CACHE,
 } from "../constants";
 import { hasMember } from "../services/util/Utils";
+
+const cacheSubdirectories = [
+  [E4E_FOLDER, COPYBOOKS_FOLDER],
+  [TAR_FOLDER],
+  [ZOWE_FSP_CACHE],
+];
 
 /**
  * Clears the downloaded copybook cache folder ({globalStoragePath}/zowe/copybooks).
@@ -28,13 +35,11 @@ import { hasMember } from "../services/util/Utils";
  */
 export function clearCache(uri: vscode.Uri) {
   const deletePromise = (async () => {
-    const zowe = await deleteFolderContent(
-      vscode.Uri.joinPath(uri, ZOWE_FOLDER, COPYBOOKS_FOLDER),
+    const results = await Promise.allSettled(
+      cacheSubdirectories.map((d) =>
+        deleteFolderContent(vscode.Uri.joinPath(uri, ...d)),
+      ),
     );
-    const e4e = await deleteFolderContent(
-      vscode.Uri.joinPath(uri, E4E_FOLDER, COPYBOOKS_FOLDER),
-    );
-    const results = await Promise.allSettled([...zowe, ...e4e]);
     if (results.find((r) => r.status === "rejected"))
       vscode.window.showInformationMessage(
         "Encountered problem while clearing copybook cache",

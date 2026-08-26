@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -49,7 +49,8 @@ class TestReplacingForSeveralTokensInOneLine {
           + " {:TAG:-PARENT^ABCDE-PARENT}|invalidS_}";
 
   private static final String REPL_NAME = "REPL";
-  private static final String MESSAGE = "Variable ABCDE-CHILD is not defined";
+  private static final String MESSAGE =
+      "Variable ABCDE-CHILD does not exist in structure ABCDE-PARENT";
 
   @Test
   void test() {

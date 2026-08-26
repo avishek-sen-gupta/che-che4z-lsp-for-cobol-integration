@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -45,7 +45,6 @@ import org.eclipse.lsp.cobol.lsp.handlers.text.CodeActionHandler;
 import org.eclipse.lsp.cobol.lsp.handlers.workspace.DidChangeConfigurationHandler;
 import org.eclipse.lsp.cobol.lsp.handlers.workspace.DidChangeWatchedFilesHandler;
 import org.eclipse.lsp.cobol.lsp.handlers.workspace.ExecuteCommandHandler;
-import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
 import org.eclipse.lsp.cobol.service.delegates.completions.Keywords;
 import org.eclipse.lsp.cobol.service.settings.SettingsService;
 import org.eclipse.lsp.cobol.service.settings.SettingsServiceImpl;
@@ -174,7 +173,6 @@ class CobolLanguageServerTest {
     SettingsService settingsService = mock(SettingsServiceImpl.class);
     WatcherService watchingService = mock(WatcherService.class);
     LocaleStore localeStore = mock(LocaleStore.class);
-    CopybookNameService copybookNameService = mock(CopybookNameService.class);
     Keywords keywords = mock(Keywords.class);
     CobolTextDocumentService textService = mock(CobolTextDocumentService.class);
     AnalysisService analysisService = mock(AnalysisService.class);
@@ -215,7 +213,6 @@ class CobolLanguageServerTest {
             new InitializeHandler(watchingService),
             new InitializedHandler(
                 watchingService,
-                copybookNameService,
                 keywords,
                 settingsService,
                 localeStore,
@@ -274,7 +271,7 @@ class CobolLanguageServerTest {
             new ShutdownHandler(stateService, lspMessageBroker),
             new InitializeHandler(mock(WatcherServiceImpl.class)),
             new InitializedHandler(
-                mock(WatcherServiceImpl.class), null, null, null, null, null, null, null, null),
+                mock(WatcherServiceImpl.class), null, null, null, null, null, null, null),
             lspEventConsumer,
             cancelProgressHandler);
 
@@ -340,7 +337,7 @@ class CobolLanguageServerTest {
             new ExitHandler(stateService),
             new ShutdownHandler(stateService, lspMessageBroker),
             new InitializeHandler(null),
-            new InitializedHandler(null, null, null, null, null, null, null, null, null),
+            new InitializedHandler(null, null, null, null, null, null, null, null),
             lspEventConsumer,
             cancelProgressHandler);
     assertEquals(1, stateService.getExitCode());

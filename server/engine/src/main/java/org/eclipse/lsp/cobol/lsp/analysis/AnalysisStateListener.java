@@ -9,12 +9,11 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.analysis;
 
-import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
 import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 
 /** Contract for the listeners which would register to {@link AnalysisStateNotifier} . */
@@ -24,8 +23,6 @@ public interface AnalysisStateListener {
    *
    * @param state
    * @param model
-   * @param eventSource
    */
-  void notifyState(
-      AnalysisState state, CobolDocumentModel model, SourceUnitGraph.EventSource eventSource);
+  void notifyState(AnalysisState state, CobolDocumentModel model);
 }

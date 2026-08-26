@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.usecases.example;
@@ -40,7 +40,7 @@ class TestMultiTokenError {
             "1",
             new Diagnostic(
                 new Range(),
-                "Variable FOO is not defined",
+                "Variable FOO does not exist in structure BAR",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText())));
   }

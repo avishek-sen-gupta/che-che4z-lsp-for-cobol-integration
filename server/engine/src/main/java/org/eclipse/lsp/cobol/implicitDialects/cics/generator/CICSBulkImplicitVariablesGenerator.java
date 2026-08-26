@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -73,7 +73,7 @@ public class CICSBulkImplicitVariablesGenerator {
         Locality.builder().uri(ImplicitCodeUtils.createFullUrl("implicit-code-DFHEIBLK")).build();
 
     VariableNode variable =
-        new GroupItemNode(locality, 1, "DFHEIBLK", false, false, UsageFormat.UNDEFINED);
+        new GroupItemNode(locality, 1, "DFHEIBLK", false, false, UsageFormat.UNDEFINED, false);
     variable.addChild(
         new ElementaryItemNode(
             locality, 2, "EIBTIME", false, "S9(7)", null, UsageFormat.COMP_3, false, false, false));

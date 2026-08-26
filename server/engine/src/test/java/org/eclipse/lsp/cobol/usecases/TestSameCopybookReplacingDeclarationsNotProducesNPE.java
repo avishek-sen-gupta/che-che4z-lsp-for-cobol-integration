@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -39,7 +39,8 @@ class TestSameCopybookReplacingDeclarationsNotProducesNPE {
           + "       {#*MAINLINE}.\n"
           + "           GOBACK. ";
 
-  private static final String REPL = "       05 {$*:TAG:-ID^ABC-ID} PIC 9.\n";
+  private static final String REPL =
+      "       05 {$*:TAG:-ID^ABC-ID} PIC 9.\n" + "       05 FILLER pic x.\n";
   private static final String REPL_NAME = "REPL";
 
   @Test

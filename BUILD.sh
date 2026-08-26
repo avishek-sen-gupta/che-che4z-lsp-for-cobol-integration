@@ -11,7 +11,7 @@
 # SPDX-License-Identifier: EPL-2.0
 #
 # Contributors:
-#    Broadcom, Inc. - initial API and implementation
+#    Broadcom - initial API and implementation
 #
 
 # Fail script if any command fails
@@ -63,6 +63,12 @@ cd -
 cd clients/cobol-lsp-vscode-extension
 npm ci
 npm run build:web
+cd -
+
+# Build Sample LS extension
+cd clients/sample-dialect-support
+npm ci
+npm run package
 cd -
 
 # Done

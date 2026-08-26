@@ -68,6 +68,49 @@
           }
         },
         "required": ["environment", "stage", "system", "subsystem", "type"]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "locationType": {
+            "const": "local",
+            "description": "TAR file is located locally"
+          },
+          "tarFileLocation": {
+            "type": "string",
+            "description": "Path of the TAR file located locally on the current machine"
+          },
+          "folderPattern": {
+            "type": "string",
+            "description": "Path or wildcard pattern of folders within the TAR file to search for copybooks",
+            "default": "**"
+          }
+        },
+        "required": ["locationType", "tarFileLocation"]
+      },
+      {
+        "type": "object",
+        "properties": {
+          "locationType": {
+            "type": "string",
+            "enum": ["DSN", "USS"],
+            "description": "Type of the remote location where the TAR file is stored (DSN or USS)"
+          },
+          "tarFileLocation": {
+            "type": "string",
+            "description": "Data set name or USS directory path of the TAR file"
+          },
+          "folderPattern": {
+            "type": "string",
+            "description": "Path or wildcard pattern of folders within the TAR file to search for copybooks",
+            "default": "**"
+          },
+          "profile": {
+            "type": "string",
+            "description": "Zowe Explorer profile name"
+          }
+        },
+        "required": ["locationType", "tarFileLocation"]
       }
     ]
   }

@@ -9,15 +9,13 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 export const SETTINGS_CPY_SECTION: string = "cobol-lsp.cpy-manager";
 export const SETTINGS_CPY_LOCAL_PATH: string =
   "cobol-lsp.cpy-manager.paths-local";
 export const SETTINGS_CPY_EXTENSIONS: string =
   "cobol-lsp.cpy-manager.copybook-extensions";
-export const SETTINGS_CPY_FILE_ENCODING: string =
-  "cobol-lsp.cpy-manager.copybook-file-encoding";
 export const SETTINGS_SQL_BACKEND: string = "cobol-lsp.target-sql-backend";
 export const SETTINGS_DIALECT = "cobol-lsp.dialects";
 export const SETTINGS_COMPILE_OPTIONS = "cobol-lsp.compiler.options";
@@ -29,9 +27,9 @@ export const SETTINGS_UNREACHABLE_CODE_SEVERITY: string =
   "cobol-lsp.unreachable-code-severity";
 export const SETTINGS_MAXIMUM_VM_COUNT: string = "cobol-lsp.maxVmCount";
 
-export const SERVER_PORT = "cobol-lsp.server.port";
 export const ANALYSIS_MODE = "cobol-lsp.analysis-mode";
 export const SERVER_RUNTIME = "cobol-lsp.serverRuntime";
+export const JAVA_HOME = "cobol-lsp.java.home";
 export const DIALECT_LIBS = "cobol-lsp.dialect.libs";
 export const PATHS_LOCAL_KEY = "paths-local";
 export const PATHS_DSN = "paths-dsn";
@@ -47,8 +45,7 @@ export const PROFILE_NAME_PLACEHOLDER = "<profilename>";
 export const DOWNLOAD_QUEUE_LOCKED_ERROR_MSG = `Invalid credentials for profile: ${PROFILE_NAME_PLACEHOLDER}. Copybook retrieval is blocked. Ensure the profile contains correct credentials.`;
 export const UNLOCK_DOWNLOAD_QUEUE_MSG = "Unblock and retry";
 export const INVALID_CREDENTIALS_ERROR_MSG = `Incorrect credentials in Zowe profile ${PROFILE_NAME_PLACEHOLDER}.`;
-export const PROVIDE_PROFILE_MSG =
-  "Please specify a valid Zowe Explorer profile to download copybooks from the mainframe.";
+export const PROVIDE_PROFILE_MSG = `Please specify a valid Zowe Explorer profile to download copybooks from the mainframe. Provided invalid profile name: ${PROFILE_NAME_PLACEHOLDER}`;
 export const SEGMENT_PLACEHOLDER = "<segment>";
 export const DSN_MUSTBE_NOT_EMPTY = "Dataset name segment must not be empty.";
 export const DSN_NOMORE_8CHARS =
@@ -79,11 +76,12 @@ export const DEFAULT_DIALECT = "COBOL";
 export const CLEARING_COPYBOOK_CACHE = "Clearing downloaded copybook cache";
 export const COPYBOOK_CACHE_CLEARED_INFO = "Downloaded copybooks removed";
 export const ZOWE_FOLDER = "zowe";
+export const ZOWE_FSP_CACHE = "zowe-fsp";
 export const FAIL_CREATE_COPYBOOK_FOLDER_MSG = `Failed to create copybook internal folder`;
 export const FAIL_CREATE_GLOBAL_STORAGE_MSG = `Failed to create extension global storage folder`;
 export const E4E_SCHEME: string = "ndvr";
-export const OUTPUT_MSG_SEARCH_LOCATION = "Looking for location => ";
 export const E4E_FOLDER = "e4e";
+export const TAR_FOLDER = "tar";
 export const DATASET = "dataset";
 export const ENVIRONMENT = "environment";
 export const USE_MAP = "MAP";
@@ -102,3 +100,11 @@ export enum PUNCH_CARD {
   AREA_B_END_POS = 72,
   IDENTIFICATION_AREA_END_POS = 80,
 }
+
+export const ANALYSIS_LIMIT_REASON = {
+  code: "limited.analysis.complexity",
+  message: "Graph generation incomplete due to complexity of the program",
+  event: "ccf.analysis.limit",
+};
+
+export const TAR_PREFIX = "TAR:";

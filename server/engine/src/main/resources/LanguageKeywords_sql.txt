@@ -6,7 +6,7 @@
 # which is available at https://www.eclipse.org/legal/epl-2.0/
 # SPDX-License-Identifier: EPL-2.0
 # Contributors:
-#   Broadcom, Inc. - initial API and implementation
+#   Broadcom - initial API and implementation
 RESULT-SET-LOCATOR=
 BLOB-LOCATOR=
 CLOB-LOCATOR=

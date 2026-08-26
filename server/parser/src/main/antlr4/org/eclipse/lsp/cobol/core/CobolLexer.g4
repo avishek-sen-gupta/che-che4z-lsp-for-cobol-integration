@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 lexer grammar CobolLexer;
@@ -19,7 +19,7 @@ lexer grammar CobolLexer;
     import java.util.ArrayList;
 }
 
-channels{COMMENTS, TECHNICAL}
+channels{COMMENTS, TECHNICAL, HIDDEN_ERROR}
 @lexer::members {
    boolean enableCobolSpecialSeparators = true;
    public static final List<Integer> cobolVerbTokens = new ArrayList()
@@ -464,6 +464,7 @@ CYCLE : C Y C L E;
 DACO_CONTROL : D A C O MINUSCHAR C O N T R O L;
 DATA            : D A T A ;
 DATE            : D A T E ;
+DATEVAL         : D A T E V A L ;
 DATE_COMPILED   : D A T E MINUSCHAR C O M P I L E D ;
 DATE_WRITTEN    : D A T E MINUSCHAR W R I T T E N ;
 DAY             : D A Y ;
@@ -550,6 +551,7 @@ FILLER               : F I L L E R ;
 FIRST                : F I R S T ;
 FOOTING              : F O O T I N G ;
 FOR                  : F O R ;
+FORMAT               : F O R M A T ;
 FREE                 : F R E E ;
 FROM                 : F R O M ;
 FUNCTION             : F U N C T I O N ;
@@ -790,6 +792,7 @@ TRAILING             : T R A I L I N G ;
 TRUE                 : T R U E ;
 TYPE: T Y P E;
 UNBOUNDED: U N B O U N D E D;
+UNDATE               : U N D A T E;
 UNIT                 : U N I T ;
 UNSTRING             : U N S T R I N G ;
 UNTIL                : U N T I L ;
@@ -816,6 +819,8 @@ WRITE_ONLY           : W R I T E MINUSCHAR O N L Y ;
 XML                  : X M L ;
 XML_DECLARATION : XML MINUSCHAR D E C L A R A T I O N;
 YEAR : Y E A R;
+YEARWINDOW           : Y E A R W I N D O W;
+DATE_PATTERN         : Y Y (Y Y)? X X? X? X?;
 YYYYDDD : Y Y Y Y D D D;
 YYYYMMDD : Y Y Y Y M M D D;
 ZERO                 : Z E R O ;
@@ -850,6 +855,7 @@ COLONCHAR : ':';
 COMMACHAR : ',';
 COMMENTTAG : '*>' -> channel(COMMENTS);
 DOLLARCHAR : '$';
+POUNDCHAR : '£';
 DOUBLEMORETHANCHAR : '>>';
 
 EQUALCHAR : '=';
@@ -873,6 +879,28 @@ DIALECT_MARKER: UNDERSCORECHAR DIALECT_MARKER_LITERAL UNDERSCORECHAR;
 // Dialect filler
 ZERO_WIDTH_SPACE: '\u200B' ('\u200B' | [ ])*;
 U_CHAR: U;
+
+UNKNOWN_EXEC : E X E C [ \n\r]+
+        (
+            I N C L U D E
+            { setChannel(DEFAULT_TOKEN_CHANNEL); }
+            |
+            (~[."']|STRINGLITERAL)*?
+            (
+                E N D MINUSCHAR E X E C
+                { setChannel(HIDDEN); }
+                |
+                '.'
+                (
+                    (~["'] | STRINGLITERAL)*? E N D MINUSCHAR E X E C
+                    { setChannel(HIDDEN); }
+                    |
+                    { setChannel(HIDDEN_ERROR); }
+                )
+            )
+        )
+        ;
+
 IDENTIFIER : [a-zA-Z0-9][-_a-zA-Z0-9]*;
 
 // treat all the non-processed tokens as errors
@@ -942,5 +970,5 @@ WS2 : [ \t\f]+ -> channel(HIDDEN);
 TEXT : ~('\n' | '\r');
 LParIntegralRPar: LPARENCHAR INTEGERLITERAL RPARENCHAR;
 fragment PICTUREPeriodAcceptables: ('0'|'9'|B|Z|CR|D B|ASTERISKCHAR|COMMACHAR|MINUSCHAR|PLUSCHAR|SLASHCHAR);
-fragment PICTURECharAcceptedMultipleTime: (A|G|N|P|U|X|DOLLARCHAR|PICTUREPeriodAcceptables);
+fragment PICTURECharAcceptedMultipleTime: (A|G|N|P|U|X|DOLLARCHAR|POUNDCHAR|PICTUREPeriodAcceptables);
 fragment PICTURECharAcceptedOneTime: (V|E|S|CR|D B);

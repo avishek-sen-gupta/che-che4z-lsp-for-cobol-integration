@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.dialects;
@@ -29,6 +29,8 @@ import org.eclipse.lsp.cobol.common.processor.ProcessorDescription;
 /** A COBOL dialect */
 public interface CobolDialect {
   String FILLER = "\u200B";
+  int COBOL_DIALECT_JAVA_VERSION = 1;
+  int COBOL_DIALECT_MODERN_VERSION = 2;
 
   /**
    * Gets the name of the dialect
@@ -140,9 +142,11 @@ public interface CobolDialect {
    * Returns the list of {@link CompilerDirectiveNode} specific to the dialect
    *
    * @param context is a DialectProcessingContext class with all needed data for dialect processing
+   * @param diagnostics a list of {@link SyntaxError}
    * @return a list of {@link CompilerDirectiveNode}
    */
-  default List<CompilerDirectiveNode> getCompilerDirectives(DialectProcessingContext context) {
+  default List<CompilerDirectiveNode> getCompilerDirectives(
+      DialectProcessingContext context, List<SyntaxError> diagnostics) {
     return ImmutableList.of();
   }
 

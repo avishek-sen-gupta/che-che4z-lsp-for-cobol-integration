@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 lexer grammar VariableLexer;
@@ -540,5 +540,5 @@ PICTUREIS : IS;
 WS2 : [ \t\f]+ -> channel(HIDDEN);
 LParIntegralRPar: LPARENCHAR INTEGERLITERAL RPARENCHAR;
 fragment PICTUREPeriodAcceptables: ('0'|'9'|B|Z|CR|DB|ASTERISKCHAR|COMMACHAR|MINUSCHAR|PLUSCHAR|SLASHCHAR);
-fragment PICTURECharAcceptedMultipleTime: (A|G|N|P|X|DOLLARCHAR|PICTUREPeriodAcceptables);
+fragment PICTURECharAcceptedMultipleTime: (A|G|N|P|X|DOLLARCHAR|POUNDCHAR|PICTUREPeriodAcceptables);
 fragment PICTURECharAcceptedOneTime: (V|E|S|CR|DB);

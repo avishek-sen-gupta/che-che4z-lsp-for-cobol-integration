@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import { Program, Location, Paragraph, Section } from "../model/cfast";
 import { CobolInstruction } from "./instructions";
@@ -36,8 +36,9 @@ export interface VirtualProcessorListener {
 
   /**
    * Fires when Virtual Processor reach the maximum VM count
+   * @param limit - VM count limit
    */
-  maximumVMCountReached(): void;
+  maximumVMCountReached(limit: number): void;
 
   /**
    * Fires when latest statement of the program was executed and control falls down

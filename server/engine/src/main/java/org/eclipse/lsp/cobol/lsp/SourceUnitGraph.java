@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp;
@@ -17,21 +17,17 @@ package org.eclipse.lsp.cobol.lsp;
 import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
-import java.nio.file.FileSystemNotFoundException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.lsp.cobol.common.file.WorkspaceFileService;
+import org.eclipse.lsp.cobol.common.io.ResolveFileContent;
 import org.eclipse.lsp.cobol.common.model.tree.CopyNode;
 import org.eclipse.lsp.cobol.common.utils.ImplicitCodeUtils;
 import org.eclipse.lsp.cobol.common.utils.RangeUtils;
@@ -46,8 +42,8 @@ import org.eclipse.lsp4j.Range;
 @Singleton
 @Slf4j
 public class SourceUnitGraph implements AnalysisStateListener {
-  private final WorkspaceFileService fileService;
 
+  private final ResolveFileContent resolveFileContent;
   // doc-a-uri --> copy-a Node. copy-b node, copy-c node
   // doc-1-uri --> copy-a Node. copy-2 node, copy-3 node
   private final Map<String, List<NodeV>> documentGraph = new ConcurrentHashMap<>();
@@ -61,46 +57,45 @@ public class SourceUnitGraph implements AnalysisStateListener {
       new ConcurrentHashMap<>();
 
   @Inject
-  public SourceUnitGraph(WorkspaceFileService fileService) {
-    this.fileService = fileService;
+  public SourceUnitGraph(ResolveFileContent resolveFileContent) {
+    this.resolveFileContent = resolveFileContent;
   }
 
   @Override
-  public void notifyState(AnalysisState state, CobolDocumentModel model, EventSource eventSource) {
+  public void notifyState(AnalysisState state, CobolDocumentModel model) {
     switch (state) {
       case SKIPPED:
       case STARTED:
       case ANALYSING:
       case SCHEDULED:
-        updateDocumentGraphUponSchedule(model, eventSource);
+        updateDocumentGraphUponSchedule(model);
         break;
       case COMPLETED:
-        updateDocumentGraphUponCompletion(model, eventSource);
+        updateDocumentGraphUponCompletion(model);
         break;
       case EXCEPTIONALLY_FINISHED:
       default:
     }
   }
 
-  private void updateDocumentGraphUponSchedule(CobolDocumentModel model, EventSource eventSource) {
-    updateGraphNodes(model, eventSource);
+  private void updateDocumentGraphUponSchedule(CobolDocumentModel model) {
+    updateGraphNodes(model);
   }
 
   private String getContent(CobolDocumentModel model) {
     return Optional.ofNullable(model.getText()).orElseGet(() -> getContent(model.getUri()));
   }
 
-  private synchronized void updateDocumentGraphUponCompletion(
-      CobolDocumentModel model, EventSource eventSource) {
-    updateGraphNodes(model, eventSource);
+  private synchronized void updateDocumentGraphUponCompletion(CobolDocumentModel model) {
+    updateGraphNodes(model);
     invalidateGraphLinks(model.getUri());
     if (isUserSuppliedCopybook(model.getUri()) || model.getAnalysisResult() == null) {
       return;
     }
-    updateGraphLink(model, eventSource);
+    updateGraphLink(model);
   }
 
-  private void updateGraphLink(CobolDocumentModel model, EventSource eventSource) {
+  private void updateGraphLink(CobolDocumentModel model) {
     List<CopyNode> copyNodes =
         model
             .getAnalysisResult()
@@ -112,7 +107,7 @@ public class SourceUnitGraph implements AnalysisStateListener {
     List<NodeV> references = new ArrayList<>();
     for (CopyNode copyNode : copyNodes) {
       String parentUri = copyNode.getLocality().getUri();
-      NodeV copyNodeV = getNode(copyNode, eventSource);
+      NodeV copyNodeV = getNode(copyNode);
       if (!copyNodeV.isDirty) {
         objectRef.computeIfPresent(
             copyNode.getUri(),
@@ -172,26 +167,15 @@ public class SourceUnitGraph implements AnalysisStateListener {
    */
   public boolean isUserSuppliedCopybook(String uri) {
     return documentGraphIndexedByCopybook.keySet().stream()
-        .anyMatch(
-            copyUri -> {
-              try {
-                String decodeUri = uri.replace(" ", "%20");
-                copyUri = copyUri.replace(" ", "%20");
-                return new URL(decodeUri).sameFile(new URL(copyUri));
-              } catch (IOException e) {
-                LOG.error("IOException encountered while comparing paths {} and {}", copyUri, uri);
-                return false;
-              }
-            });
+        .anyMatch(copyUri -> copyUri.equals(uri));
   }
 
-  private void updateGraphNodes(CobolDocumentModel model, EventSource eventSource) {
+  private void updateGraphNodes(CobolDocumentModel model) {
     Location location = new Location();
     location.setUri(model.getUri());
     NodeV defaultNodeForModel =
         new NodeV(
             model.getUri(),
-            eventSource,
             Sets.newConcurrentHashSet(Sets.newHashSet(location)),
             false,
             false,
@@ -202,7 +186,6 @@ public class SourceUnitGraph implements AnalysisStateListener {
         (uri, node) -> {
           if (node == null) return defaultNodeForModel;
           node.setOpenInIde(true);
-          node.setLastUpdatedBy(eventSource);
           node.setContent(model.getText());
           return node;
         });
@@ -224,12 +207,16 @@ public class SourceUnitGraph implements AnalysisStateListener {
   }
 
   private String getFileContent(String uri) {
-    return Optional.ofNullable(fileService.getPathFromURI(uri))
-        .map(fileService::getContentByPath)
-        .orElse(null);
+    CompletableFuture<String> fileContent = resolveFileContent.getFileContent(uri);
+    try {
+      return fileContent.get();
+    } catch (InterruptedException | ExecutionException e) {
+      LOG.error("Cannot get content of: {}", uri, e);
+      return null;
+    }
   }
 
-  private NodeV getNode(CopyNode copyNode, EventSource eventSource) {
+  private NodeV getNode(CopyNode copyNode) {
     String content = null;
     String uri = null;
     boolean isDirty = true;
@@ -240,7 +227,7 @@ public class SourceUnitGraph implements AnalysisStateListener {
       uri = copyNode.getUri();
       isDirty = false;
     }
-    return new NodeV(uri, eventSource, references, true, isDirty, content, false);
+    return new NodeV(uri, references, true, isDirty, content, false);
   }
 
   /**
@@ -395,53 +382,16 @@ public class SourceUnitGraph implements AnalysisStateListener {
     return false;
   }
 
-  /**
-   * Gives a list of all the copybooks contained inside a parent dir.
-   *
-   * @param parentFolder parent directory
-   * @return List of copybooks contained inside a parent directory
-   */
-  public List<String> getCopybookUriInsideFolder(String parentFolder) {
-    List<String> result = new ArrayList<>();
-    Path parentPath;
-
-    try {
-      parentPath = Paths.get(URI.create(parentFolder));
-    } catch (FileSystemNotFoundException | SecurityException e) {
-      return result;
-    }
-
-    Set<String> allCopybooks = documentGraphIndexedByCopybook.keySet();
-    for (String copybookUri : allCopybooks) {
-      try {
-        Path copybookPath = Paths.get(URI.create(copybookUri));
-        if (copybookPath.startsWith(parentPath)) {
-          result.add(copybookUri);
-        }
-      } catch (Exception e) {
-        LOG.error("{} not found", copybookUri);
-      }
-    }
-    return result;
-  }
-
   /** Nodes in the {@link SourceUnitGraph} representing document and their links in a workspace */
   @AllArgsConstructor
   @EqualsAndHashCode(onlyExplicitlyIncluded = true)
   @Getter
   public class NodeV {
     @EqualsAndHashCode.Include private String uri;
-    @Setter private EventSource lastUpdatedBy;
     @Setter private Set<Location> referencedLocation;
     private boolean isCopybook;
     @Setter private boolean isDirty;
     @Setter private String content;
     @Setter private boolean isOpenInIde;
-  }
-
-  /** Represent different source for event for the LSP server */
-  public enum EventSource {
-    FILE_SYSTEM,
-    IDE
   }
 }

@@ -9,18 +9,19 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
-import { Program } from "@code4z/analysis/lib/model/cfast";
 import {
+  Program,
   DiagnosticDto,
   DiagnosticSeverityDto,
-} from "@code4z/analysis/lib/model/external";
-import { GraphDTO } from "@code4z/analysis/lib/model/GraphDTO";
+  EventDto,
+  GraphDTO,
+} from "@code4z/analysis";
 
 export type WorkerMessage = {
   vmCount: number;
-  severity: number;
+  severity: number | undefined;
   programs: Program[];
 };
 
@@ -33,12 +34,17 @@ export type WorkerProcessingResult = {
   graphs: GraphDTO[];
   locations: string[];
   diagnostics: Map<string, DiagnosticDto[]>;
+  events: EventDto[];
 };
 
 export type WorkerResultMessage =
   | {
       type: "result";
       payload: WorkerProcessingResult;
+    }
+  | {
+      type: "error";
+      payload: string;
     }
   | {
       type: "log";

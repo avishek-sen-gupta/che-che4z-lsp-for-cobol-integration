@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.usecases;
@@ -60,7 +60,7 @@ class TestDaCoVariableUnwrapping1 {
             "1",
             new Diagnostic(
                 new Range(),
-                "Variable KMKKLS-XTT is not defined",
+                "Variable KMKKLS-XTT does not exist in structure ROOT",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText())),
         ImmutableList.of(),

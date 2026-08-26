@@ -9,11 +9,11 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
-import { Terminal } from "vscode";
+import { SettingsService } from "../services/Settings";
 
 export interface AnalysisConfiguration {
   typeToRun?: string;
@@ -32,7 +32,11 @@ export class RunAnalysis {
   protected extensionUri: vscode.Uri;
   protected showDiagnostics: boolean;
 
-  constructor(globalStorageUri: vscode.Uri, extensionPath: vscode.Uri) {
+  constructor(
+    globalStorageUri: vscode.Uri,
+    extensionPath: vscode.Uri,
+    private outputChannel: vscode.LogOutputChannel,
+  ) {
     this.runNative = false;
     this.copybookConfigLocation = "";
     this.globalStorageUri = globalStorageUri;
@@ -69,7 +73,8 @@ export class RunAnalysis {
 
     const command = await this.buildCommand();
     if (command !== "") {
-      this.sendToTerminal(command);
+      this.outputChannel.appendLine(command);
+      this.outputChannel.show();
     }
   }
 
@@ -151,12 +156,14 @@ export class RunAnalysis {
    * @protected
    */
   protected buildJavaCommand(currentFileLocation: string) {
-    const extensionFolder: string | undefined =
-      this.extensionUri.fsPath + "/server/jar/server.jar";
+    const extensionFolder: string | undefined = vscode.Uri.joinPath(
+      this.extensionUri,
+      "/server/jar/server.jar",
+    ).fsPath;
 
     if (extensionFolder && currentFileLocation !== "") {
       return (
-        'java -jar "' +
+        `${SettingsService.getJavaCommand()} -jar "` +
         extensionFolder +
         '" ' +
         this.buildAnalysisCommandPortion(currentFileLocation)
@@ -187,24 +194,6 @@ export class RunAnalysis {
       copyBookCommand +
       (this.showDiagnostics ? "" : " -nd")
     );
-  }
-
-  /**
-   * Sends a given command to a terminal.
-   * Checks to see if one named "Analysis" is already created, if so clear and reuse it.
-   * @param command - The command to run from the terminal.
-   * @protected
-   */
-  protected sendToTerminal(command: string) {
-    const existingTerminal = vscode.window.terminals.find(
-      (term: Terminal) => term.name === "Analysis",
-    );
-    const terminal = existingTerminal
-      ? existingTerminal
-      : vscode.window.createTerminal("Analysis");
-
-    terminal.sendText(command);
-    terminal.show(true);
   }
 
   /**

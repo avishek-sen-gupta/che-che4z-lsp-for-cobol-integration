@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.usecases;
@@ -17,6 +17,8 @@ package org.eclipse.lsp.cobol.dialects.daco.usecases;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.dialects.daco.DaCoDialect;
@@ -65,8 +67,10 @@ public class TestDaCoCopyFrom5 {
             CopybookProcessingMode.DISABLED,
             ImmutableList.of(DaCoDialect.NAME),
             true,
-                ImmutableMap.of(), false,
-            ImmutableList.of()
-        ));
+            false,
+            SqlProcessing.ENABLED,
+            SqlDecimalComma.DISABLED,
+            ImmutableList.of(),
+            ImmutableMap.of()));
   }
 }

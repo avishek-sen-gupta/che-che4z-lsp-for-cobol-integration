@@ -63,16 +63,22 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
     private final DialectProcessingContext context;
     private final MessageService messageService;
     private final CopybookService copybookService;
+    private final boolean isSqlProcessingEnabled;
     private static final Pattern DOUBLE_DASH_SQL_COMMENT =
             Pattern.compile("--\\s[^\\r\\n]*", Pattern.MULTILINE);
 
 //    @Getter
 //    private final List<SyntaxError> errors = new LinkedList<>();
 
-    Db2SqlSubstitutingVisitor(DialectProcessingContext context, MessageService messageService, CopybookService copybookService) {
+    Db2SqlSubstitutingVisitor(DialectProcessingContext context, MessageService messageService, CopybookService copybookService, boolean isSqlProcessingEnabled) {
         this.context = context;
         this.messageService = messageService;
         this.copybookService = copybookService;
+        this.isSqlProcessingEnabled = isSqlProcessingEnabled;
+    }
+
+    Db2SqlSubstitutingVisitor(DialectProcessingContext context, MessageService messageService, CopybookService copybookService) {
+        this(context, messageService, copybookService, true);
     }
 
     @Override
@@ -355,6 +361,10 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
 
     @Override
     public List<Node> visitSqlCode(Db2SqlParser.SqlCodeContext ctx) {
+        if (!isSqlProcessingEnabled) {
+            return ImmutableList.of();
+        }
+
         String sqlCode = preProcessSqlComment(ctx);
 
         List<Node> nodes =

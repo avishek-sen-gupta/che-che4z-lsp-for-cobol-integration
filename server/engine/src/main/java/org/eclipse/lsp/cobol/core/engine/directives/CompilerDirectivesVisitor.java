@@ -9,17 +9,13 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.engine.directives;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.eclipse.lsp.cobol.AntlrRangeUtils;
 import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
 import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
@@ -130,36 +126,26 @@ public class CompilerDirectivesVisitor extends CompilerDirectivesParserBaseVisit
   }
 
   @Override
-  public Object visitCicsTranslatorOptions(
-      CompilerDirectivesParser.CicsTranslatorOptionsContext ctx) {
-    final Token t = ctx.getStart();
-    if (t != null) {
-      List<String> cicsDirectives =
-          analysisContext
-              .getPreprocessorsDirectives()
-              .computeIfAbsent("CICS", e -> new ArrayList<>());
-      cicsDirectives.add(t.getText());
-    }
-    return super.visitCicsTranslatorOptions(ctx);
-  }
+  public Object visitCobolJavaInteroperabilityOptions(
+      CompilerDirectivesParser.CobolJavaInteroperabilityOptionsContext ctx) {
+    for (TerminalNode commaToken : ctx.COMMACHAR()) {
+      if (commaToken.getText().length() <= 1) continue;
+      Range range =
+          CompilerDirectivesUtils.shiftRange(
+              AntlrRangeUtils.constructRange(commaToken), startPosition);
 
-  private static final Pattern CICS_DIRECTIVES_IN_LITERAL =
-      Pattern.compile("\\b(SP|LENGTH|NOLENGTH|EXCI|APOST|QUOTE)\\b", Pattern.CASE_INSENSITIVE);
-
-  @Override
-  public Object visitCicsTranslatorDirectives(
-      CompilerDirectivesParser.CicsTranslatorDirectivesContext ctx) {
-    final TerminalNode literal = ctx.LITERAL();
-    if (literal != null) {
-      List<String> cicsDirectives =
-          analysisContext
-              .getPreprocessorsDirectives()
-              .computeIfAbsent("CICS", e -> new ArrayList<>());
-      Matcher m = CICS_DIRECTIVES_IN_LITERAL.matcher(literal.getText());
-      while (m.find()) {
-        cicsDirectives.add(m.group());
-      }
+      Location location = new Location(analysisContext.getExtendedDocument().getUri(), range);
+      analysisContext
+          .getAccumulatedErrors()
+          .add(
+              SyntaxError.syntaxError()
+                  .errorSource(ErrorSource.PARSING)
+                  .location(new OriginalLocation(location, null))
+                  .suggestion(
+                      messageService.getMessage("compilerDirective.javaiop.spaceAfterComma"))
+                  .severity(ErrorSeverity.ERROR)
+                  .build());
     }
-    return super.visitCicsTranslatorDirectives(ctx);
+    return super.visitCobolJavaInteroperabilityOptions(ctx);
   }
 }

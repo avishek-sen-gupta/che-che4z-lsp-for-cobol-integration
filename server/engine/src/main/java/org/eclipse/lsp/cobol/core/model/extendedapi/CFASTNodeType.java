@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.model.extendedapi;
@@ -39,6 +39,7 @@ public enum CFASTNodeType {
   EXEC_CICS("execcics"),
   EXEC_CICS_RETURN("execcicsreturn"),
   EXEC_CICS_HANDLE("execcicshandle"),
+  EXEC_CICS_ABEND("execcicsabend"),
   EXEC_SQL("execsql"),
   EXEC_SQL_WHENEVER("execwhenever"),
   END_EXEC("endexec"),

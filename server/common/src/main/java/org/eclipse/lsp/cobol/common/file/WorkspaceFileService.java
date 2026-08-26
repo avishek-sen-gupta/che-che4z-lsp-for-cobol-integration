@@ -9,12 +9,11 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.file;
 
-import com.google.common.collect.ImmutableList;
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -23,15 +22,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.List;
-import java.util.function.BiPredicate;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
@@ -115,41 +107,6 @@ public class WorkspaceFileService implements FileSystemService {
       }
     }
     return resultStringBuilder.toString();
-  }
-
-  @Override
-  @NonNull
-  public List<String> listFilesInDirectory(final String path) {
-    final String[] pathSplittedByFirstAsterisk =
-        uriWithReplacedPlaceholdersToAsterisks(path).split("\\*", 2);
-    final String pathToResolve = pathSplittedByFirstAsterisk[0];
-    final boolean isPathContainsAsterisk = pathSplittedByFirstAsterisk.length >= 2;
-    int maxDepth = 1;
-    if (isPathContainsAsterisk) {
-      maxDepth = pathSplittedByFirstAsterisk[1].split("/").length + 1;
-    }
-
-    BiPredicate<Path, BasicFileAttributes> pathBasicFileAttributesBiPredicate =
-        (a, c) -> {
-          final String uriPath = a.toUri().getPath().replace("\\\\", "/");
-          return !isPathContainsAsterisk
-              || Pattern.compile(pathSplittedByFirstAsterisk[1]).matcher(uriPath).find();
-        };
-    Path start = Paths.get(pathToResolve);
-    if (!Files.isDirectory(start)) {
-      return ImmutableList.of();
-    }
-    try (Stream<Path> streamPath =
-        Files.find(start, maxDepth, pathBasicFileAttributesBiPredicate)) {
-      return streamPath
-          .map(Path::toFile)
-          .filter(File::isFile)
-          .map(File::getName)
-          .collect(Collectors.toList());
-    } catch (IOException e) {
-      LOG.error("An error occurred while reading list of files", e);
-    }
-    return ImmutableList.of();
   }
 
   /**

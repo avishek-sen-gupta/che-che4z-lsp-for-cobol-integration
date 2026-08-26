@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import {
@@ -18,20 +18,19 @@ import {
   CompletionItem,
   CompletionItemKind,
   CompletionItemProvider,
-  OutputChannel,
   Position,
   Progress,
   ProgressLocation,
   TextDocument,
   window,
 } from "vscode";
-import { CopybookDownloadService } from "./CopybookDownloadService";
 import {
   COPYBOOK_COMPLETIONS_SORT_PREFIX,
   DEFAULT_DIALECT,
 } from "../../constants";
-import { CopyStatementParser, DialectRegistry } from "../DialectRegistry";
-import { listLocalCopybooks } from "./LocalCopybooksService";
+import { DialectRegistry } from "../../dialect/DialectRegistry";
+import { loadProcessorGroupCopybooksLibs } from "../ProcessorGroups";
+import type { CopyStatementParser } from "@code4z/cobol-dialect-api";
 
 const isDefaultCopyStatement: CopyStatementParser = (statement: string) => {
   const regex = /^.*\bCOPY(?:\s+"?'?)([\S]+)?$/i;
@@ -52,11 +51,6 @@ const isSQLCopyStatement: CopyStatementParser = (statement: string) => {
 };
 
 export class CopybooksCompletionProvider implements CompletionItemProvider {
-  constructor(
-    private cds?: CopybookDownloadService,
-    private outputChannel?: OutputChannel,
-  ) {}
-
   async provideCompletionItems(
     document: TextDocument,
     position: Position,
@@ -101,32 +95,20 @@ export class CopybooksCompletionProvider implements CompletionItemProvider {
         prefix = prefix?.toUpperCase();
 
         if (isCopy) {
-          copybooksLoadingPromises.push(
-            (async () => {
-              const list = await this.cds?.listRemoteCopybooks(
-                document.uri.toString(),
-                dialect.name,
-              );
-              list?.forEach((copybook) => {
-                if (!prefix || copybook.startsWith(prefix)) {
-                  copybooks.add(copybook);
-                }
-              });
-            })(),
+          const pgLibs = await loadProcessorGroupCopybooksLibs(
+            document.uri,
+            dialect.name,
           );
+
           copybooksLoadingPromises.push(
-            (async () => {
-              const list = await listLocalCopybooks(
-                document.uri.toString(),
-                dialect.name,
-                this.outputChannel,
-              );
+            ...pgLibs.map(async (lib) => {
+              const list = await lib.listCopybooks(document.uri, dialect.name);
               list?.forEach((copybook) => {
                 if (!prefix || copybook.startsWith(prefix)) {
                   copybooks.add(copybook);
                 }
               });
-            })(),
+            }),
           );
         }
       }

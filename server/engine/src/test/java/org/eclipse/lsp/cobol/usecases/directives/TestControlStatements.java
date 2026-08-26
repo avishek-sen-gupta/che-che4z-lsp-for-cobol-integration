@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.usecases.directives;
@@ -44,7 +44,8 @@ class TestControlStatements {
         Arguments.of("AR(E)"),
         Arguments.of("CICS"),
         Arguments.of("NOCICS"),
-        Arguments.of("CICS(\"string3\")"),
+        Arguments.of("CICS('APOST')"),
+        Arguments.of("CICS(\"APOST\")"),
         Arguments.of("CODEPAGE(1140)"),
         Arguments.of("CP(1140)"),
         Arguments.of("CURRENCY($)"),

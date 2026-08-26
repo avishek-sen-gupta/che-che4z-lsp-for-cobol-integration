@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.ibm;
@@ -83,7 +83,9 @@ public class PreprocessorStage
             ctx.getLanguageId());
 
     CopybooksRepository copybooks =
-        grammarPreprocessor.preprocess(context, preprocessor).unwrap(preprocessorErrors::addAll);
+        grammarPreprocessor
+            .preprocess(context, preprocessor, false)
+            .unwrap(preprocessorErrors::addAll);
     extendedDocument.commitTransformations();
 
     ctx.getAccumulatedErrors().addAll(preprocessorErrors);

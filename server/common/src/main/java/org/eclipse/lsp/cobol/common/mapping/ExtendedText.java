@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.mapping;
@@ -17,6 +17,7 @@ package org.eclipse.lsp.cobol.common.mapping;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import lombok.Getter;
@@ -49,13 +50,14 @@ public class ExtendedText {
 
   @Override
   public String toString() {
-    final StringBuilder builder = new StringBuilder();
+    int expectedSize = 0;
+    for (ExtendedTextLine line : lines) {
+      expectedSize += line.getCharacters().size() + 1;
+    }
+    final StringBuilder builder = new StringBuilder(expectedSize);
     int index = 0;
     for (ExtendedTextLine line : lines) {
-      String lineText = line.toString();
-      if (!lineText.isEmpty()) {
-        builder.append(lineText);
-      }
+      line.appendString(builder);
       if (++index != lines.size()) {
         builder.append("\n");
       }
@@ -298,7 +300,7 @@ public class ExtendedText {
    */
   public void addLineBreak(Position position) {
     ExtendedTextLine line = lines.get(position.getLine());
-    ExtendedTextLine newLine = line.subline(position.getCharacter(), line.size() - 1);
+    ExtendedTextLine newLine = line.subline(position.getCharacter(), line.size());
     line.trim(position.getCharacter());
 
     lines.add(position.getLine() + 1, newLine);
@@ -329,6 +331,20 @@ public class ExtendedText {
         return;
       }
     }
+  }
+
+  /**
+   * Replaces given range of text with a new text using replacement map
+   *
+   * @param range - range of text to replace
+   * @param statementRange - a statement range within the text range
+   * @param statementMap - a map of token names and its ranges from the original text
+   * @param replacementMap - a new text replacement map
+   * @return a HashMap of mapped tokens
+   */
+  public Map<String, TextMapReplacer.Token> replace(
+      Range range, Range statementRange, Map<String, Range> statementMap, String replacementMap) {
+    return TextMapReplacer.execute(this, range, statementRange, statementMap, replacementMap);
   }
 
   private MappedCharacter getCharacterAt(Position position) {

@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.model.tree;
@@ -27,5 +27,9 @@ import org.eclipse.lsp.cobol.common.model.NodeType;
 public class ParagraphNode extends CodeBlockDefinitionNode {
   public ParagraphNode(Locality location, String name, String text, Locality definition) {
     super(location, name, text, definition, NodeType.PARAGRAPH);
+  }
+
+  public String getFullVariableDescription() {
+    return text;
   }
 }

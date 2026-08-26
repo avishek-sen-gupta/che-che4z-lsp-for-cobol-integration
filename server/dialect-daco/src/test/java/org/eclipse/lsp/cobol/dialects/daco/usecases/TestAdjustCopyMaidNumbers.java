@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.usecases;
@@ -71,7 +71,7 @@ class TestAdjustCopyMaidNumbers {
             "invalid",
             new Diagnostic(
                 new Range(),
-                "Variable NOT-ADJUSTED is not defined",
+                "Variable NOT-ADJUSTED does not exist in structure TABMAX-PW7",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText())),
         ImmutableList.of(),

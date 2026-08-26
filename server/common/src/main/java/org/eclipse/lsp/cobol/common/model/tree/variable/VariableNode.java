@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.model.tree.variable;
@@ -18,8 +18,11 @@ import static java.util.stream.Collectors.toList;
 import static org.eclipse.lsp.cobol.common.error.ErrorSeverity.ERROR;
 import static org.eclipse.lsp.cobol.common.model.NodeType.VARIABLE;
 import static org.eclipse.lsp.cobol.common.model.NodeType.VARIABLE_DEFINITION_NAME;
+import static org.eclipse.lsp.cobol.common.model.tree.variable.VariableType.*;
 
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -34,18 +37,21 @@ import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.utils.RangeUtils;
 import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.MarkupContent;
+import org.eclipse.lsp4j.MarkupKind;
 import org.eclipse.lsp4j.Position;
 import org.eclipse.lsp4j.Range;
 
 /** The abstract class for all variable definitions. */
+@Getter
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
 public abstract class VariableNode extends Node implements DefinedAndUsedStructure {
   public static final String PREFIX = "  ";
-  @Getter private final VariableType variableType;
-  @Getter private final String name;
-  @Getter @Setter private boolean global;
-  @Getter @EqualsAndHashCode.Exclude private final List<Location> usages = new ArrayList<>();
+  private final VariableType variableType;
+  private final String name;
+  @Setter private boolean global;
+  @EqualsAndHashCode.Exclude private final List<Location> usages = new ArrayList<>();
 
   protected VariableNode(
       Locality location, String name, VariableType variableType, boolean global) {
@@ -137,39 +143,61 @@ public abstract class VariableNode extends Node implements DefinedAndUsedStructu
   /**
    * Get user friendly variable description.
    *
-   * @return the string with described variable.
+   * @return the List of {@link MarkupContent} with described variable.
    */
-  public String getFullVariableDescription() {
+  public List<MarkupContent> getFullVariableDescription() {
     StringBuilder prefix = new StringBuilder();
-    List<String> lines = new ArrayList<>();
-    for (String parentLine : parentsDescription()) {
-      lines.add(prepend(prefix.toString(), parentLine));
-      prefix.append(PREFIX);
+    List<MarkupContent> lines = new ArrayList<>();
+    List<MarkupContent> otherDetails = new ArrayList<>();
+    for (VariableNode node : getParentVariableNodes()) {
+      List<MarkupContent> details =
+          Arrays.stream(node.getVariableDisplayString().split("\\r?\\n"))
+              .map(line -> new MarkupContent(MarkupKind.MARKDOWN, line))
+              .collect(toList());
+      if (doesNodeHaveLevel(node)) {
+        lines.addAll(details);
+      } else {
+        otherDetails.addAll(details);
+      }
     }
-    lines.add(prepend(prefix.toString(), getVariableDisplayString()));
+    if (!lines.isEmpty()) prefix.append(PREFIX);
+    Arrays.stream(getVariableDisplayString().split("\\r?\\n"))
+        .map(line -> new MarkupContent(MarkupKind.MARKDOWN, prepend(prefix.toString(), line)))
+        .forEach(lines::add);
+
     prefix.append(PREFIX);
-    lines.addAll(getChildrenDescription(prefix.toString()));
-    return String.join("\n", lines);
+    List<MarkupContent> childrenDescription = getChildrenDescription(prefix.toString());
+    lines.addAll(childrenDescription);
+    if (!otherDetails.isEmpty()) {
+      lines.add(new MarkupContent(MarkupKind.MARKDOWN, ""));
+      lines.addAll(otherDetails);
+    }
+    return lines;
   }
 
-  private List<String> parentsDescription() {
+  private static Boolean doesNodeHaveLevel(VariableNode vn) {
+    return !ImmutableList.of(FD, SD, MAP_NAME).contains(vn.getVariableType());
+  }
+
+  private List<VariableNode> getParentVariableNodes() {
     return getNearestParentByType(VARIABLE)
         .map(VariableNode.class::cast)
         .map(
             variableNode -> {
-              List<String> result = variableNode.parentsDescription();
-              result.add(variableNode.getVariableDisplayString());
+              List<VariableNode> result = variableNode.getParentVariableNodes();
+              result.add(variableNode);
               return result;
             })
         .orElseGet(ArrayList::new);
   }
 
-  protected List<String> getChildrenDescription(String prefix) {
+  protected List<MarkupContent> getChildrenDescription(String prefix) {
     return getChildren().stream()
         .filter(hasType(VARIABLE))
         .map(VariableNode.class::cast)
         .map(VariableNode::getDisplayStringWithConditionals)
         .map(description -> prepend(prefix, description))
+        .map(desc1 -> new MarkupContent(MarkupKind.MARKDOWN, desc1))
         .collect(toList());
   }
 

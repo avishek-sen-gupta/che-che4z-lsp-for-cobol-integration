@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.implicitDialects.cics.utility;
@@ -180,9 +180,6 @@ public class CICSSendOptionsCheckUtility extends CICSOptionsCheckBaseUtility {
     checkHasMutuallyExclusiveOptions("ACTPARTN or LDC", ctx.ACTPARTN(), ctx.LDC());
     checkHasMutuallyExclusiveOptions(
         "TERMINAL or SET or PAGING", ctx.TERMINAL(), ctx.SET(), ctx.PAGING());
-    if (!ctx.WAIT().isEmpty() || !ctx.LAST().isEmpty()) {
-      checkHasMandatoryOptions(ctx.TERMINAL(), ctx, "TERMINAL");
-    }
     if (!ctx.LENGTH().isEmpty()) {
       checkHasMandatoryOptions(ctx.FROM(), ctx, "FROM");
     }

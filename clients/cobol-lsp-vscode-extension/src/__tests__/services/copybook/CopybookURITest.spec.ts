@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as vscode from "vscode";
 import { CopybookURI } from "../../../services/copybook/CopybookURI";
@@ -29,19 +29,15 @@ describe("CopybooksPathGenerator tests", () => {
     ];
   });
 
-  it("creates copybook path", () => {
-    expect(
-      CopybookURI.createCopybookPath(
-        [profile],
-        dataset,
-        "copybook",
-        "downloadFolder",
-      ),
-    ).toEqual("downloadFolder/zowe/copybooks/profile/dataset/copybook");
-  });
   it("creates dataset path", () => {
     expect(
-      CopybookURI.createDatasetPath([profile], dataset, "downloadFolder"),
-    ).toEqual({ path: "downloadFolder/zowe/copybooks/profile/dataset" });
+      CopybookURI.createDatasetPath(
+        [profile],
+        dataset,
+        vscode.Uri.file("/downloadFolder"),
+      ),
+    ).toEqual(
+      vscode.Uri.file("/downloadFolder/zowe/copybooks/profile/dataset"),
+    );
   });
 });

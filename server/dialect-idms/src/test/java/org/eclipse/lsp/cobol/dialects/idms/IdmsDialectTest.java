@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.idms;
@@ -28,6 +28,6 @@ class IdmsDialectTest {
   void testKeywords() {
     IdmsDialect dialect = new IdmsDialect(mock(CopybookService.class), mock(MessageService.class));
     Map<String, String> result = dialect.getKeywords();
-    assertEquals(47, result.size());
+    assertEquals(58, result.size());
   }
 }

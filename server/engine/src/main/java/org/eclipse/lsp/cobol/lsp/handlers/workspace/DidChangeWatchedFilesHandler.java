@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers.workspace;
@@ -17,14 +17,21 @@ package org.eclipse.lsp.cobol.lsp.handlers.workspace;
 import com.google.inject.Inject;
 import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashSet;
+import java.util.AbstractMap;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.lsp.cobol.common.UserInterruptException;
 import org.eclipse.lsp.cobol.lsp.DisposableLSPStateService;
 import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
@@ -33,117 +40,180 @@ import org.eclipse.lsp4j.DidChangeWatchedFilesParams;
 import org.eclipse.lsp4j.FileChangeType;
 import org.eclipse.lsp4j.FileEvent;
 
-/** LSP DidChangeWatchedFiles Handler */
+/** Handles LSP DidChangeWatchedFiles events for COBOL language server */
 @Slf4j
 public class DidChangeWatchedFilesHandler {
-  private final DisposableLSPStateService disposableLSPStateService;
+  private static final String FILE_SCHEME = "file";
+  private static final String GIT_SCHEME_PREFIX = "git:";
+  private static final String VSCODE_SCHEME_PREFIX = "vscode:";
+
+  private final DisposableLSPStateService lspStateService;
   private final SourceUnitGraph sourceUnitGraph;
   private final AsyncAnalysisService asyncAnalysisService;
 
   @Inject
   public DidChangeWatchedFilesHandler(
-      DisposableLSPStateService disposableLSPStateService,
+      DisposableLSPStateService lspStateService,
       SourceUnitGraph sourceUnitGraph,
       AsyncAnalysisService asyncAnalysisService) {
-    this.disposableLSPStateService = disposableLSPStateService;
+    this.lspStateService = lspStateService;
     this.sourceUnitGraph = sourceUnitGraph;
     this.asyncAnalysisService = asyncAnalysisService;
   }
 
   /**
-   * Handle didChangeWatchedFiles LSP event.
+   * Processes file system change notifications
    *
-   * @param params DidChangeWatchedFilesParams
+   * @param params LSP notification parameters containing file changes
    */
   public void didChangeWatchedFiles(@NonNull DidChangeWatchedFilesParams params) {
-    if (disposableLSPStateService.isServerShutdown()) return;
-    if (isRelevant(params.getChanges())) {
-      Set<FileEvent> changedFiles = new HashSet<>(params.getChanges());
-      LOG.info(
-          "[File change event] : {}",
-          changedFiles.stream().map(FileEvent::getUri).collect(Collectors.joining(", ")));
-      changedFiles.forEach(
-          file -> {
-            URI uri = URI.create(file.getUri());
-            if ("file".equals(uri.getScheme())) {
-              LOG.info("[File change event] uri in progress : {}", uri);
-              Path path = Paths.get(uri);
-              if (file.getType() == FileChangeType.Deleted) {
-                path = path.getParent();
-              }
-              String uriString = path.toUri().toString();
-              if (sourceUnitGraph.isFileOpened(uriString)) {
-                LOG.debug(
-                    "[File change event]  ignoring event for uri : {} as its already opened in"
-                        + " editor",
-                    uri);
-                // opened files are taken care by textChange events
-                return;
-              }
-              boolean isDirectory = Files.isDirectory(path);
-              if (!isDirectory) {
-                triggerAnalysisForChangedFile(uriString);
-              } else {
-                triggerAnalysisForFilesInDirectory(path);
-              }
-            }
-          });
-    }
+    if (lspStateService.isServerShutdown()) return;
+
+    List<FileEvent> relevantChanges = filterRelevantChanges(params.getChanges());
+    if (relevantChanges.isEmpty()) return;
+
+    logFileChanges(relevantChanges.stream().map(FileEvent::getUri).collect(Collectors.toSet()));
+    processFileEvents(relevantChanges);
   }
 
-  private boolean isRelevant(List<FileEvent> changes) {
+  private List<FileEvent> filterRelevantChanges(List<FileEvent> changes) {
     return changes.stream()
-        .filter(c -> !isGitFolder(c.getUri()))
-        .anyMatch(c -> !c.getUri().startsWith("git:"));
+        .filter(this::isRelevantFileChange)
+        .filter(
+            event -> {
+              final boolean inEditor = isOpenInEditor(event.getUri());
+              if (inEditor) {
+                LOG.debug("Ignoring change for open file: {}", event.getUri());
+              }
+              return !inEditor;
+            })
+        .collect(Collectors.toList());
   }
 
-  private static boolean isGitFolder(String uri) {
+  private boolean isRelevantFileChange(FileEvent change) {
+    return !isGitMetadataFile(change.getUri())
+        && !change.getUri().startsWith(GIT_SCHEME_PREFIX)
+        && !isVscodeSchemaFile(change.getUri())
+        && !isZoweFspCacheFile(change.getUri());
+  }
+
+  private boolean isGitMetadataFile(String uri) {
     return uri.startsWith("file:") && uri.contains("/.git/");
   }
 
-  private void triggerAnalysisForChangedFile(String uri) {
-    List<String> uris = sourceUnitGraph.getAllAssociatedFilesForACopybook(uri);
-    String fileContent = null;
-    if (uris.isEmpty()) {
-      LOG.debug("[File change event]  trigger analysis for all opened document");
-      analyseAllOpenedDocument();
+  private boolean isVscodeSchemaFile(String uri) {
+    return uri.startsWith(VSCODE_SCHEME_PREFIX);
+  }
+
+  static final Pattern ZOWE_FSP_PATTERN = Pattern.compile(".*/zowe-fsp/v\\d+\\.[a-f0-9]{64}$");
+
+  private boolean isZoweFspCacheFile(String uri) {
+    return ZOWE_FSP_PATTERN.matcher(uri).matches();
+  }
+
+  private void logFileChanges(Set<String> changes) {
+    LOG.info("[File change event]: {}", changes.stream().collect(Collectors.joining(", ")));
+  }
+
+  private void processFileEvents(List<FileEvent> changes) {
+    if (changes.stream().anyMatch(DidChangeWatchedFilesHandler::isCreateOrDelete)) {
+      analyzeAllOpenedDocuments();
       return;
     }
-    if (Files.exists(Paths.get(URI.create(uri)))) {
-      sourceUnitGraph.updateContent(uri);
-      fileContent = sourceUnitGraph.getContent(uri);
-    }
-    if (!sourceUnitGraph.isFileOpened(uri)) {
-      LOG.debug("[File change event]  trigger analysis for uris: {}", String.join(", ", uris));
-      asyncAnalysisService.reanalyseCopybooksAssociatedPrograms(
-          uris, uri, fileContent, SourceUnitGraph.EventSource.FILE_SYSTEM);
-    }
-  }
 
-  private void triggerAnalysisForFilesInDirectory(Path path) {
-    // Only care for deleted copybooks as they impact the diagnostics
-    Set<String> affectedPrograms =
-        sourceUnitGraph.getCopybookUriInsideFolder(path.toUri().toString()).stream()
-            .flatMap(
-                copybookUri ->
-                    sourceUnitGraph.getAllAssociatedFilesForACopybook(copybookUri).stream())
+    final List<Pair<FileEvent, URI>> data =
+        changes.stream()
+            .map(event -> ImmutablePair.of(event, toUri(event)))
+            .filter(p -> p.getRight() != null)
+            .collect(Collectors.toList());
+
+    if (data.stream()
+        .map(p -> p.getRight())
+        .anyMatch(DidChangeWatchedFilesHandler::isDirectoryUri)) {
+      analyzeAllOpenedDocuments();
+      return;
+    }
+
+    Set<ChangeEvent> changeEvents =
+        data.stream()
+            .map(p -> getEffectedSourceChangeEvent(p.getLeft().getUri()))
+            .filter(Objects::nonNull)
             .collect(Collectors.toSet());
 
-    affectedPrograms.forEach(this::triggerAnalysisForChangedFile);
+    Map<String, Set<String>> cobolSourceToCopybookUris =
+        changeEvents.stream()
+            .flatMap(
+                e ->
+                    e.getAffectedUris().stream()
+                        .map(val -> new AbstractMap.SimpleEntry<>(val, e.getUri())))
+            .collect(
+                Collectors.groupingBy(
+                    Map.Entry::getKey,
+                    Collectors.mapping(Map.Entry::getValue, Collectors.toSet())));
 
-    if (affectedPrograms.isEmpty()) {
-      LOG.debug(
-          "[File change event]  trigger analysis for all opened document due to event for path: {}",
-          path);
-      analyseAllOpenedDocument();
+    cobolSourceToCopybookUris.forEach(
+        (cobolDocUri, copybookUris) -> {
+          asyncAnalysisService.reanalyseProgram(cobolDocUri, copybookUris);
+        });
+  }
+
+  private static boolean isCreateOrDelete(FileEvent event) {
+    return event.getType() == FileChangeType.Deleted || event.getType() == FileChangeType.Created;
+  }
+
+  private static URI toUri(FileEvent event) {
+    try {
+      return URI.create(event.getUri());
+    } catch (IllegalArgumentException e) {
+      LOG.error("Invalid URI in FileEvent:{}, error:{}", event.getUri(), e.getMessage());
+      return null;
     }
   }
 
-  private void analyseAllOpenedDocument() {
+  private static boolean isDirectoryUri(URI uri) {
+    return FILE_SCHEME.equals(uri.getScheme()) && Files.isDirectory(Paths.get(uri));
+  }
+
+  private boolean isOpenInEditor(String uri) {
+    return sourceUnitGraph.isFileOpened(uri);
+  }
+
+  private ChangeEvent getEffectedSourceChangeEvent(String uri) {
+    List<String> associatedUris = sourceUnitGraph.getAllAssociatedFilesForACopybook(uri);
+    if (associatedUris.isEmpty()) {
+      return null;
+    }
+    return new ChangeEvent(uri, associatedUris);
+  }
+
+  private void analyzeAllOpenedDocuments() {
     try {
-      asyncAnalysisService.reanalyseOpenedPrograms(SourceUnitGraph.EventSource.FILE_SYSTEM);
+      asyncAnalysisService.reanalyseOpenedPrograms();
     } catch (InterruptedException e) {
-      throw new UserInterruptException("analysis interrupted by user");
+      Thread.currentThread().interrupt();
+      throw new UserInterruptException("Analysis interrupted", e);
+    }
+  }
+
+  @Getter
+  @EqualsAndHashCode
+  private static final class ChangeEvent {
+    private final String uri;
+    private final boolean isDirectory;
+    private final List<String> affectedUris;
+
+    private ChangeEvent(String uri, boolean isDirectory) {
+      this(uri, isDirectory, Collections.emptyList());
+    }
+
+    private ChangeEvent(String uri, List<String> affectedUris) {
+      this(uri, false, affectedUris);
+    }
+
+    private ChangeEvent(String uri, boolean isDirectory, List<String> affectedUris) {
+      this.uri = uri;
+      this.isDirectory = isDirectory;
+      this.affectedUris = affectedUris;
     }
   }
 }

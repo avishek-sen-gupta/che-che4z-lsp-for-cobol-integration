@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.engine.processors;
@@ -212,7 +212,7 @@ public class SectionNodeProcessorHelper {
       if (node instanceof VariableDefinitionNode) {
         VariableDefinitionNode varNode = (VariableDefinitionNode) node;
         if (varNode.getLocality().equals(variable.getLocality())
-            && varNode.getVariableName().equals(variable.getVariableName())) {
+            && Objects.equals(varNode.getVariableName(), variable.getVariableName())) {
           return true;
         }
       }
@@ -495,7 +495,8 @@ public class SectionNodeProcessorHelper {
               getName(definitionNode),
               definitionNode.isGlobal(),
               definitionNode.hasRedefines(),
-              definitionNode.getUsage());
+              definitionNode.getUsage(),
+              definitionNode.isExternal());
       createVariableNameNode(variable, definitionNode.getVariableName());
       return new ResultWithErrors<>(variable, ImmutableList.of());
     }

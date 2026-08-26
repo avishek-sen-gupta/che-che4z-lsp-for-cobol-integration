@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.engine.dialects;
@@ -22,11 +22,13 @@ import java.util.List;
 import org.eclipse.lsp.cobol.common.DialectRegistryItem;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
+import org.eclipse.lsp.cobol.common.copybook.PredefinedCopybookStore;
 import org.eclipse.lsp.cobol.common.dialects.CobolDialect;
 import org.eclipse.lsp.cobol.common.dialects.DialectOutcome;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
 import org.eclipse.lsp.cobol.common.mapping.ExtendedDocument;
 import org.eclipse.lsp.cobol.common.message.MessageService;
+import org.eclipse.lsp.cobol.core.engine.dialects.v2.DialectProcessingService;
 import org.eclipse.lsp.cobol.core.engine.errors.ErrorFinalizerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,19 +40,28 @@ class DialectServiceTest {
   DialectService dialectService;
   DialectDiscoveryService ddService;
   CopybookService copybookService;
+  PredefinedCopybookStore predefinedCopybookService;
   MessageService messageService;
+  DialectProcessingService dialectProcessingService;
+  PredefinedCopybookStore predefinedCopybookStore;
 
   @BeforeEach
   void init() {
     ddService = mock(DialectDiscoveryService.class);
     copybookService = mock(CopybookService.class);
     messageService = mock(MessageService.class);
+    predefinedCopybookService = mock(PredefinedCopybookStore.class);
     ErrorFinalizerService errorFinalizerService = mock(ErrorFinalizerService.class);
-
     when(ddService.loadDialects(copybookService, messageService)).thenReturn(ImmutableList.of());
 
     dialectService =
-        new DialectService(ddService, copybookService, messageService, errorFinalizerService);
+        new DialectService(
+            ddService,
+            copybookService,
+            predefinedCopybookStore,
+            messageService,
+            errorFinalizerService,
+            dialectProcessingService);
   }
 
   private CobolDialect configureDialect(DialectProcessingContext context, String name) {
@@ -79,7 +90,7 @@ class DialectServiceTest {
         .thenReturn(ImmutableList.of(dialect));
     List<DialectRegistryItem> dialectRegistry =
         ImmutableList.of(
-            new DialectRegistryItem(dialect.getName(), URI.create(""), "", "extensionId"));
+            new DialectRegistryItem(dialect.getName(), 1, URI.create(""), "", "extensionId"));
     dialectService.updateDialects(dialectRegistry);
 
     dialectService.process(ImmutableList.of("dialect"), context);
@@ -105,8 +116,8 @@ class DialectServiceTest {
 
     List<DialectRegistryItem> dialectRegistry =
         ImmutableList.of(
-            new DialectRegistryItem(dialect1.getName(), URI.create(""), "", "extensionId"),
-            new DialectRegistryItem(dialect2.getName(), URI.create(""), "", "extensionId"));
+            new DialectRegistryItem(dialect1.getName(), 1, URI.create(""), "", "extensionId"),
+            new DialectRegistryItem(dialect2.getName(), 1, URI.create(""), "", "extensionId"));
 
     InOrder inOrder = inOrder(dialect1, dialect2);
 

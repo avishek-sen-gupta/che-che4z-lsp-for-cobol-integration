@@ -9,11 +9,12 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.error;
 
+import java.util.List;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -21,6 +22,7 @@ import org.eclipse.lsp.cobol.common.mapping.OriginalLocation;
 import org.eclipse.lsp.cobol.common.message.MessageTemplate;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp4j.DiagnosticRelatedInformation;
+import org.eclipse.lsp4j.DiagnosticTag;
 
 /**
  * This value class represents a syntax or semantic error found during the analysis. The finalized
@@ -39,7 +41,8 @@ public class SyntaxError {
   @EqualsAndHashCode.Include ErrorSeverity severity;
   ErrorCode errorCode;
   @EqualsAndHashCode.Include ErrorSource errorSource;
-  @EqualsAndHashCode.Include DiagnosticRelatedInformation relatedInformation;
+  @EqualsAndHashCode.Include List<DiagnosticRelatedInformation> relatedInformation;
+  @EqualsAndHashCode.Include List<DiagnosticTag> tags;
 
   @EqualsAndHashCode.Include
   private String matchErrorCode() {
@@ -66,7 +69,8 @@ public class SyntaxError {
           severity,
           errorCode,
           errorSource,
-          relatedInformation);
+          relatedInformation,
+          tags);
     }
   }
 }

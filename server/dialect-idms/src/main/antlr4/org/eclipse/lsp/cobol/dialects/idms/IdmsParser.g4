@@ -9,14 +9,14 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 parser grammar IdmsParser;
 options {tokenVocab = IdmsLexer;  superClass = MessageServiceParser; contextSuperClass = org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;}
 
 startRule: .*? idmsRules* EOF;
-idmsRules: (idmsStatements | idmsSections | idmsIfStatement | ifStatement | copyIdmsStatement) .*?;
+idmsRules: (idmsStatements | obtainLRStatement | idmsSections | idmsIfStatement | ifStatement | copyIdmsStatement) .*?;
 
 idmsSections
    : idmsControlSection | schemaSection | mapSection
@@ -25,7 +25,7 @@ idmsSections
 // -- copy section ----------------------------------
 
 copyIdmsStatement
-    : LEVEL_NUMBER? COPY IDMS copyIdmsOptions (DOT_FS | SEMICOLON_FS)?
+    : LEVEL_NUMBER? COPY IDMS copyIdmsOptions endClause?
     ;
 
 copyIdmsOptions
@@ -152,11 +152,11 @@ idmsStatements
     ;
 
 idmsOptTermStatement
-    : idmsStmtsOptTermOn endClause? idmsOnClause?
+    : idmsStmtsOptTermOn endClause? imperativeStatementCall? idmsOnClause?
     ;
 
 idmsMandTermStatement
-    : idmsStmtsMandTermOn (SEMICOLON_FS idmsOnClause? | DOT_FS)
+    : idmsStmtsMandTermOn (SEMICOLON_FS idmsOnClause? | DOT_FS | imperativeStatementCall)
     ;
 
 
@@ -403,7 +403,11 @@ enqueueNameClause
 // erase statement
 
 eraseStatement
-   : ERASE idms_db_entity_name ((PERMANENT | SELECTIVE | ALL) MEMBERS?)?
+   : ERASE  idms_db_entity_name
+     ( (PERMANENT | SELECTIVE | ALL) MEMBERS?
+     | eraseStoreModifyLrStatementsOptions
+     |
+     )
    ;
 
 // find statement
@@ -694,7 +698,7 @@ idmsWaitNowaitClause
 
 // modify statement
 modifyStatement
-    : MODIFY  ((MAP modifyMapClause) | idms_db_entity_name )
+    : MODIFY  ((MAP modifyMapClause) | (idms_db_entity_name eraseStoreModifyLrStatementsOptions?))
     ;
 // modify map statement
 modifyMapClause
@@ -787,7 +791,7 @@ startpageStatement
 
 // store statement
 storeStatement
-    : STORE idms_db_entity_name
+    : STORE idms_db_entity_name eraseStoreModifyLrStatementsOptions?
     ;
 
 // transfer statement
@@ -815,7 +819,7 @@ waitEventListClause
 // write IDMS
 writeIdmsStatement
    : WRITE (writeJournalClause | writeLineClause | writeLogClause | writePrinterClause | writeTerminalClause |
-            writeThenReadClause) idmsOnClause?
+            writeThenReadClause)
    ;
 
 writeJournalClause
@@ -878,7 +882,7 @@ writeThenReadClause
 
 // read statement
 readStatement
-   : READ (readLineFromTerminalClause | readTerminalClause) idmsOnClause?
+   : READ (readLineFromTerminalClause | readTerminalClause)
    ;
 
 readTerminalClause
@@ -894,7 +898,7 @@ readLineFromTerminalClause
 
 // accept statement
 acceptStatement
-    : ACCEPT (acceptIdmsDcClause idmsOnClause? | acceptIdmsDbClause idmsOnClause?)
+    : ACCEPT (acceptIdmsDcClause  | acceptIdmsDbClause )
     ;
 
 acceptIdmsDcClause
@@ -937,7 +941,7 @@ currencyPageInfo
 // delete statement
 
 deleteStatement
-    : DELETE deleteIdmsDCStatement idmsOnClause?
+    : DELETE deleteIdmsDCStatement
     ;
 
 deleteIdmsDCStatement
@@ -967,7 +971,7 @@ deleteTableClause
 // return statment
 
 returnStatement
-    : RETURN idmsReturn idmsOnClause?
+    : RETURN idmsReturn
     ;
 
 idmsReturn
@@ -992,7 +996,7 @@ sendIdmsToClause
 // set statement
 
 setStatement
-    : SET setIdmsDcStatement idmsOnClause?
+    : SET setIdmsDcStatement
     ;
 
 setIdmsDcStatement
@@ -1204,7 +1208,8 @@ cobolKeywords
    ;
 
 idmsKeywords
-   : DAY | DATE | DAY_OF_WEEK | TIME
+   : DAY | DATE | DAY_OF_WEEK | TIME | ALL | MATCHES | CONTAINS | AND
+   | EQ | GE | GT | LT | LE | OR | WHERE
    ;
 
 cobolCompilerDirectivesKeywords
@@ -1223,5 +1228,27 @@ cobolCompilerDirectivesKeywords
     ;
 
 endClause
-    : (DOT_FS | SEMICOLON_FS)
+    : DOT_FS
     ;
+
+obtainLRStatement
+    : OBTAIN (FIRST|NEXT)? logicalRecordName
+      (INTO altLogicalRecordLocation)?
+      (WHERE booleanExpression)?
+      imperativeStatementCall?
+    ;
+
+eraseStoreModifyLrStatementsOptions
+    : FROM altLogicalRecordLocation (WHERE booleanExpression)? imperativeStatementCall?
+    | WHERE booleanExpression imperativeStatementCall?
+    | imperativeStatementCall
+ ;
+
+pathStatus: {validateLength(_input.LT(1).getText(), "path-status", 16);} cobolWord;
+imperativeStatementCall: ON pathStatus;
+booleanExpression: NOT? (comparison | logicalRecordField) ((AND | OR) NOT?  (comparison | logicalRecordField))*;
+logicalRecordField: cobolWord | literal;
+comparison: ((logicalRecordField | arithmeticExpression) (OF LR)?) (operator ((logicalRecordField | arithmeticExpression) (OF LR)?)) ;
+operator: CONTAINS | MATCHES | EQ | EQUALCHAR | NE | GT | MORETHANCHAR | LT | LESSTHANCHAR | GE | LE;
+altLogicalRecordLocation: idms_db_entity_name;
+logicalRecordName: cobolWord;

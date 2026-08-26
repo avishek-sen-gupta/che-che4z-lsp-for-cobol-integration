@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -52,7 +52,7 @@ class TestElementWithPICNotAllowedAsGroup {
             "2",
             new Diagnostic(
                 new Range(),
-                "Variable CHILD1 is not defined",
+                "Variable CHILD1 does not exist in structure PARENT",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText())));
   }

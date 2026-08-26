@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.implicitDialects.sql;
@@ -60,6 +60,7 @@ class Db2SqlVisitor extends MarkerDb2SqlVisitor {
   private final DialectProcessingContext context;
   private final MessageService messageService;
   private final CopybookService copybookService;
+  private final boolean isSqlProcessingEnabled;
   private static final Pattern DOUBLE_DASH_SQL_COMMENT =
       Pattern.compile("--\\s[^\\r\\n]*", Pattern.MULTILINE);
 
@@ -380,6 +381,10 @@ class Db2SqlVisitor extends MarkerDb2SqlVisitor {
 
   @Override
   public List<Node> visitSqlCode(Db2SqlParser.SqlCodeContext ctx) {
+    if (!isSqlProcessingEnabled) {
+      return ImmutableList.of();
+    }
+
     String sqlCode = preProcessSqlComment(ctx);
 
     List<Node> nodes =
@@ -433,6 +438,7 @@ class Db2SqlVisitor extends MarkerDb2SqlVisitor {
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     Db2SqlExecParser parser = new Db2SqlExecParser(tokens);
     Db2ErrorListener listener = new Db2ErrorListener(context.getProgramDocumentUri());
+    lexer.setSQLDecimalCommaAllowed(context.getConfig().getSqlDecimalCommaAllowed().toBoolean());
     lexer.removeErrorListeners();
     lexer.addErrorListener(listener);
     parser.removeErrorListeners();

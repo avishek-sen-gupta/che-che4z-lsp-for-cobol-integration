@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import { join } from "path";
@@ -28,7 +28,6 @@ export class WindowsLanguageClient implements NativeLanguageClient {
   public getServer(): Executable {
     return {
       args: [
-        "pipeEnabled",
         "-Dline.separator=\r\n",
         "-Dlogback.statusListenerClass=ch.qos.logback.core.status.NopStatusListener",
         "-DserverType=NATIVE",

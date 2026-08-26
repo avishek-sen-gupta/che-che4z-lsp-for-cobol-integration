@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.implicitDialects.cics.utility;
@@ -21,7 +21,6 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
 import org.eclipse.lsp.cobol.common.model.Locality;
-import org.eclipse.lsp4j.Location;
 
 /***
  * Utility class for CICS antlr visitor
@@ -50,7 +49,9 @@ public class VisitorUtility {
    * @return locality
    */
   public Locality constructLocality(TerminalNode node, DialectProcessingContext context) {
-    Location location = context.getExtendedDocument().mapLocation(constructRange(node.getSymbol()));
-    return Locality.builder().uri(location.getUri()).range(location.getRange()).build();
+    return Locality.builder()
+        .uri(context.getExtendedDocument().getUri())
+        .range(constructRange(node))
+        .build();
   }
 }

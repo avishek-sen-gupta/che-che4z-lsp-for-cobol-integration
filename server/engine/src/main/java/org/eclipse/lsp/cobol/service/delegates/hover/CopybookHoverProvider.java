@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service.delegates.hover;
@@ -45,6 +45,7 @@ public class CopybookHoverProvider implements HoverProvider {
         return getHover(containedCopybookNode.get(0).getContent());
       }
     }
+
     return Optional.ofNullable(document)
         .map(CobolDocumentModel::getAnalysisResult)
         .map(AnalysisResult::getRootNode)
@@ -52,6 +53,7 @@ public class CopybookHoverProvider implements HoverProvider {
         .filter(CopyNode.class::isInstance)
         .map(CopyNode.class::cast)
         .filter(node -> node.getUri() != null)
+        .filter(n -> !n.getUri().equals(uri))
         .map(documentGraph::getCopyNodeContent)
         .map(this::getHover)
         .orElse(null);

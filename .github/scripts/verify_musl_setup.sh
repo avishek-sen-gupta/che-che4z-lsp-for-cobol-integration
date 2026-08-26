@@ -9,7 +9,7 @@
 # SPDX-License-Identifier: EPL-2.0
 #
 # Contributors:
-#   Broadcom, Inc. - initial API and implementation
+#   Broadcom - initial API and implementation
 set +e
 #Ref - https://www.graalvm.org/22.0/reference-manual/native-image/StaticImages/
 output=`x86_64-linux-musl-gcc`

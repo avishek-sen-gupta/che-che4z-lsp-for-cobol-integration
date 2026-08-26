@@ -8,7 +8,7 @@
       * SPDX-License-Identifier: EPL-2.0
       *
       * Contributors:
-      * Broadcom, Inc. - initial API and implementation
+      * Broadcom - initial API and implementation
         01 {$*SQLCA}.
                 05 {$*SQLCAID}      PIC X(8).
                 05 {$*SQLCABC}      PIC S9(9) COMP-5.

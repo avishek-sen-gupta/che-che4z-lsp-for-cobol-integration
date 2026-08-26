@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service;
@@ -38,7 +38,6 @@ public class CobolDocumentModel {
   private final List<Line> lines = new CopyOnWriteArrayList<>();
   private String text;
   private final String uri;
-  @Setter private volatile boolean opened = true;
   @Setter private String languageId;
   private volatile AnalysisResult analysisResult;
   private volatile AnalysisResult lastAnalysisResult;

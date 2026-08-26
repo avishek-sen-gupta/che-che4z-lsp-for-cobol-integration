@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -20,7 +20,6 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.List;
 import javax.annotation.Nullable;
 import lombok.NonNull;
 
@@ -86,15 +85,6 @@ public interface FileSystemService {
    */
   @NonNull
   String readFromInputStream(InputStream inputStream, Charset charset) throws IOException;
-
-  /**
-   * Lists the files of the directory path by name.
-   *
-   * @param uri URI to process
-   * @return the lists of the files
-   */
-  @NonNull
-  List<String> listFilesInDirectory(String uri);
 
   /**
    * Reads implicit content

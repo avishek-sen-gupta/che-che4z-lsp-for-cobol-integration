@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 lexer grammar CompilerDirectivesLexer;
@@ -32,6 +32,7 @@ NOTRUNCBIN: N O T R U N C B I N;
 DATEPROC: D A T E P R O C;
 DP: D P;
 FLAG : F L A G;
+FLAGMIG: F L A G M I G;
 NOFLAG : N O F L A G;
 TRIG : T R I G;
 NOTRIG : N O T R I G;
@@ -248,7 +249,12 @@ LANG: L A N G;
 ENGLISH: E N G L I S H;
 JAPANESE: J A P A N E S E;
 JA: J A;
+JAVAIOP: J A V A I O P;
+JAVA64: J A V A '64';
+JIOP: J I O P;
 JP: J P;
+JVMINITOPTIONS: J V M I N I T O P T I O N S;
+JVMI: J V M I;
 UENGLISH: U E N G L I S H;
 UE: U E;
 LINECOUNT: L I N E C O U N T;
@@ -296,12 +302,18 @@ OPTIMIZE: O P T I M I Z E;
 OPT: O P T;
 OUTDD: O U T D D;
 OUT: O U T;
+OUTPATH: O U T P A T H;
 PARMCHECK: P A R M C H E C K;
 PC: P C;
 MSG: M S G;
 ABD: A B D;
 NOPARMCHECK: N O P A R M C H E C K;
 NOPC: N O P C;
+NOJVMINITOPTIONS: N O J V M I N I T O P T I O N S;
+NOJVMI: N O J V M I;
+NOJAVA64: N O J A V A '64';
+NOJAVAIOP: N O J A V A I O P;
+NOJIOP: N O J I O P;
 PGMNAME: P G M N A M E;
 PGMN: P G M N;
 CO: C O;
@@ -393,37 +405,10 @@ ZONEDATA: Z O N E D A T A;
 ZD: Z D;
 ZWB: Z W B;
 NOZWB: N O Z W B;
-XOPT: X O P T;
-XOPTS: X O P T S;
 APOST: A P O S T;
-CBLCARD: C B L C A R D;
 CICS: C I C S;
-CO2: C O '2';
-COBOL2: C O B O L '2';
-CO3: C O '3';
-COBOL3: C O B O L '3';
 CPSM: C P S M;
-DEBUG: D E B U G;
-DLI: D L I;
-EDF: E D F;
-EXCI: E X C I;
-FEPI: F E P I;
-LENGTH: L E N G T H;
-LINKAGE: L I N K A G E;
-NOCBLCARD: N O C B L C A R D;
-NOCPSM: N O C P S M;
-NODEBUG: N O D E B U G;
-NOEDF: N O E D F;
-NOFEPI: N O F E P I;
-NOLENGTH: N O L E N G T H;
-NOLINKAGE: N O L I N K A G E;
-NOOPTIONS: N O O P T I O N S;
-NOSPIE: N O S P I E;
-OPTIONS: O P T I O N S;
 QUOTE: Q U O T E;
-SP: S P;
-SPIE: S P I E;
-SYSEIB: S Y S E I B;
 
 PLUSCHAR : '+';
 MINUSCHAR : '-';

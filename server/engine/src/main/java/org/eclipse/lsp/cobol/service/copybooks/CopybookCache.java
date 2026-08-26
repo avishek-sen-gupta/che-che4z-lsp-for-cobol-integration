@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service.copybooks;
@@ -78,6 +78,16 @@ public class CopybookCache {
   public CopybookModel get(CopybookId copybookId, Callable<CopybookModel> callable)
       throws ExecutionException {
     return cache.get(copybookId, callable);
+  }
+
+  /**
+   * Copybook model in cache
+   *
+   * @param copybookId copybook name
+   * @return true if cache contains the copybook
+   */
+  public boolean has(CopybookId copybookId) {
+    return cache.getIfPresent(copybookId) != null;
   }
 
   /**

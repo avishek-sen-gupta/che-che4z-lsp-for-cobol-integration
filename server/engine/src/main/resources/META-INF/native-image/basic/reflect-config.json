@@ -1005,7 +1005,6 @@
           "org.eclipse.lsp.cobol.service.utils.CustomThreadPoolExecutor",
           "org.eclipse.lsp.cobol.lsp.DisposableLSPStateService",
           "org.eclipse.lsp.cobol.service.settings.ConfigurationService",
-          "org.eclipse.lsp.cobol.service.copybooks.CopybookNameService",
           "org.eclipse.lsp.cobol.service.delegates.completions.Keywords",
           "org.eclipse.lsp.cobol.core.engine.dialects.DialectService",
           "org.eclipse.lsp.cobol.common.message.MessageService"
@@ -1069,7 +1068,6 @@
           "org.eclipse.lsp.cobol.common.message.LocaleStore",
           "org.eclipse.lsp.cobol.common.SubroutineService",
           "org.eclipse.lsp.cobol.lsp.DisposableLSPStateService",
-          "org.eclipse.lsp.cobol.service.copybooks.CopybookNameService",
           "org.eclipse.lsp.cobol.service.delegates.completions.Keywords",
           "org.eclipse.lsp.cobol.common.message.MessageService"
         ]
@@ -1171,38 +1169,6 @@
       {
         "name": "<init>",
         "parameterTypes": []
-      }
-    ]
-  },
-  {
-    "name": "org.eclipse.lsp.cobol.service.copybooks.CopybookNameServiceImpl",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "org.eclipse.lsp.cobol.service.settings.SettingsService",
-          "org.eclipse.lsp.cobol.common.file.FileSystemService",
-          "com.google.inject.Provider"
-        ]
-      }
-    ]
-  },
-  {
-    "name": "org.eclipse.lsp.cobol.cli.modules.CliCopybookNameServiceImpl",
-    "allDeclaredFields": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllDeclaredConstructors": true,
-    "methods": [
-      {
-        "name": "<init>",
-        "parameterTypes": [
-          "org.eclipse.lsp.cobol.service.settings.SettingsService",
-          "org.eclipse.lsp.cobol.common.file.FileSystemService",
-          "com.google.inject.Provider"
-        ]
       }
     ]
   },
@@ -3924,7 +3890,63 @@
     ]
   },
   {
+    "name": "org.eclipse.lsp.cobol.lsp.DialectItemDTO",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
     "name": "org.eclipse.lsp.cobol.common.copybook.CopyBookDTO",
     "allDeclaredFields": true
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.lsp.jrpc.DialectProcessingResult",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.lsp.jrpc.DocumentReplacement",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.lsp.jrpc.DocumentReplacementMap",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.lsp.jrpc.DocumentReplacementMap",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.lsp.jrpc.DialectCopybookInfo",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.lsp.jrpc.ReplacementTokens",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
+  },
+  {
+    "name": "org.eclipse.lsp.cobol.lsp.jrpc.ReplacementToken",
+    "allDeclaredFields": true,
+    "queryAllDeclaredMethods": true,
+    "queryAllDeclaredConstructors": true,
+    "allPublicConstructors": true
   }
 ]

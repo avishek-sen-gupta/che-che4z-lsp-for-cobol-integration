@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.utils;
@@ -22,6 +22,9 @@ import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
+import org.eclipse.lsp.cobol.common.DialectRegistryItem;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 import org.eclipse.lsp.cobol.dialects.daco.DaCoDialect;
 import org.eclipse.lsp.cobol.dialects.idms.IdmsDialect;
@@ -40,10 +43,14 @@ public class DialectConfigs {
         CopybookProcessingMode.DISABLED,
         ImmutableList.of(DaCoDialect.NAME, IdmsDialect.NAME),
         true,
-            createPredefinedSectionsConfig(
-                ImmutableList.of("S930", "S940", "S950", "S990", "S991", "S997", "S999")), false,
-        ImmutableList.of()
-    );
+        false,
+        SqlProcessing.ENABLED,
+        SqlDecimalComma.DISABLED,
+        ImmutableList.of(
+            new DialectRegistryItem("DaCo", 1, null, "", ""),
+            new DialectRegistryItem("IDMS", 1, null, "", "")),
+        createPredefinedSectionsConfig(
+            ImmutableList.of("S930", "S940", "S950", "S990", "S991", "S997", "S999")));
   }
 
   /**
@@ -59,9 +66,13 @@ public class DialectConfigs {
         copybookProcessingMode,
         ImmutableList.of(DaCoDialect.NAME, IdmsDialect.NAME),
         true,
-            createPredefinedSectionsConfig(predefinedSections), false,
-        ImmutableList.of()
-    );
+        false,
+        SqlProcessing.ENABLED,
+        SqlDecimalComma.DISABLED,
+        ImmutableList.of(
+            new DialectRegistryItem("DaCo", 1, null, "", ""),
+            new DialectRegistryItem("IDMS", 1, null, "", "")),
+        createPredefinedSectionsConfig(predefinedSections));
   }
 
   private Map<String, JsonElement> createPredefinedSectionsConfig(List<String> predefinedSections) {

@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as cp from "child_process";
 import { PassThrough } from "stream";
@@ -18,7 +18,7 @@ export function mockSpawnProcess(
   stdout: string,
   stderr: string,
   exitCode = 0,
-  error?: string,
+  error?: NodeJS.ErrnoException,
 ) {
   const stdoutStream = new PassThrough();
   const stderrStream = new PassThrough();

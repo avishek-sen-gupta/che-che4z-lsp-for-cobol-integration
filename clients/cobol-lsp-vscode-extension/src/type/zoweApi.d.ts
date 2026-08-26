@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 /**
@@ -20,6 +20,7 @@ interface IApiRegisterClient {
   getUssApi(profile: IProfileLoaded): IUss;
   getMvsApi(profile: IProfileLoaded): IMvs;
   registeredApiTypes(): string[];
+  onProfileUpdated?(fn: (profile: IProfileLoaded) => unknown): void;
 }
 
 interface IApiExplorerExtender {

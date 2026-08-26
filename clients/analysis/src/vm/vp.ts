@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import { VirtualProcessorListener } from "./listener";
 import { ProgramListing } from "./listing";
@@ -41,7 +41,7 @@ export class VirtualProcessor {
       }
       // Guard condition
       if (this.vms.length > this.maxVmCount) {
-        this.listener.maximumVMCountReached();
+        this.listener.maximumVMCountReached(this.maxVmCount);
         return;
       }
     }

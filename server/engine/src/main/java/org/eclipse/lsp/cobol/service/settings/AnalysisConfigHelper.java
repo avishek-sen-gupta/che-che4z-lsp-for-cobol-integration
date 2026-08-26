@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service.settings;
@@ -37,11 +37,14 @@ class AnalysisConfigHelper {
             mode,
             entity.getDialects(),
             entity.isCicsTranslatorEnabled(),
-                false,
+            false,
+            entity.getIsSQLProcessingEnabled(),
+            entity.getIsSQLDecimalCommaAllowed(),
             entity.getDialectRegistry(),
             entity.getDialectsSettings()
         );
     analysisConfig.getCompilerOptions().addAll(entity.getCompilerOptions());
+    analysisConfig.getUnusedVariableSeverity().severity = entity.getUnusedVariableSeverity();
     return analysisConfig;
   }
 }

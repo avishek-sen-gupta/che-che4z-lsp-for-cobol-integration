@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -78,7 +78,7 @@ class ReplacingServiceImplTest {
     ReplacingService replacingService = new ReplacingServiceImpl(messageService);
     assertEquals(
         new ResultWithErrors<>(
-            Pair.of("(?<=^|[.,;]?\\s)01(?=[,;]?\\s|\\.|$)", "BY"), Collections.emptyList()),
+            Pair.of("01(?<=(?:^|[.,;]?\\s)01)(?=[,;]?\\s|\\.|$)", "BY"), Collections.emptyList()),
         replacingService.retrievePseudoTextReplacingPattern(
             ImmutablePair.of("  01  ", " BY   "),
             locality,
@@ -86,12 +86,15 @@ class ReplacingServiceImplTest {
             SearchPattern.EXACT));
     assertEquals(
         new ResultWithErrors<>(
-            Pair.of("(?<=^|[.,;]?\\s)(?=[,;]?\\s|\\.|$)", ""), Collections.emptyList()),
+            Pair.of("(?<=(?:^|[.,;]?\\s))(?=[,;]?\\s|\\.|$)", ""), Collections.emptyList()),
         replacingService.retrievePseudoTextReplacingPattern(
             ImmutablePair.of("", ""), locality, CobolLanguageId.COBOL, SearchPattern.EXACT));
     assertEquals(
         new ResultWithErrors<>(
-            Pair.of("(?<=^|[.,;]?\\s)a\\s+b\\s+c(?=[,;]?\\s|\\.|$)", ""), Collections.emptyList()),
+            Pair.of(
+                "a\\s{1,999}b\\s{1,999}c(?<=(?:^|[.,;]?\\s)a\\s{1,999}b\\s{1,999}c)(?=[,;]?\\s|\\.|$)",
+                ""),
+            Collections.emptyList()),
         replacingService.retrievePseudoTextReplacingPattern(
             ImmutablePair.of("a   b  \nc", ""),
             locality,
@@ -99,7 +102,7 @@ class ReplacingServiceImplTest {
             SearchPattern.EXACT));
     assertEquals(
         new ResultWithErrors<>(
-            Pair.of("(?<=^|[.,;]?\\s)BY(?=[,;]?\\s|\\.|$)", ""), Collections.emptyList()),
+            Pair.of("BY(?<=(?:^|[.,;]?\\s)BY)(?=[,;]?\\s|\\.|$)", ""), Collections.emptyList()),
         replacingService.retrievePseudoTextReplacingPattern(
             ImmutablePair.of("BY", "\n" + "      \n" + "   "),
             locality,
@@ -116,17 +119,17 @@ class ReplacingServiceImplTest {
   void testRetrieveTokenReplacingPattern() {
     ReplacingService replacingService = new ReplacingServiceImpl(messageService);
     assertEquals(
-        Pair.of("(?<=^|[.,;]?\\s)01(?=[,;]?\\s|\\.|$)", "05"),
+        Pair.of("01(?<=(?:^|[.,;]?\\s)01)(?=[,;]?\\s|\\.|$)", "05"),
         replacingService.retrieveTokenReplacingPattern(Pair.of("01", "05"), CobolLanguageId.COBOL));
     assertEquals(
-        Pair.of("(?<=^|[.,;]?\\s)(?=[,;]?\\s|\\.|$)", ""),
+        Pair.of("(?<=(?:^|[.,;]?\\s))(?=[,;]?\\s|\\.|$)", ""),
         replacingService.retrieveTokenReplacingPattern(Pair.of("", ""), CobolLanguageId.COBOL));
     assertEquals(
-        Pair.of("(?<=^|[.,;]?\\s)IDENTIFICATION(?=[,;]?\\s|\\.|$)", "DIVISION"),
+        Pair.of("IDENTIFICATION(?<=(?:^|[.,;]?\\s)IDENTIFICATION)(?=[,;]?\\s|\\.|$)", "DIVISION"),
         replacingService.retrieveTokenReplacingPattern(
             Pair.of("IDENTIFICATION", "DIVISION"), CobolLanguageId.COBOL));
     assertEquals(
-        Pair.of("(?<=^|[.,;]?\\s)\\s+A(?=[,;]?\\s|\\.|$)", "B"),
+        Pair.of("\\s{1,999}A(?<=(?:^|[.,;]?\\s)\\s{1,999}A)(?=[,;]?\\s|\\.|$)", "B"),
         replacingService.retrieveTokenReplacingPattern(
             Pair.of("\n" + "A", "\n" + "  B "), CobolLanguageId.COBOL));
   }

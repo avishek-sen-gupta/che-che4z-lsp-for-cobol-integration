@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers.workspace;
@@ -25,6 +25,7 @@ import static org.mockito.Mockito.*;
 import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonPrimitive;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -37,7 +38,6 @@ import org.eclipse.lsp.cobol.lsp.*;
 import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.service.CobolLSPServerStateService;
 import org.eclipse.lsp.cobol.service.WatcherService;
-import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
 import org.eclipse.lsp.cobol.service.delegates.completions.Keywords;
 import org.eclipse.lsp.cobol.service.settings.SettingsService;
 import org.eclipse.lsp.cobol.service.settings.SettingsServiceImpl;
@@ -56,7 +56,6 @@ class DidChangeConfigurationHandlerTest {
     WatcherService watchingService = mock(WatcherService.class);
     CopybookService copybookService = mock(CopybookService.class);
     LocaleStore localeStore = mock(LocaleStore.class);
-    CopybookNameService copybookNameService = mock(CopybookNameService.class);
     Keywords keywords = mock(Keywords.class);
     MessageService messageService = mock(MessageService.class);
     AsyncAnalysisService asyncAnalysisService = mock(AsyncAnalysisService.class);
@@ -66,7 +65,6 @@ class DidChangeConfigurationHandlerTest {
         new DidChangeConfigurationHandler(
             stateService,
             settingsService,
-            copybookNameService,
             watchingService,
             localeStore,
             keywords,
@@ -76,8 +74,10 @@ class DidChangeConfigurationHandlerTest {
             copybookService,
             errorFinalizerService);
 
-    when(copybookNameService.copybookLocalFolders(null))
-        .thenReturn(completedFuture(ImmutableList.of("some-path")));
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(CPY_LOCAL_PATHS.label)))
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of("some-path")));
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(DIALECTS.label)))
+        .thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
     when(settingsService.fetchConfiguration(LOCALE.label))
         .thenReturn(completedFuture(singletonList("LOCALE")));
     when(settingsService.fetchConfiguration(LOGGING_LEVEL.label))
@@ -106,7 +106,6 @@ class DidChangeConfigurationHandlerTest {
     SettingsService settingsService = mock(SettingsService.class);
     WatcherService watchingService = mock(WatcherService.class);
     LocaleStore localeStore = mock(LocaleStore.class);
-    CopybookNameService copybookNameService = mock(CopybookNameService.class);
     Keywords keywords = mock(Keywords.class);
     MessageService messageService = mock(MessageService.class);
     AsyncAnalysisService asyncAnalysisService = mock(AsyncAnalysisService.class);
@@ -116,7 +115,6 @@ class DidChangeConfigurationHandlerTest {
         new DidChangeConfigurationHandler(
             stateService,
             settingsService,
-            copybookNameService,
             watchingService,
             localeStore,
             keywords,
@@ -128,8 +126,10 @@ class DidChangeConfigurationHandlerTest {
 
     String path = "foo/bar";
 
-    when(copybookNameService.copybookLocalFolders(null))
-        .thenReturn(completedFuture(singletonList(path)));
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(CPY_LOCAL_PATHS.label)))
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(path)));
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(DIALECTS.label)))
+        .thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
     when(settingsService.fetchConfiguration(LOCALE.label))
         .thenReturn(completedFuture(singletonList("LOCALE")));
     when(settingsService.fetchConfiguration(LOGGING_LEVEL.label))
@@ -158,7 +158,6 @@ class DidChangeConfigurationHandlerTest {
     SettingsService settingsService = mock(SettingsServiceImpl.class);
     WatcherService watchingService = mock(WatcherService.class);
     LocaleStore localeStore = mock(LocaleStore.class);
-    CopybookNameService copybookNameService = mock(CopybookNameService.class);
     Keywords keywords = mock(Keywords.class);
     MessageService messageService = mock(MessageService.class);
     AsyncAnalysisService asyncAnalysisService = mock(AsyncAnalysisService.class);
@@ -168,7 +167,6 @@ class DidChangeConfigurationHandlerTest {
         new DidChangeConfigurationHandler(
             stateService,
             settingsService,
-            copybookNameService,
             watchingService,
             localeStore,
             keywords,
@@ -181,8 +179,10 @@ class DidChangeConfigurationHandlerTest {
     ArgumentCaptor<List<String>> watcherCaptor = forClass(List.class);
     String path = "foo/bar";
 
-    when(copybookNameService.copybookLocalFolders(null))
-        .thenReturn(completedFuture(singletonList(path)));
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(CPY_LOCAL_PATHS.label)))
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of(path)));
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(DIALECTS.label)))
+        .thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
     when(settingsService.fetchConfiguration(LOCALE.label))
         .thenReturn(completedFuture(singletonList("LOCALE")));
     when(settingsService.fetchConfiguration(LOGGING_LEVEL.label))
@@ -214,7 +214,6 @@ class DidChangeConfigurationHandlerTest {
     SettingsService settingsService = mock(SettingsService.class);
     WatcherService watchingService = mock(WatcherService.class);
     LocaleStore localeStore = mock(LocaleStore.class);
-    CopybookNameService copybookNameService = mock(CopybookNameService.class);
     Keywords keywords = mock(Keywords.class);
     MessageService messageService = mock(MessageService.class);
     AsyncAnalysisService asyncAnalysisService = mock(AsyncAnalysisService.class);
@@ -224,7 +223,6 @@ class DidChangeConfigurationHandlerTest {
         new DidChangeConfigurationHandler(
             stateService,
             settingsService,
-            copybookNameService,
             watchingService,
             localeStore,
             keywords,
@@ -238,8 +236,10 @@ class DidChangeConfigurationHandlerTest {
     String path = "foo/bar";
     arr.add(new JsonPrimitive(path));
 
-    CompletableFuture<List<String>> copybookFuture = completedFuture(emptyList());
-    when(copybookNameService.copybookLocalFolders(null)).thenReturn(copybookFuture);
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(CPY_LOCAL_PATHS.label)))
+        .thenReturn(CompletableFuture.completedFuture(ImmutableList.of()));
+    when(settingsService.fetchTextConfigurationWithScope(any(), eq(DIALECTS.label)))
+        .thenReturn(CompletableFuture.completedFuture(Collections.emptyList()));
     when(settingsService.fetchConfiguration(LOCALE.label))
         .thenReturn(completedFuture(singletonList("LOCALE")));
     when(settingsService.fetchConfiguration(LOGGING_LEVEL.label))

@@ -9,7 +9,7 @@
       * SPDX-License-Identifier: EPL-2.0                             *
       *                                                              *
       * Contributors:                                                *
-      *   Broadcom, Inc. - initial API and implementation            *
+      *   Broadcom - initial API and implementation            *
       ****************************************************************
       * BOOK2 Test
        01 BOOK1N-REC.

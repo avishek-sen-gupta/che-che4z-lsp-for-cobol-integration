@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.engine.processors;
@@ -17,6 +17,7 @@ package org.eclipse.lsp.cobol.core.engine.processors;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
@@ -39,6 +40,7 @@ import org.eclipse.lsp.cobol.core.engine.symbols.SymbolAccumulator;
 @Slf4j
 public class QualifiedReferenceUpdateVariableUsage implements Processor<QualifiedReferenceNode> {
   private static final String NOT_DEFINED_ERROR = "semantics.notDefined";
+  private static final String NOT_DEFINED_IN_STRUCTURE_ERROR = "semantics.notDefinedInStructure";
   private static final String AMBIGUOUS_REFERENCE_ERROR = "semantics.ambiguous";
 
   private final SymbolAccumulator symbolAccumulator;
@@ -57,7 +59,7 @@ public class QualifiedReferenceUpdateVariableUsage implements Processor<Qualifie
     }
 
     if (variableUsageChain.isEmpty()) {
-      LOG.warn("Qualified reference node don't have any variable usages. {}", node);
+      LOG.debug("Qualified reference node don't have any variable usages. {}", node);
       return;
     }
 
@@ -67,8 +69,9 @@ public class QualifiedReferenceUpdateVariableUsage implements Processor<Qualifie
                 ctx.getCurrentProgramNode(), variableUsageChain)
             : ImmutableList.of();
 
-    if (isQualifyExtendedDirectiveEnabled(ctx) && foundDefinitions.size() > 1) {
-      foundDefinitions = updateDefinitionForQualifyExtended(node, foundDefinitions);
+    if (foundDefinitions.size() > 1 && isQualifyExtendedDirectiveEnabled(ctx)) {
+      foundDefinitions =
+          updateDefinitionForQualifyExtended(node, foundDefinitions, variableUsageChain);
     }
     for (VariableNode definitionNode : foundDefinitions) {
       node.setVariableDefinitionNode(definitionNode);
@@ -114,13 +117,34 @@ public class QualifiedReferenceUpdateVariableUsage implements Processor<Qualifie
             .errorSource(ErrorSource.PARSING)
             .severity(ErrorSeverity.ERROR)
             .location(node.getLocality().toOriginalLocation())
-            .messageTemplate(
-                MessageTemplate.of(
-                    foundDefinitions.isEmpty() ? NOT_DEFINED_ERROR : AMBIGUOUS_REFERENCE_ERROR,
-                    dataName))
+            .messageTemplate(generateMessageTemplate(foundDefinitions, variableUsageChain))
             .build();
     ctx.getErrors().add(error);
     LOG.debug("Syntax error by QualifiedReferenceNode " + error.toString());
+  }
+
+  private static MessageTemplate generateMessageTemplate(
+      List<VariableNode> foundDefinitions, List<VariableUsageNode> variableUsageChain) {
+    String base =
+        variableUsageChain.size() == 1 ? NOT_DEFINED_ERROR : NOT_DEFINED_IN_STRUCTURE_ERROR;
+
+    return MessageTemplate.of(
+        foundDefinitions.isEmpty() ? base : AMBIGUOUS_REFERENCE_ERROR,
+        convertStructureToParams(
+            variableUsageChain.stream()
+                .map(VariableUsageNode::getName)
+                .collect(Collectors.toList())));
+  }
+
+  private static Object[] convertStructureToParams(List<String> variableUsageNames) {
+    List<Object> params = new ArrayList<>();
+    params.add(variableUsageNames.get(0));
+    variableUsageNames.remove(0);
+
+    if (!variableUsageNames.isEmpty()) {
+      params.add(String.join(" OF ", variableUsageNames));
+    }
+    return params.toArray();
   }
 
   private static boolean isQualifyExtendedDirectiveEnabled(ProcessingContext ctx) {
@@ -131,18 +155,58 @@ public class QualifiedReferenceUpdateVariableUsage implements Processor<Qualifie
         .orElse(false);
   }
 
+  /**
+   * If compiler option QUALIFY(EXTEND) is in effect, and if there is only one fully qualified name
+   * that matches your combination of qualifiers, that reference will be considered unique, even if
+   * the set of qualifiers also matches a partial qualification for a different data item. Fully
+   * qualified means every qualifier is specified.
+   *
+   * <p>Ref: https://www.ibm.com/docs/en/cobol-zos/6.3.0?topic=reference-qualification
+   *
+   * @param node
+   * @param foundDefinitions
+   * @param variableUsageChain
+   * @return
+   */
   private List<VariableNode> updateDefinitionForQualifyExtended(
-      QualifiedReferenceNode node, List<VariableNode> foundDefinitions) {
-    List<VariableNode> definitionWithLevel01 =
+      QualifiedReferenceNode node,
+      List<VariableNode> foundDefinitions,
+      List<VariableUsageNode> variableUsageChain) {
+    final int parentLevel = variableUsageChain.size() - 1;
+    final String topParentName = variableUsageChain.get(parentLevel).getName();
+    List<VariableNode> variableDefsWithLevelNode =
         foundDefinitions.stream()
             .filter(VariableWithLevelNode.class::isInstance)
             .map(VariableWithLevelNode.class::cast)
-            .filter(n -> n.getLevel() == 1)
             .collect(Collectors.toList());
-    if (definitionWithLevel01.size() == 1) {
-      foundDefinitions = definitionWithLevel01;
-      node.setVariableDefinitionNode(definitionWithLevel01.get(0));
+    List<VariableNode> resultNodes =
+        variableDefsWithLevelNode.stream()
+            .map(VariableWithLevelNode.class::cast)
+            .filter(v -> matchingExtendedQualification(v, parentLevel, topParentName))
+            .collect(Collectors.toList());
+    if (resultNodes.size() == 1) {
+      node.setVariableDefinitionNode(resultNodes.get(0));
+      variableDefsWithLevelNode = resultNodes;
     }
-    return foundDefinitions;
+    return variableDefsWithLevelNode;
+  }
+
+  private static boolean matchingExtendedQualification(
+      VariableWithLevelNode v, int parentLevel, String topParentName) {
+    return parentLevel == 0 && v.getLevel() == 1
+        || matchesNthVariableParentName(v, parentLevel, topParentName);
+  }
+
+  private static boolean matchesNthVariableParentName(
+      VariableWithLevelNode v, int depth, String parentName) {
+    Node n = v;
+    for (int i = 0; i < depth; ++i) {
+      Optional<Node> parent = n.getNearestParentByType(NodeType.VARIABLE);
+      if (!parent.isPresent()) return false;
+      n = parent.get();
+    }
+    return depth != 0
+        && n instanceof VariableWithLevelNode
+        && ((VariableWithLevelNode) n).getName().equalsIgnoreCase(parentName);
   }
 }

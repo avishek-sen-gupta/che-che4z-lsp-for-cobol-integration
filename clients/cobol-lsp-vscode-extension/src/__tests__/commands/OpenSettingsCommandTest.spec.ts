@@ -9,25 +9,20 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
 import { gotoCopybookSettings } from "../../commands/OpenSettingsCommand";
-import { registerEvent } from "../../services/reporter";
+import { telemetryEvent } from "../../services/reporter";
 
 jest.mock("../../services/reporter");
-jest.mock("vscode", () => ({
-  commands: {
-    executeCommand: jest.fn(),
-  },
-}));
 
 test("check gotoCopybookSettings calls telemetry services and vscode execute command with right parameters.", () => {
   expect(gotoCopybookSettings).toBeTruthy();
   gotoCopybookSettings();
 
-  expect(registerEvent).toHaveBeenCalledWith(
+  expect(telemetryEvent).toHaveBeenCalledWith(
     "Open copybook settings",
     ["COBOL", "copybook", "settings"],
     "The user invokes the open settings quick fix to see the copybook locations stored in the settings file",

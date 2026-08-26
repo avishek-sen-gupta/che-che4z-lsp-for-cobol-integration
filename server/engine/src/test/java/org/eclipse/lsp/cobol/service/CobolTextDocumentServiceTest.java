@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service;
@@ -18,6 +18,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import com.google.gson.JsonObject;
+import com.google.inject.Provider;
 import java.util.Set;
 import org.eclipse.lsp.cobol.cfg.CFASTBuilder;
 import org.eclipse.lsp.cobol.common.SubroutineService;
@@ -26,12 +27,14 @@ import org.eclipse.lsp.cobol.common.dialects.TrueDialectService;
 import org.eclipse.lsp.cobol.lsp.*;
 import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.lsp.events.notifications.DidChangeNotification;
+import org.eclipse.lsp.cobol.lsp.events.notifications.DidOpenNotification;
 import org.eclipse.lsp.cobol.lsp.events.queries.CompletionQuery;
 import org.eclipse.lsp.cobol.lsp.events.queries.DefinitionQuery;
 import org.eclipse.lsp.cobol.lsp.events.queries.DocumentHighlightQuery;
 import org.eclipse.lsp.cobol.lsp.events.queries.FormattingQuery;
 import org.eclipse.lsp.cobol.lsp.handlers.extended.AnalysisHandler;
 import org.eclipse.lsp.cobol.lsp.handlers.text.*;
+import org.eclipse.lsp.cobol.lsp.jrpc.CobolLanguageClient;
 import org.eclipse.lsp.cobol.service.delegates.actions.CodeActions;
 import org.eclipse.lsp.cobol.service.delegates.communications.Communications;
 import org.eclipse.lsp.cobol.service.delegates.completions.Completions;
@@ -70,6 +73,8 @@ class CobolTextDocumentServiceTest {
 
   @Mock LspMessageBroker lspMessageBroker;
 
+  @Mock private Provider<CobolLanguageClient> clientProvider;
+
   private CobolTextDocumentService service;
 
   /**
@@ -89,7 +94,9 @@ class CobolTextDocumentServiceTest {
             analysisService,
             copybookService,
             subroutineService,
-            communications);
+            communications,
+            null,
+            clientProvider);
 
     CompletionHandler completionHandler =
         new CompletionHandler(asyncAnalysisService, completions, documentModelService);
@@ -101,16 +108,17 @@ class CobolTextDocumentServiceTest {
         new AnalysisHandler(
             asyncAnalysisService, analysisService, builder, communications, documentModelService);
 
-    DidOpenHandler didOpenHandler = new DidOpenHandler(asyncAnalysisService, watcherService);
+    DidOpenHandler didOpenHandler =
+        new DidOpenHandler(asyncAnalysisService, mock(SourceUnitGraph.class));
     DidCloseHandler didCloseHandler =
         new DidCloseHandler(
             disposableLSPStateService,
             asyncAnalysisService,
             documentModelService,
             watcherService,
-            copybookService,
-            documentGraph);
-    DidChangeHandler didChangeHandler = new DidChangeHandler(asyncAnalysisService, documentGraph);
+            copybookService);
+    DidChangeHandler didChangeHandler =
+        new DidChangeHandler(asyncAnalysisService, documentGraph, documentModelService);
     DefinitionHandler definitionHandler =
         new DefinitionHandler(asyncAnalysisService, documentModelService, occurrences);
     DocumentSymbolHandler documentSymbolHandler =
@@ -176,12 +184,8 @@ class CobolTextDocumentServiceTest {
   @Test
   void testDidOpen() {
     DidOpenTextDocumentParams params = mock(DidOpenTextDocumentParams.class);
-    TextDocumentItem textDocumentItem = mock(TextDocumentItem.class);
-    when(params.getTextDocument()).thenReturn(textDocumentItem);
-    when(textDocumentItem.getUri()).thenReturn(URI);
-    when(documentModelService.get(anyString())).thenReturn(new CobolDocumentModel(URI));
     service.didOpen(params);
-    Mockito.verify(lspMessageBroker, times(0)).query(any());
+    Mockito.verify(lspMessageBroker, times(1)).notify(any(DidOpenNotification.class));
   }
 
   @Test

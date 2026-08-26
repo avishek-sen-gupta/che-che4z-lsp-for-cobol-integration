@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.dialects;
@@ -33,6 +33,10 @@ public class CobolProgramLayout {
 
   public int getMaxLineLength() {
     return getSourceCodeLength() + commentAreaLength;
+  }
+
+  public int getAriaAStart() {
+    return getSequenceLength() + getIndicatorLength();
   }
 
   private final Integer areaALength;

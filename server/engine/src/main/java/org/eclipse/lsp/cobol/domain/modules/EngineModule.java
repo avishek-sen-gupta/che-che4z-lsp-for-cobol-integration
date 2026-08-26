@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -40,8 +40,6 @@ import org.eclipse.lsp.cobol.core.visitor.InterruptingTreeListener;
 import org.eclipse.lsp.cobol.dialects.TrueDialectServiceImpl;
 import org.eclipse.lsp.cobol.lsp.CobolWorkspaceServiceImpl;
 import org.eclipse.lsp.cobol.lsp.LspEventConsumer;
-import org.eclipse.lsp.cobol.service.copybooks.CopybookNameService;
-import org.eclipse.lsp.cobol.service.copybooks.CopybookNameServiceImpl;
 import org.eclipse.lsp.cobol.service.delegates.communications.Communications;
 import org.eclipse.lsp.cobol.service.delegates.communications.ServerCommunications;
 import org.eclipse.lsp.cobol.service.settings.CachingConfigurationService;
@@ -65,7 +63,6 @@ public class EngineModule extends AbstractModule {
     bind(Communications.class).to(ServerCommunications.class);
     bind(ParseTreeListener.class).to(InterruptingTreeListener.class);
     bind(ConfigurationService.class).to(CachingConfigurationService.class);
-    bind(CopybookNameService.class).to(CopybookNameServiceImpl.class);
     bind(LspEventConsumer.class).to(CobolWorkspaceServiceImpl.class);
     bind(CFASTBuilder.class).to(CFASTBuilderImpl.class);
 

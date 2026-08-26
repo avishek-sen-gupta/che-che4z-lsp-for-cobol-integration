@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.processors.implicit;
@@ -50,9 +50,8 @@ public class DaCoImplicitCodeProcessor implements Processor<ProgramNode> {
             .filter(n -> n instanceof VariableNode)
             .map(VariableNode.class::cast)
             .collect(toList());
-    variables.addAll(children);
 
-    variables.forEach(
+    children.forEach(
         node ->
             processingContext.getVariableAccumulator().addVariableDefinition(programNode, node));
 

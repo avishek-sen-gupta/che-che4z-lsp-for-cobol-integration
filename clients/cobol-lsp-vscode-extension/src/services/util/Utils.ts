@@ -9,11 +9,13 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
 import { ResolvedProfile } from "../../type/e4eApi";
+import { TAR_PREFIX } from "../../constants";
+import { SEPARATOR } from "../../provider/TarCopybookFileSystemProvider";
 
 async function safeActivate(ext: vscode.Extension<unknown>) {
   try {
@@ -123,4 +125,68 @@ export function asPartialProfile(s: string): Partial<ResolvedProfile> {
 function whitespaceAsUndefined(s: string) {
   for (const c of s) if (c !== " ") return s;
   return undefined;
+}
+
+export function asArray<T>(input: T | T[]): T[] {
+  if (Array.isArray(input)) {
+    return input;
+  }
+  return [input];
+}
+
+/**
+ * Checks if a passed path is a tar file location i.e. it starts with 'tar:' case insensitively
+ * @param input The string to process, e.g., 'tar:FILE_PATH::INTERNAL_PATH'
+ * @returns a boolean indicating if the specified path is a tar file location
+ */
+export function isTarPath(input: string) {
+  return input.toUpperCase().startsWith(TAR_PREFIX);
+}
+
+/**
+ * Extracts the text between 'tar:' and '::' and the text after '::'
+ * from a structured string.
+ * @param input The string to process, e.g., 'tar:FILE_PATH::INTERNAL_PATH'
+ * @returns An object containing the extracted file path and internal path.
+ */
+export function extractTarPath(input: string): {
+  tarPath: string;
+  internalPath: string;
+} {
+  // 1. Find the start index for the file path (after 'tar:')
+  const tarPrefixIndex = input.toUpperCase().indexOf(TAR_PREFIX);
+  if (tarPrefixIndex != 0) {
+    throw new Error("String must start with 'tar:'.");
+  }
+  const filePathStartIndex = tarPrefixIndex + TAR_PREFIX.length;
+
+  // 2. Find the index of the separator '::'
+  const separatorIndex = input.indexOf(SEPARATOR, filePathStartIndex);
+  let tarPath;
+  let internalPath;
+
+  if (separatorIndex === -1) {
+    tarPath = input.substring(filePathStartIndex, input.length);
+    internalPath = "**";
+  } else {
+    tarPath = input.substring(filePathStartIndex, separatorIndex);
+    internalPath = input.substring(separatorIndex + SEPARATOR.length);
+  }
+  return { tarPath, internalPath };
+}
+
+/**
+ * returns IProfileLoaded from a passed profile name
+ * @param profileName
+ * @param explorerAPI
+ * @returns IProfileLoaded
+ */
+export function loadProfile(
+  profileName: string,
+  explorerAPI: IApiRegisterClient,
+): IProfileLoaded {
+  return explorerAPI
+    .getExplorerExtenderApi()
+    .getProfilesCache()
+    .loadNamedProfile(profileName);
 }

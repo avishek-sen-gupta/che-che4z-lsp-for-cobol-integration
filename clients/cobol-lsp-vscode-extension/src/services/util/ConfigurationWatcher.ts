@@ -9,13 +9,19 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
-import { SERVER_RUNTIME } from "../../constants";
+import {
+  SERVER_RUNTIME,
+  SETTINGS_CPY_NDVR_DEPENDENCIES,
+  SETTINGS_CPY_SECTION,
+} from "../../constants";
 import { SettingsService } from "../Settings";
-import { registerEvent } from "../reporter";
+import { telemetryEvent } from "../reporter";
+import { clearDiagnostics } from "../ExternalAPIsService";
+import { clearWorkspaceConfigCache } from "../ProcessorGroupsLoader";
 
 export class ConfigurationWatcher {
   private static async restartVsCode() {
@@ -28,7 +34,7 @@ export class ConfigurationWatcher {
       return;
     }
     if (selection === "Ok") {
-      registerEvent(
+      telemetryEvent(
         "serverRuntime modified by user",
         ["COBOL", "serverRuntime", "settings"],
         `Server type modified by user to ${this.getServerRuntime()}`,
@@ -51,6 +57,14 @@ export class ConfigurationWatcher {
       if (event.affectsConfiguration(SERVER_RUNTIME)) {
         await this.handleServerRuntimeConfigurationChange();
       }
+      if (
+        event.affectsConfiguration(
+          `${SETTINGS_CPY_SECTION}.${SETTINGS_CPY_NDVR_DEPENDENCIES}`,
+        )
+      ) {
+        clearWorkspaceConfigCache();
+      }
+      clearDiagnostics();
     });
   }
 

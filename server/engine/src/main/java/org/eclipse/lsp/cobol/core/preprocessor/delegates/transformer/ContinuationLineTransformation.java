@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.preprocessor.delegates.transformer;
@@ -144,9 +144,12 @@ public abstract class ContinuationLineTransformation implements CobolLinesTransf
   private boolean isCompilerDirectiveStatement(CobolLine line) {
     if (Objects.isNull(line.getPredecessor())) return false;
     String predecessorContentArea = line.getPredecessor().getContentArea();
+    final int space = predecessorContentArea.indexOf(' ');
+    final String firstWord =
+        space == -1 ? predecessorContentArea : predecessorContentArea.substring(0, space);
     return Stream.of(CompilerDirectives.values())
             .map(CompilerDirectives::getDirective)
-            .anyMatch(predecessorContentArea.split("\\s+")[0].toUpperCase()::equals)
+            .anyMatch(firstWord.toUpperCase()::equals)
         || isPseudoDelimiterContinued(line, predecessorContentArea);
   }
 

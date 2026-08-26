@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -305,10 +305,12 @@ public class UseCaseEngine {
                 .subroutines(subroutineNames)
                 .cicsTranslator(analysisConfig.isCicsTranslatorEnabled())
                 .copybookProcessingMode(analysisConfig.getCopybookProcessingMode())
+                .sqlProcessing(analysisConfig.getSqlProcessing())
                 .dialects(analysisConfig.getDialects())
                 .sqlBackend(sqlBackendSetting)
                 .dialectsSettings(analysisConfig.getDialectsSettings())
                 .compilerOptions(analysisConfig.getCompilerOptions())
+                .unusedVariableSeverity(analysisConfig.getUnusedVariableSeverity())
                 .preprocessorsDirectives(preprocessorsDirectives)
                 .build(),
             languageId);

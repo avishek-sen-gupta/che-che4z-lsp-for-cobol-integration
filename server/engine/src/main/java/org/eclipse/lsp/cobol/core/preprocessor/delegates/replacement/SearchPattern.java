@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -66,6 +66,7 @@ public enum SearchPattern {
         return Arrays.stream(split)
             .map(String::trim)
             .filter(sd -> !StringUtils.isEmpty(sd))
+            .map(Pattern::quote)
             .collect(Collectors.joining(regex));
       }
       return Pattern.quote(trim);
@@ -88,7 +89,7 @@ public enum SearchPattern {
   };
 
   private static String adjustSpaces(String escapeSpecialCharacters) {
-    return String.join("\\s+", escapeSpecialCharacters.split("[\\r\\n]*\\s+"));
+    return String.join("\\s{1,999}", escapeSpecialCharacters.split("[\\r\\n]*\\s+"));
   }
 
   private static boolean isQuotedString(String text) {
@@ -106,7 +107,8 @@ public enum SearchPattern {
   // ) }, Colon { : }  //NOSONAR
   // Ref - https://www.ibm.com/support/knowledgecenter/SS6SG3_6.2.0/lr/ref/rllanrul.html
   private static final Pattern NEW_LINE_PATTERN = Pattern.compile("[\\r\\n]");
-  public static final String SEPARATE_TOKEN_PATTERN = "(?<=^|[.,;]?\\s)%s(?=[,;]?\\s|\\.|$)";
+  public static final String SEPARATE_TOKEN_PATTERN =
+      "%1$s(?<=(?:^|[.,;]?\\s)%1$s)(?=[,;]?\\s|\\.|$)";
   // Patterns for the enclosures
   private static final Pattern[] COBOL_REPLACE_PATTERN_SEPARATORS = {
     Pattern.compile("^;.+;$"),

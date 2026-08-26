@@ -9,12 +9,12 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as vscode from "vscode";
 import { LANGUAGE_ID, SETTINGS_DIALECT } from "../../constants";
-import { DialectRegistry } from "../DialectRegistry";
-import cobolSnippets = require("./cobolSnippets.json");
+import { DialectRegistry } from "../../dialect/DialectRegistry";
+import cobolSnippets = require("../../../snippets.json");
 import * as t from "io-ts";
 import { isRight } from "fp-ts/Either";
 import { TextDecoder } from "util";
@@ -129,13 +129,15 @@ function createCompletionItem(
  * Return map of all predefined snippets and snippets
  * for all active dialects from JSON files provided by dialects
  */
-async function loadSnippets() {
-  const loadedSnippets = new Map(Object.entries(predefinedSnippets));
+async function loadSnippets(
+  entries: Record<string, Snippet> = {},
+): Promise<Map<string, Snippet>> {
+  const loadedSnippets = new Map(Object.entries(entries));
   const activeDialects = DialectRegistry.getActiveDialects();
 
   await Promise.all(
     activeDialects.map(async (d) => {
-      const dialectSnippets = await importDialectSnippets(d.snippetPath);
+      const dialectSnippets = await importDialectSnippets(d.snippetUri);
       if (dialectSnippets) {
         dialectSnippets.forEach((snippet, key) => {
           loadedSnippets.set(key, snippet);
@@ -147,9 +149,8 @@ async function loadSnippets() {
   return loadedSnippets;
 }
 
-async function importDialectSnippets(snippetPath: string) {
+async function importDialectSnippets(snippetUri: vscode.Uri) {
   const dialectSnippets: Map<string, Snippet> = new Map();
-  const snippetUri = vscode.Uri.parse(snippetPath);
   try {
     const rawFile = await vscode.workspace.fs.readFile(snippetUri);
     const textData = new TextDecoder().decode(rawFile);
@@ -161,7 +162,7 @@ async function importDialectSnippets(snippetPath: string) {
       });
     }
   } catch (error) {
-    console.error({ snippetPath, error }, "Unable to import snippet");
+    console.error({ snippetUri, error }, "Unable to import snippet");
   }
 
   return dialectSnippets;
@@ -219,7 +220,7 @@ export async function pickSnippet() {
     const editor = vscode.window.activeTextEditor;
     type ItemType = { snippet: Snippet } & vscode.QuickPickItem;
     const snippetList: ItemType[] = [];
-    const snippets = await loadSnippets();
+    const snippets = await loadSnippets(predefinedSnippets);
     const input = vscode.window.createQuickPick<ItemType>();
     input.matchOnDetail = true;
     input.matchOnDescription = true;

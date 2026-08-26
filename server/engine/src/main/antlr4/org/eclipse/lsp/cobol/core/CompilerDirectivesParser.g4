@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 parser grammar CompilerDirectivesParser;
@@ -18,58 +18,8 @@ options {tokenVocab = CompilerDirectivesLexer;}
 compilerOptions: compilerOption | (compilerOption COMMACHAR compilerOptions)+;
 compilerOption
     : deprecatedCompilerOptions
-    | cicsTranslatorDirectives
     | cobolCompilerOption
     ;
-
-// compiler translator options
-cicsTranslatorDirectives: (CICS | XOPTS | XOPT) LPARENCHAR (cicsTranslatorOptions | LITERAL ) (COMMACHAR? cicsTranslatorOptions)* RPARENCHAR;
-
-cicsTranslatorOptions
-       : APOST
-       | CBLCARD
-       | CICS
-       | CO2
-       | COBOL2
-       | CO3
-       | COBOL3
-       | CPSM
-       | DBCS
-       | DEBUG
-       | DLI
-       | EDF
-       | EXCI
-       | FEPI
-       | ((FLAG | F_CHAR) LPARENCHAR (E_CHAR | I_CHAR | S_CHAR | U_CHAR | W_CHAR) (COMMACHAR (E_CHAR | I_CHAR | S_CHAR | U_CHAR | W_CHAR))? RPARENCHAR)
-       | LENGTH
-       | ((LINECOUNT | LC) LPARENCHAR INTEGERLITERAL RPARENCHAR)
-       | LIN
-       | LINKAGE
-       | NATLANG
-       | NOCBLCARD
-       | NOCPSM
-       | NODEBUG
-       | NOEDF
-       | NOFEPI
-       | NOLENGTH
-       | NOLINKAGE
-       | NONUM
-       | NOOPTIONS
-       | NOSEQ
-       | NOSPIE
-       | NOVBREF
-       | NUM
-       | OP
-       | OPTIONS
-       | Q_CHAR
-       | QUOTE
-       | SEQ
-       | SP
-       | SPACE LPARENCHAR INTEGERLITERAL RPARENCHAR
-       | SPIE
-       | SYSEIB
-       | VBREF
-       ;
 
 deprecatedCompilerOptions:
             unSupportedDeprecatedCompilerDirectives
@@ -161,6 +111,7 @@ cobolCompilerOption
    | INITIAL | NOINITIAL
    | INLINE | INL | NOINLINE | NOINL
    | INTDATE LPARENCHAR (ANSI | LILIAN) RPARENCHAR
+   | cobolJavaInteroperabilityOptions
    | (INVDATA | INVD) (LPARENCHAR invdataSuboptions (COMMACHAR invdataSuboptions)* RPARENCHAR)? | NOINVDATA | NOINVD
    | (LANGUAGE | LANG) LPARENCHAR (ENGLISH | EN | JAPANESE | JA | JP | UENGLISH | UE) RPARENCHAR
    | (LINECOUNT | LC) LPARENCHAR INTEGERLITERAL RPARENCHAR
@@ -212,6 +163,14 @@ cobolCompilerOption
    | (ZONEDATA | ZD) LPARENCHAR (PFD | MIG | NOPFD) RPARENCHAR
    | ZWB | NOZWB | deprecatedCompilerOptions
    ;
+
+cobolJavaInteroperabilityOptions:
+            (JAVAIOP | JIOP) LPARENCHAR cobolJavaInteroperabilitySubOptions (COMMACHAR cobolJavaInteroperabilitySubOptions)* RPARENCHAR | (NOJAVAIOP | NOJIOP);
+
+ cobolJavaInteroperabilitySubOptions : (OUTPATH | OP) LPARENCHAR LITERAL RPARENCHAR
+                | (NOJVMINITOPTIONS | NOJVMI)
+                | (JVMINITOPTIONS | JVMI) LPARENCHAR LITERAL RPARENCHAR
+                | (NOJAVA64 | JAVA64);
 
 ssrangeSuboptions
    : NOZLEN

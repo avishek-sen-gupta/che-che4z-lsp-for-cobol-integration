@@ -9,13 +9,14 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.usecases;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.eclipse.lsp.cobol.implicitDialects.cics.CICSDialect;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +38,6 @@ public class TestCICSPreprocessorOptions {
         TEXT,
         ImmutableList.of(),
         ImmutableMap.of(),
-        ImmutableMap.of("CICS", ImmutableList.of("SP")));
+        ImmutableMap.of(CICSDialect.DIALECT_NAME, ImmutableList.of("SP")));
   }
 }

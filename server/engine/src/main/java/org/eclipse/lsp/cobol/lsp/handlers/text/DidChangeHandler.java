@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers.text;
@@ -20,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
 import org.eclipse.lsp.cobol.lsp.analysis.AsyncAnalysisService;
 import org.eclipse.lsp.cobol.lsp.handlers.HandlerUtility;
+import org.eclipse.lsp.cobol.service.CobolDocumentModel;
+import org.eclipse.lsp.cobol.service.DocumentModelService;
 import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 
 /** LSP DidChange Handler */
@@ -27,22 +29,24 @@ import org.eclipse.lsp4j.DidChangeTextDocumentParams;
 public class DidChangeHandler {
   private final AsyncAnalysisService asyncAnalysisService;
   private final SourceUnitGraph sourceUnitGraph;
+  private final DocumentModelService documentModelService;
 
   @Inject
   public DidChangeHandler(
-      AsyncAnalysisService asyncAnalysisService, SourceUnitGraph sourceUnitGraph) {
+      AsyncAnalysisService asyncAnalysisService,
+      SourceUnitGraph sourceUnitGraph,
+      DocumentModelService documentModelService) {
     this.asyncAnalysisService = asyncAnalysisService;
     this.sourceUnitGraph = sourceUnitGraph;
+    this.documentModelService = documentModelService;
   }
 
   /**
    * Handle LSP didChange event.
    *
    * @param params DidChangeTextDocumentParams.
-   * @param eventSource
    */
-  public void didChange(
-      DidChangeTextDocumentParams params, SourceUnitGraph.EventSource eventSource) {
+  public void didChange(DidChangeTextDocumentParams params) {
     String uri = params.getTextDocument().getUri();
     if (!HandlerUtility.isUriSupported(uri)) {
       return;
@@ -53,10 +57,13 @@ public class DidChangeHandler {
       List<String> allAssociatedFilesForACopybook =
           sourceUnitGraph.getAllAssociatedFilesForACopybook(uri);
       asyncAnalysisService.reanalyseCopybooksAssociatedPrograms(
-          allAssociatedFilesForACopybook, uri, text, SourceUnitGraph.EventSource.IDE);
+          allAssociatedFilesForACopybook, uri, text);
       return;
     }
-    asyncAnalysisService.scheduleAnalysis(
-        uri, text, params.getTextDocument().getVersion(), false, eventSource);
+    CobolDocumentModel model = documentModelService.changeDocument(uri, text);
+    if (model != null) {
+      asyncAnalysisService.scheduleAnalysis(
+          model, params.getTextDocument().getVersion(), false, false);
+    }
   }
 }

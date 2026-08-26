@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp;
@@ -52,7 +52,7 @@ public class LspMessageBroker {
    * @throws InterruptedException
    */
   public <Q> void putBack(LspQuery<Q> nextEven) throws InterruptedException {
-    LOG.debug("putBack: " + nextEven);
+    LOG.trace("putBack: " + nextEven);
     if (!eventQueue.offer(nextEven)) {
       LOG.warn("Event " + nextEven + " dropped");
     }

@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -28,7 +28,7 @@ public enum EffectiveDataType {
   STRING {
     @Override
     boolean checkDataType(ElementaryNode node) {
-      return StringUtils.containsAny(node.getPicClause(), "A", "a", "X", "x");
+      return StringUtils.containsAny(node.getPicClause(), "A", "a", "X", "x", "U", "u");
     }
   },
   REAL {

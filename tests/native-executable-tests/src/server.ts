@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
 
  * Contributors:
- *  Broadcom, Inc. - initial API and implementation
+ *  Broadcom - initial API and implementation
  */
 
 import { ServerLaucher } from "./serverLaucher";
@@ -48,17 +48,16 @@ export class Server {
     private logger: ConsoleLogger;
     private diagnostics: PublishDiagnosticsParams | null = null;
 
-    constructor(rootPath: string, name: string, configLoc: string, port?: number) {
+    constructor(rootPath: string, name: string, configLoc: string) {
         this.rootPath = rootPath;
         this.name = name;
         this.configLoc = configLoc;
-        this.port = port;
         this.logger = new ConsoleLogger();
     }
 
     public async launchServer() {
         const serverLaucher = new ServerLaucher();
-        const { reader, writer } = await serverLaucher.createSocketMessageTransporter(this.logger, this.port);
+        const { reader, writer } = await serverLaucher.createMessageTransporter(this.logger);
         this.reader =  reader;
         this.writer = writer;
     }
@@ -110,6 +109,21 @@ export class Server {
             //TODO  Handle dialects
             return copybooks.find(t => t.includes(copybookName));
         });
+
+        serverConnection.onRequest(
+            "copybook/resolve",
+            (_cobolFilename, copybookName, _dialectType) => {
+              //TODO  Handle dialects
+              return copybooks.find((t) => t.includes(copybookName));
+            }
+          );
+      
+          serverConnection.onRequest(
+            "copybook/uri",
+            (documentURI: string, copybookName: string, dialectType: string) => {
+              return copybooks.find((t) => t.includes(copybookName));
+            }
+          );
 
         serverConnection.onRequest("cobol/resolveSubroutine", _params => {return; });
         serverConnection.onRequest("window/workDoneProgress/create", (_param) => {return;} );

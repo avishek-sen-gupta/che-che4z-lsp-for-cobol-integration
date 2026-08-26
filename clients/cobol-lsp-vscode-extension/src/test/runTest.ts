@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as path from "path";
@@ -26,6 +26,7 @@ async function main() {
       path.join(__dirname, "../../"),
       path.join(__dirname, "../../../idms-dialect-support/"),
       path.join(__dirname, "../../../daco-dialect-support/"),
+      path.join(__dirname, "../../../sample-dialect-support/"),
     ];
     const extensionTestsPath = path.join(__dirname, "./suite/index");
     const userDir = os.tmpdir();

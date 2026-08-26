@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp;
@@ -17,11 +17,11 @@ package org.eclipse.lsp.cobol.lsp;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Stream;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
-import org.eclipse.lsp.cobol.common.file.WorkspaceFileService;
+import org.eclipse.lsp.cobol.common.io.ResolveFileContent;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.CopyNode;
 import org.eclipse.lsp.cobol.common.model.tree.RootNode;
@@ -40,18 +40,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 @ExtendWith(MockitoExtension.class)
 class SourceUnitGraphTest {
   public static final String URI = "file://document.cbl";
-  @Mock private WorkspaceFileService fileService;
   @Mock private AsyncAnalysisService asyncAnalysisService;
 
   @Test
   void testNotifyState() {
-    SourceUnitGraph sourceUnitGraph = new SourceUnitGraph(fileService);
+    ResolveFileContent resolveFileContent = mock(ResolveFileContent.class);
+    when(resolveFileContent.getFileContent(anyString()))
+        .thenReturn(CompletableFuture.completedFuture("some dummy text"));
+    SourceUnitGraph sourceUnitGraph = new SourceUnitGraph(resolveFileContent);
     String initialDocumentText = "sample text for test";
     String updatedContent = "Updated content";
     sourceUnitGraph.notifyState(
-        AnalysisState.STARTED,
-        new CobolDocumentModel(URI, initialDocumentText),
-        SourceUnitGraph.EventSource.FILE_SYSTEM);
+        AnalysisState.STARTED, new CobolDocumentModel(URI, initialDocumentText));
 
     assertEquals(initialDocumentText, sourceUnitGraph.getContent(URI));
     assertTrue(sourceUnitGraph.isFileOpened(URI));
@@ -67,13 +67,11 @@ class SourceUnitGraphTest {
     String copy1Uri = "file://copy1.cpy";
     String copy2Uri = "file://copy2.cpy";
     String copy3Uri = "file://copy3.cpy";
-    SourceUnitGraph sourceUnitGraph = new SourceUnitGraph(fileService);
+    ResolveFileContent resolveFileContent = mock(ResolveFileContent.class);
+    when(resolveFileContent.getFileContent(anyString()))
+        .thenReturn(CompletableFuture.completedFuture("some dummy text"));
+    SourceUnitGraph sourceUnitGraph = new SourceUnitGraph(resolveFileContent);
     RootNode rootNode = mock(RootNode.class);
-    when(fileService.getPathFromURI(anyString())).thenReturn(Paths.get(""));
-    when(fileService.getContentByPath(any()))
-        .thenReturn("COPY 1 TEXT")
-        .thenReturn("COPY 2 TEXT")
-        .thenReturn("COPY 3 TEXT");
     CopyNode copyNode1 =
         new CopyNode(
             Locality.builder().uri(URI).build(),
@@ -95,10 +93,9 @@ class SourceUnitGraphTest {
     when(rootNode.getDepthFirstStream()).thenReturn(Stream.of(copyNode1, copyNode2, copyNode3));
     AnalysisResult analysisResult = AnalysisResult.builder().rootNode(rootNode).build();
     CobolDocumentModel model = new CobolDocumentModel(URI, "text", analysisResult);
-    sourceUnitGraph.notifyState(
-        AnalysisState.COMPLETED, model, SourceUnitGraph.EventSource.FILE_SYSTEM);
+    sourceUnitGraph.notifyState(AnalysisState.COMPLETED, model);
 
-    assertEquals("COPY 3 TEXT", sourceUnitGraph.getCopyNodeContent(copyNode3));
+    assertEquals("some dummy text", sourceUnitGraph.getCopyNodeContent(copyNode3));
     assertTrue(sourceUnitGraph.isUserSuppliedCopybook(copy1Uri));
     assertTrue(sourceUnitGraph.isUserSuppliedCopybook(copy2Uri));
     assertTrue(sourceUnitGraph.isUserSuppliedCopybook(copy3Uri));

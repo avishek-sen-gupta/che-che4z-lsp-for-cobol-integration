@@ -9,17 +9,20 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.model;
+
+import java.util.List;
+import org.eclipse.lsp4j.MarkupContent;
 
 /** The interface represents structure that can show formatted line to the user. */
 public interface Describable {
   /**
    * Get user friendly node description.
    *
-   * @return the string with description.
+   * @return the {@link MarkupContent} with description.
    */
-  String getFormattedDisplayString();
+  List<MarkupContent> getFormattedDisplayString();
 }

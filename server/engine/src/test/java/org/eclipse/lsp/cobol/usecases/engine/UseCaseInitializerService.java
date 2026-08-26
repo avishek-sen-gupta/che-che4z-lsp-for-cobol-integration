@@ -9,13 +9,14 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.usecases.engine;
 
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,9 +34,12 @@ import org.eclipse.lsp.cobol.common.LanguageEngineFacade;
 import org.eclipse.lsp.cobol.common.SubroutineService;
 import org.eclipse.lsp.cobol.common.action.CodeActionProvider;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
+import org.eclipse.lsp.cobol.common.copybook.PredefinedCopybookStore;
 import org.eclipse.lsp.cobol.common.dialects.TrueDialectService;
 import org.eclipse.lsp.cobol.common.file.FileSystemService;
 import org.eclipse.lsp.cobol.common.file.WorkspaceFileService;
+import org.eclipse.lsp.cobol.common.io.ResolveCopybookUri;
+import org.eclipse.lsp.cobol.common.io.ResolveFileContent;
 import org.eclipse.lsp.cobol.core.engine.dialects.DialectDiscoveryFolderService;
 import org.eclipse.lsp.cobol.core.engine.dialects.DialectDiscoveryService;
 import org.eclipse.lsp.cobol.dialects.TrueDialectServiceImpl;
@@ -79,10 +83,17 @@ public class UseCaseInitializerService implements UseCaseInitializer {
           protected void configure() {
             bind(TrueDialectService.class).to(TrueDialectServiceImpl.class);
             bind(LanguageEngineFacade.class).to(CobolLanguageEngineFacade.class);
-            bind(CopybookService.class).to(CopybookServiceImpl.class);
             bind(SettingsService.class).toInstance(mockSettingsService);
             bind(FileSystemService.class).toInstance(new WorkspaceFileService());
             bind(CobolLanguageClient.class).toInstance(languageClient);
+            bind(CopybookService.class).to(CopybookServiceImpl.class);
+            bind(PredefinedCopybookStore.class).to(PredefinedCopybookStoreImpl.class);
+            ResolveCopybookUri resolveMock = mock(ResolveCopybookUri.class);
+            doReturn(CompletableFuture.completedFuture(null))
+                .when(resolveMock)
+                .resolveCopybookUri(any(), any(), any());
+            bind(ResolveCopybookUri.class).toInstance(resolveMock);
+            bind(ResolveFileContent.class).toInstance(mock(ResolveFileContent.class));
             bind(SubroutineService.class).to(SubroutineServiceImpl.class);
             bind(WatcherService.class).to(WatcherServiceImpl.class);
             bind(CFASTBuilder.class).to(CFASTBuilderImpl.class);

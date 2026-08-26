@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as t from "io-ts";
 import { isLeft } from "fp-ts/Either";
@@ -66,7 +66,7 @@ export async function loadBridgeJsonContent(
   return reloadBridgeJsonContent(b4gPath);
 }
 
-const watcherChangeEventHandler = (uri: Uri) => {
+export const watcherChangeEventHandler = (uri: Uri) => {
   bridge4GitCacheMap.delete(uri.toString());
 };
 

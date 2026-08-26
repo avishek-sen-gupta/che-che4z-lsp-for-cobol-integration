@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service;
@@ -47,12 +47,13 @@ public class DocumentModelService {
    * @param uri - document uri
    * @param text - document text
    * @param languageId
+   * @return document model
    */
   @Synchronized
-  public void openDocument(String uri, String text, String languageId) {
+  public CobolDocumentModel openDocument(String uri, String text, String languageId) {
     CobolDocumentModel model = docs.computeIfAbsent(uri, u -> new CobolDocumentModel(uri, text));
     Optional.ofNullable(languageId).ifPresent(model::setLanguageId);
-    model.setOpened(true);
+    return model;
   }
 
   /**
@@ -77,6 +78,7 @@ public class DocumentModelService {
       return sourceUnitGraph.getAllAssociatedFilesForACopybook(uri).stream()
           .filter(a -> !sourceUnitGraph.isUserSuppliedCopybook(a))
           .map(docs::get)
+          .filter(Objects::nonNull)
           .collect(Collectors.toList());
     }
 
@@ -93,13 +95,15 @@ public class DocumentModelService {
    * @param uri - document uri
    * @param analysisResult - analysis result
    * @param text - updated text
+   * @return update document model
    */
   @Synchronized
-  public void processAnalysisResult(String uri, AnalysisResult analysisResult, String text) {
+  public CobolDocumentModel processAnalysisResult(
+      String uri, AnalysisResult analysisResult, String text) {
     CobolDocumentModel document = docs.get(uri);
     if (document == null) {
       LOG.warn("Can't process analysis result of " + uri);
-      return;
+      return null;
     }
     removeAllRelatedDiagnostics(document);
     updateDiagnosticRepo(uri, analysisResult.getDiagnostics());
@@ -108,6 +112,8 @@ public class DocumentModelService {
     updatedModel.setOutlineResult(
         BuildOutlineTreeFromSyntaxTree.convert(analysisResult.getRootNode(), uri));
     docs.put(uri, updatedModel);
+
+    return updatedModel;
   }
 
   /**
@@ -117,12 +123,12 @@ public class DocumentModelService {
    */
   @Synchronized
   public void closeDocument(String uri) {
-    Optional.ofNullable(docs.get(uri))
-        .ifPresent(
-            d -> {
-              d.setOpened(false);
-              removeAllRelatedDiagnostics(d);
-            });
+    docs.computeIfPresent(
+        uri,
+        (k, documentModel) -> {
+          removeAllRelatedDiagnostics(documentModel);
+          return null;
+        });
   }
 
   /**
@@ -130,10 +136,13 @@ public class DocumentModelService {
    *
    * @param uri - document uri
    * @param text - document text
+   * @return document model associated with the uri
    */
   @Synchronized
-  public void changeDocument(String uri, String text) {
-    Optional.ofNullable(docs.get(uri)).ifPresent(d -> d.update(text));
+  public CobolDocumentModel changeDocument(String uri, String text) {
+    CobolDocumentModel model = docs.get(uri);
+    if (model != null) model.update(text);
+    return model;
   }
 
   /**
@@ -153,7 +162,7 @@ public class DocumentModelService {
    */
   @Synchronized
   public List<CobolDocumentModel> getAllOpened() {
-    return docs.values().stream().filter(CobolDocumentModel::isOpened).collect(Collectors.toList());
+    return new ArrayList<>(docs.values());
   }
 
   /**
@@ -183,18 +192,24 @@ public class DocumentModelService {
       String uri = entry.getKey();
       CobolDocumentModel document = entry.getValue();
       List<Diagnostic> diagnostics = diagnosticRepo.get(document.getUri());
-      if (diagnostics != null && document.isOpened()) {
+      if (diagnostics != null) {
         result.put(uri, diagnostics);
       } else {
         result.put(uri, ImmutableList.of());
       }
     }
-
+    fillRemovedDiagnostics(result);
     return result;
   }
 
+  private void fillRemovedDiagnostics(Map<String, List<Diagnostic>> result) {
+    HashSet<String> diagnosticUris = new HashSet<>(diagnosticRepo.keySet());
+    diagnosticUris.removeAll(docs.keySet());
+    diagnosticUris.forEach(e -> result.putIfAbsent(e, Collections.emptyList()));
+  }
+
   private void removeAllRelatedDiagnostics(CobolDocumentModel documentModel) {
-    AnalysisResult analysisResult = documentModel.getAnalysisResult();
+    AnalysisResult analysisResult = documentModel.getLastAnalysisResult();
     if (analysisResult == null || analysisResult.getDiagnostics() == null) {
       return;
     }

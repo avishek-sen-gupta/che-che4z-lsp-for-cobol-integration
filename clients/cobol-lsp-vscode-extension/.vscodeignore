@@ -8,7 +8,7 @@
 # SPDX-License-Identifier: EPL-2.0
 #
 # Contributors:
-#   Broadcom, Inc. - initial API and implementation
+#   Broadcom - initial API and implementation
 
 # Ignore everything
 *
@@ -31,6 +31,7 @@
 !syntaxes/CICS.tmLanguage.json
 !syntaxes/SQL.tmLanguage.json
 !syntaxes/HP.COBOL.tmLanguage.json
+!syntaxes/NDVR.COBOL.tmLanguage.json
 !schema/pgm_conf.schema.json
 !schema/preprocessor_entry.schema.json
 !schema/proc_grps.schema.json
@@ -47,4 +48,5 @@
 !server/jar/server.jar
 # ** bundled dialects implementation 
 !server/jar/dialects/*
-
+# ** snippets
+!snippets.json

@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.idms;
@@ -41,6 +41,8 @@ import org.eclipse.lsp.cobol.common.model.tree.variable.VariableNameAndLocality;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableUsageNode;
 import org.eclipse.lsp.cobol.dialects.idms.IdmsParser.*;
 import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.Position;
+import org.eclipse.lsp4j.Range;
 
 /**
  * This extension of {@link IdmsParserBaseVisitor} applies the semantic analysis based on the
@@ -60,8 +62,21 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
 
   @Override
   public List<Node> visitIdmsStatements(IdmsStatementsContext ctx) {
-      replaceWithMetadata(ctx);
+      // An ON path-status clause is followed by a COBOL imperative statement (optionally closed by
+      // END-IF) which stays in the extended document, so the substitution has to keep an IF around
+      // it. The _IF_ marker makes the COBOL parser treat it as a dialectIfStatment.
+      replaceWithMetadata(ctx, imperativeStatementCallOf(ctx) == null ? "" : IF);
       return visitChildren(ctx);
+  }
+
+  private static ImperativeStatementCallContext imperativeStatementCallOf(IdmsStatementsContext ctx) {
+    if (ctx.idmsOptTermStatement() != null) {
+      return ctx.idmsOptTermStatement().imperativeStatementCall();
+    }
+    if (ctx.idmsMandTermStatement() != null) {
+      return ctx.idmsMandTermStatement().imperativeStatementCall();
+    }
+    return null;
   }
 
     @Override
@@ -88,12 +103,48 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
   }
 
   @Override
+  public List<Node> visitObtainLRStatement(ObtainLRStatementContext ctx) {
+    if (ctx.imperativeStatementCall() == null) {
+      addReplacementContext(ctx);
+    } else {
+      addReplacementImperativeStatementContext(ctx, ctx.imperativeStatementCall());
+    }
+    return visitChildren(ctx);
+  }
+
+  @Override
+  public List<Node> visitEraseStoreModifyLrStatementsOptions(
+      EraseStoreModifyLrStatementsOptionsContext ctx) {
+    if (ctx.imperativeStatementCall() != null) {
+      addReplacementImperativeStatementContext(ctx.getParent(), ctx.imperativeStatementCall());
+    } else {
+      addReplacementContext(ctx);
+    }
+    return visitChildren(ctx);
+  }
+
+  @Override
   public List<Node> visitQualifiedDataName(QualifiedDataNameContext ctx) {
     return addTreeNode(ctx, QualifiedReferenceNode::new);
   }
 
   @Override
   public List<Node> visitIdms_db_entity_name(Idms_db_entity_nameContext ctx) {
+
+    if (ctx.getParent() instanceof EraseStatementContext) {
+      if (((EraseStatementContext) ctx.getParent()).eraseStoreModifyLrStatementsOptions() != null) {
+        return visitChildren(ctx);
+      }
+    } else if (ctx.getParent() instanceof StoreStatementContext) {
+      if (((StoreStatementContext) ctx.getParent()).eraseStoreModifyLrStatementsOptions() != null) {
+        return visitChildren(ctx);
+      }
+    } else if (ctx.getParent() instanceof ModifyStatementContext) {
+      if (((ModifyStatementContext) ctx.getParent()).eraseStoreModifyLrStatementsOptions()
+          != null) {
+        return visitChildren(ctx);
+      }
+    }
     return addTreeNode(ctx, QualifiedReferenceNode::new);
   }
 
@@ -217,4 +268,18 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
         addReplacementContext(ctx, String.format("%s_DIALECT_ %s %s", staticPrefix, contextTextReference, terminator));
         extractions++;
     }
+
+  private void addReplacementImperativeStatementContext(
+      ParserRuleContext ctx, ImperativeStatementCallContext imperativeStatementCallContext) {
+    Range range =
+        new Range(
+            new Position(ctx.getStart().getLine() - 1, ctx.getStart().getCharPositionInLine()),
+            new Position(
+                imperativeStatementCallContext.getStart().getLine() - 1,
+                imperativeStatementCallContext.getStart().getCharPositionInLine()));
+    context.getExtendedDocument().clear(range);
+    context
+        .getExtendedDocument()
+        .replace(DialectUtils.constructRange(imperativeStatementCallContext), "IF 1 + 1 = 2");
+  }
 }

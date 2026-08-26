@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.idms.usecases;
@@ -23,16 +23,18 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
+import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.dialects.idms.IdmsDialect;
 import org.eclipse.lsp.cobol.dialects.idms.utils.Fixtures;
 import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
 import org.eclipse.lsp.cobol.service.CobolDocumentModel;
-import org.eclipse.lsp.cobol.service.delegates.hover.VariableHover;
+import org.eclipse.lsp.cobol.service.delegates.hover.DefinedAndUsedStructureHoverProvider;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
 import org.eclipse.lsp.cobol.test.engine.UseCaseUtils;
 import org.eclipse.lsp4j.*;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -67,20 +69,24 @@ class TestMapDefinition {
                 CopybookProcessingMode.ENABLED,
                 ImmutableList.of(IdmsDialect.NAME),
                 true,
-                    ImmutableMap.of(), false,
-                ImmutableList.of()
-            ));
+                false,
+                SqlProcessing.ENABLED,
+                SqlDecimalComma.DISABLED,
+                ImmutableList.of(),
+                ImmutableMap.of()));
     SourceUnitGraph documentGraph = mock(SourceUnitGraph.class);
     when(documentGraph.isUserSuppliedCopybook(anyString())).thenReturn(false);
+    CobolDocumentModel document = new CobolDocumentModel(UseCaseUtils.DOCUMENT_URI, TEXT, result);
+    document.setLanguageId(CobolLanguageId.COBOL.getId());
     final Hover mapHover =
-        new VariableHover()
+        new DefinedAndUsedStructureHoverProvider()
             .getHover(
-                new CobolDocumentModel(UseCaseUtils.DOCUMENT_URI, TEXT, result),
+                document,
                 new TextDocumentPositionParams(
                     new TextDocumentIdentifier(UseCaseUtils.DOCUMENT_URI), new Position(5, 19)),
                 documentGraph);
     assertEquals(
-        new Hover(ImmutableList.of(Either.forRight(new MarkedString("cobol", "MAP ABCDE.")))),
+        new Hover(new MarkupContent(MarkupKind.MARKDOWN, "```cobol\n       MAP ABCDE.\n\n```")),
         mapHover);
   }
 }

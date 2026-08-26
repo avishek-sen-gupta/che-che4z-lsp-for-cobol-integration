@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.analysis;
@@ -17,6 +17,7 @@ package org.eclipse.lsp.cobol.lsp.analysis;
 import static org.mockito.Mockito.*;
 
 import com.google.common.collect.ImmutableList;
+import com.google.inject.Provider;
 import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,6 +25,7 @@ import java.util.stream.Stream;
 import org.eclipse.lsp.cobol.common.SubroutineService;
 import org.eclipse.lsp.cobol.common.dialects.TrueDialectService;
 import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
+import org.eclipse.lsp.cobol.lsp.jrpc.CobolLanguageClient;
 import org.eclipse.lsp.cobol.service.AnalysisService;
 import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 import org.eclipse.lsp.cobol.service.DocumentModelService;
@@ -44,6 +46,7 @@ class AsyncAnalysisServiceTest {
   @Mock private SubroutineService subroutineService;
   @Mock private Communications communication;
   @Mock private SourceUnitGraph sourceUnitGraph;
+  @Mock private Provider<CobolLanguageClient> clientProvider;
 
   private AsyncAnalysisService asyncAnalysisService;
 
@@ -57,7 +60,9 @@ class AsyncAnalysisServiceTest {
             analysisService,
             copybookService,
             subroutineService,
-            communication);
+            communication,
+            null,
+            clientProvider);
   }
 
   @Test
@@ -74,7 +79,7 @@ class AsyncAnalysisServiceTest {
 
   @Test
   void testReanalyseCopybooksAssociatedPrograms() {
-    Map<String, Integer> analysisResultsRevisionsMock = mock(Map.class);
+    Map<String, Integer> analysisResultsRevisionsMock = new HashMap<>();
     try {
       Field field = AsyncAnalysisService.class.getDeclaredField("analysisResultsRevisions");
       field.setAccessible(true);
@@ -83,16 +88,15 @@ class AsyncAnalysisServiceTest {
       throw new RuntimeException(e);
     }
     List<String> uris = Stream.of("URI1", "URI2").collect(Collectors.toList());
-    SourceUnitGraph.EventSource eventSource = mock(SourceUnitGraph.EventSource.class);
     CobolDocumentModel cobolDocumentModel = mock(CobolDocumentModel.class);
     when(cobolDocumentModel.getUri()).thenReturn("URI1");
     when(cobolDocumentModel.getText()).thenReturn("code");
     when(documentModelService.getAllOpened()).thenReturn(ImmutableList.of(cobolDocumentModel));
     when(documentModelService.get(any())).thenReturn(cobolDocumentModel);
     when(analysisService.isCopybook(anyString(), anyString())).thenReturn(false);
-    when(analysisResultsRevisionsMock.get(cobolDocumentModel.getUri())).thenReturn(1);
+    analysisResultsRevisionsMock.put(cobolDocumentModel.getUri(), 1);
     asyncAnalysisService.reanalyseCopybooksAssociatedPrograms(
-        uris, "copybookUri", "copybookContent", eventSource);
+        uris, "copybookUri", "copybookContent");
 
     verify(cobolDocumentModel, times(2)).getText();
   }

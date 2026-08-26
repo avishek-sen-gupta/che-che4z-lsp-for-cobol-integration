@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -18,7 +18,6 @@ package org.eclipse.lsp.cobol.implicitDialects.cics;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -113,25 +112,9 @@ public class CICSDialect implements CobolDialect {
   }
 
   @Override
-  public List<CompilerDirectiveNode> getCompilerDirectives(DialectProcessingContext context) {
-//    CICSVisitor cicsVisitor = new CICSVisitor(context, messageService, 0);
-    CICSParserBaseVisitor<List<Node>> cicsVisitor = visitorBuilder.visitor(context, messageService);
-    List<SyntaxError> parseError = new ArrayList<>();
-    // parse the document text to get parseTree
-    CICSParser.CompilerDirectiveContext compilerDirectiveContext =
-        parseCICSDirective(
-            context.getExtendedDocument().toString(),
-            context.getExtendedDocument().getUri(),
-            parseError);
-
-    // Traverse the parse tree to generate dialect specific nodes
-    List<Node> nodes =
-        new ArrayList<>(cicsVisitor.visitCompilerDirective(compilerDirectiveContext));
-
-    return nodes.stream()
-        .filter(CompilerDirectiveNode.class::isInstance)
-        .map(CompilerDirectiveNode.class::cast)
-        .collect(Collectors.toList());
+  public List<CompilerDirectiveNode> getCompilerDirectives(
+      DialectProcessingContext context, List<SyntaxError> diagnostics) {
+    return TranslatorOptionsUtils.extractCompilerDirectives(context, diagnostics);
   }
 
   private CICSParser.StartRuleContext parseCICS(
@@ -162,21 +145,4 @@ public class CICSDialect implements CobolDialect {
             setDialectRecursively(child, dialect);
         }
     }
-
-  private CICSParser.CompilerDirectiveContext parseCICSDirective(
-      String text, String programDocumentUri, List<SyntaxError> errors) {
-    CICSLexer lexer = new CICSLexer(CharStreams.fromString(text));
-    CommonTokenStream tokens = new CommonTokenStream(lexer);
-    CICSParser parser = new CICSParser(tokens);
-    CICSErrorListener listener = new CICSErrorListener(programDocumentUri);
-    lexer.removeErrorListeners();
-    lexer.addErrorListener(listener);
-    parser.removeErrorListeners();
-    parser.addErrorListener(listener);
-    parser.setErrorHandler(new CICSErrorStrategy(messageService));
-
-    CICSParser.CompilerDirectiveContext compilerDirectiveContext = parser.compilerDirective();
-    errors.addAll(listener.getErrors());
-    return compilerDirectiveContext;
-  }
 }

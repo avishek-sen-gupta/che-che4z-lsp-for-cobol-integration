@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -19,12 +19,14 @@ import static org.mockito.Mockito.*;
 
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.Locale;
+import java.util.Properties;
 import java.util.jar.JarFile;
 import org.eclipse.lsp.cobol.common.DialectRegistryItem;
 import org.junit.jupiter.api.Assertions;
@@ -59,14 +61,20 @@ class CobolLSPropertiesResourceBundleTest {
         new CobolLSPropertiesResourceBundle("resourceBundles/test", Locale.FRENCH);
     CobolLSPropertiesResourceBundle spyBundle = spy(bundle);
 
-    doReturn(
-            org.apache.commons.io.IOUtils.toInputStream(
-                "test.test: flip flop", StandardCharsets.UTF_8))
+    doAnswer(
+            i -> {
+              try (InputStream stream =
+                  org.apache.commons.io.IOUtils.toInputStream(
+                      "test.test: flip flop", StandardCharsets.UTF_8)) {
+                ((Properties) i.getArgument(0)).load(stream);
+              }
+              return null;
+            })
         .when(spyBundle)
-        .getDialectResources(any(), any());
+        .loadDialectResources(any(), any(), any());
     DialectRegistryItem dialectRegistryItem =
         new DialectRegistryItem(
-            "dummyDialect", URI.create("file://uri"), "dummy dialect", "dummyDialect");
+            "dummyDialect", 1, URI.create("file://uri"), "dummy dialect", "dummyDialect");
     spyBundle.updateMessageResourceBundle(dialectRegistryItem);
     Assertions.assertEquals(spyBundle.handleGetObject("test.test"), "flip flop");
     Assertions.assertEquals(spyBundle.handleGetObject("1"), "French test selected.");
@@ -83,7 +91,7 @@ class CobolLSPropertiesResourceBundleTest {
   @Test
   void updateMessageResourceBundleWhenResourcesNotFound() throws IOException {
     DialectRegistryItem dialectRegistryItem =
-        new DialectRegistryItem("dummyDialect", uri, "dummy dialect", "dummyDialect");
+        new DialectRegistryItem("dummyDialect", 2, uri, "dummy dialect", "dummyDialect");
     CobolLSPropertiesResourceBundle bundle =
         new CobolLSPropertiesResourceBundle("resourceBundles/test", Locale.FRENCH);
     bundle.updateMessageResourceBundle(dialectRegistryItem);
@@ -95,7 +103,7 @@ class CobolLSPropertiesResourceBundleTest {
   @Test
   void updateMessageResourceBundleNoLocale() throws IOException {
     DialectRegistryItem dialectRegistryItem =
-        new DialectRegistryItem("dummyDialect", uri, "dummy dialect", "dummyDialect");
+        new DialectRegistryItem("dummyDialect", 2, uri, "dummy dialect", "dummyDialect");
     CobolLSPropertiesResourceBundle bundle =
         new CobolLSPropertiesResourceBundle("resourceBundles/test", new Locale(""));
     bundle.updateMessageResourceBundle(dialectRegistryItem);
@@ -107,7 +115,7 @@ class CobolLSPropertiesResourceBundleTest {
   @Test
   void updateMessageResourceBundleLocaleWithScript() throws IOException {
     DialectRegistryItem dialectRegistryItem =
-        new DialectRegistryItem("dummyDialect", uri, "dummy dialect", "dummyDialect");
+        new DialectRegistryItem("dummyDialect", 2, uri, "dummy dialect", "dummyDialect");
     Locale locale =
         new Locale.Builder().setLanguage("fr").setRegion("FR").setScript("Latn").build();
     CobolLSPropertiesResourceBundle bundle =
@@ -121,7 +129,7 @@ class CobolLSPropertiesResourceBundleTest {
   @Test
   void updateMessageResourceBundleLocaleWithVariant() throws IOException {
     DialectRegistryItem dialectRegistryItem =
-        new DialectRegistryItem("dummyDialect", uri, "dummy dialect", "dummyDialect");
+        new DialectRegistryItem("dummyDialect", 1, uri, "dummy dialect", "dummyDialect");
     Locale locale =
         new Locale.Builder().setLanguage("fr").setRegion("FR").setVariant("variant").build();
     CobolLSPropertiesResourceBundle bundle =
@@ -135,7 +143,7 @@ class CobolLSPropertiesResourceBundleTest {
   @Test
   void updateMessageResourceBundleLocaleWithScriptVariant() throws IOException {
     DialectRegistryItem dialectRegistryItem =
-        new DialectRegistryItem("dummyDialect", uri, "dummy dialect", "dummyDialect");
+        new DialectRegistryItem("dummyDialect", 1, uri, "dummy dialect", "dummyDialect");
     Locale locale =
         new Locale.Builder()
             .setLanguage("fr")

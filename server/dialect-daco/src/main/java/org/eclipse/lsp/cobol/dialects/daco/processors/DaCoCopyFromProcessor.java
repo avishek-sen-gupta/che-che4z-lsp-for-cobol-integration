@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.processors;
@@ -95,7 +95,8 @@ public class DaCoCopyFromProcessor implements Processor<DaCoCopyFromNode> {
               newName,
               groupItemNode.isGlobal(),
               groupItemNode.isRedefines(),
-              groupItemNode.getUsageFormat());
+              groupItemNode.getUsageFormat(),
+              groupItemNode.isExternal());
       createVariableDefinitionNameNode(node, newName).ifPresent(cloneNode::addChild);
 
       groupItemNode
@@ -130,12 +131,34 @@ public class DaCoCopyFromProcessor implements Processor<DaCoCopyFromNode> {
       MultiTableDataNameNode cloneNode =
           new MultiTableDataNameNode(
               srcNode.getLocality(),
-              srcNode.getLevel(),
+              srcNode.getLevel() + lvlShift,
               newName,
               srcNode.isRedefines(),
               srcNode.getOccursClause(),
               srcNode.getUsageFormat(),
               srcNode.isGlobal());
+      createVariableDefinitionNameNode(node, newName).ifPresent(cloneNode::addChild);
+      srcNode
+          .getChildren()
+          .forEach(c -> cloneVarNode(lvlShift, c, newSuffix).ifPresent(cloneNode::addChild));
+      return Optional.of(cloneNode);
+    }
+    if (node instanceof TableDataNameNode) {
+      TableDataNameNode srcNode = (TableDataNameNode) node;
+      String newName = srcNode.getName().substring(0, srcNode.getName().length() - 2) + newSuffix;
+      TableDataNameNode cloneNode =
+          new TableDataNameNode(
+              srcNode.getLocality(),
+              srcNode.getLevel() + lvlShift,
+              newName,
+              srcNode.isRedefines(),
+              srcNode.isGlobal(),
+              srcNode.getPicClause(),
+              srcNode.getValue(),
+              srcNode.getOccursTimes(),
+              srcNode.getUsageFormat(),
+              srcNode.isBlankWhenZeroPresent(),
+              srcNode.isSignClausePresent());
       createVariableDefinitionNameNode(node, newName).ifPresent(cloneNode::addChild);
       srcNode
           .getChildren()

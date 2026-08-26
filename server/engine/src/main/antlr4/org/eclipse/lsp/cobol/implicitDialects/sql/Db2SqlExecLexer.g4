@@ -9,11 +9,15 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 lexer grammar Db2SqlExecLexer;
 @lexer::members {
-   boolean commaCharAllowed = true;
+    private boolean commaCharAllowed = false;
+
+    public void setSQLDecimalCommaAllowed(boolean value) {
+        this.commaCharAllowed = value;
+    }
 }
 channels{COMMENTS}
 

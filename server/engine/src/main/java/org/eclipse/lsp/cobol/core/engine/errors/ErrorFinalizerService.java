@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.engine.errors;
@@ -170,6 +170,7 @@ public class ErrorFinalizerService {
           "cobolParser.expectSpace",
           "procedureDivisionHeaderProcess.wrongNodeLocation",
           "procedureDivisionHeaderProcess.wrongDataName",
+          "analysis.unusedVariable",
           ErrorCodes.MISSING_COPYBOOK.getLabel());
 
   @Inject
@@ -287,13 +288,17 @@ public class ErrorFinalizerService {
    * update the diagnostics level set by client
    *
    * @param levels
+   * @return a boolean if filterDiagnostics is changed
    */
-  public void updateDiagnosticsLevel(List<Object> levels) {
+  public boolean updateDiagnosticsLevel(List<Object> levels) {
     if (levels != null && !levels.isEmpty()) {
       if (levels.get(0) instanceof JsonElement) {
         JsonElement option = (JsonElement) levels.get(0);
+        boolean isUpdated = AnalysisMode.valueOf(option.getAsString()) != filterDiagnostics;
         filterDiagnostics = AnalysisMode.valueOf(option.getAsString());
+        return isUpdated;
       }
     }
+    return false;
   }
 }

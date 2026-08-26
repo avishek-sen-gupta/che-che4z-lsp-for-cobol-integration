@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -24,6 +24,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.CopybookModel;
 import org.eclipse.lsp.cobol.common.copybook.CopybookName;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
@@ -50,6 +51,7 @@ import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2DeclareVariableNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2ProcedureDivisionNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2WorkingAndLinkageSectionNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.processor.*;
+import org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +63,9 @@ import java.util.stream.Collectors;
 @Slf4j
 public class Db2SqlDialect implements CobolDialect {
   public static final String DIALECT_NAME = "db2";
-  public static final String SQL_BACKEND_SETTING = "target-sql-backend";
+  public static final String SQL_BACKEND_SETTING = SettingsParametersEnum.SQL_BACKEND_SETTING.label;
+  public static final String SQL_PROCESSING_ENABLED_SETTING =
+      SettingsParametersEnum.SQL_PROCESSING_ENABLED_SETTING.label;
 
   private final CopybookService copybookService;
   private final MessageService messageService;
@@ -90,8 +94,9 @@ public class Db2SqlDialect implements CobolDialect {
 
   @Override
   public ResultWithErrors<DialectOutcome> processText(DialectProcessingContext context) {
-//    Db2SqlVisitor db2SqlVisitor = new Db2SqlVisitor(0, context, messageService, copybookService);
-    MarkerDb2SqlVisitor db2SqlVisitor = visitorBuilder.visitor(context, messageService, copybookService);
+    boolean isSqlProcessingEnabled = getSqlProcessingEnabled(context);
+    MarkerDb2SqlVisitor db2SqlVisitor =
+        visitorBuilder.visitor(context, messageService, copybookService, isSqlProcessingEnabled);
 
     List<SyntaxError> parseError = new ArrayList<>();
 
@@ -175,6 +180,10 @@ public class Db2SqlDialect implements CobolDialect {
     return result;
   }
 
+  private boolean getSqlProcessingEnabled(DialectProcessingContext context) {
+    return context.getConfig().getSqlProcessing() == SqlProcessing.ENABLED;
+  }
+
   /**
    * Retrieve optional {@link CopybookModel} of the {@link PredefinedCopybooks} for the given name
    * if it is predefined.
@@ -186,7 +195,7 @@ public class Db2SqlDialect implements CobolDialect {
   private Optional<CopybookModel> tryResolvePredefinedCopybook(
       CopybookName copybookName, Map<String, JsonElement> dialectsSettings) {
     SQLBackend sqlBackend =
-        Optional.ofNullable(dialectsSettings.get("target-sql-backend"))
+        Optional.ofNullable(dialectsSettings.get(SQL_BACKEND_SETTING))
             .map(JsonElement::getAsString)
             .map(SQLBackend::valueOf)
             .orElse(SQLBackend.DB2_SERVER);

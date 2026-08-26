@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
@@ -20,22 +20,24 @@ import {
 } from "../services/snippetcompletion/SnippetCompletionProvider";
 import { LANGUAGE_ID } from "../constants";
 import { initSmartTab, RangeTabShiftStore } from "../commands/SmartTabCommand";
-import { initTelemetry, registerEvent } from "../services/reporter";
+import { initTelemetry, telemetryEvent } from "../services/reporter";
 import { SubroutinesCompletionsProvider } from "../services/subroutines/SubroutinesCompletionsProvider";
 import { CopybooksCompletionProvider } from "../services/copybook/CopybooksCompletionProvider";
-
-let outputChannel: vscode.OutputChannel;
+import { initializeExternalAPIs } from "../services/ExternalAPIsService";
+import { outputChannel } from "../services/util/OutputChannel";
+import { createSampleConfiguration } from "../commands/CreateSampleConfiguration";
 
 export async function activate(context: ExtensionContext) {
   await initTelemetry(context);
-  registerEvent(
+  telemetryEvent(
     "log",
     ["bootstrap", "experiment-tag"],
     "Web extension activation event was triggered",
   );
 
-  outputChannel = vscode.window.createOutputChannel("COBOL Language Support");
   outputChannel.appendLine("Activating COBOL Language Support Web Extension");
+
+  await initializeExternalAPIs(context.globalStorageUri);
 
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
@@ -51,6 +53,13 @@ export async function activate(context: ExtensionContext) {
         outputChannel.appendLine("Executing Insert Cobol Snippet command");
         await pickSnippet();
       },
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "cobol-lsp.configuration.create-sample",
+      createSampleConfiguration,
     ),
   );
 
@@ -72,7 +81,7 @@ export async function activate(context: ExtensionContext) {
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(
       { language: LANGUAGE_ID },
-      new CopybooksCompletionProvider(undefined, outputChannel),
+      new CopybooksCompletionProvider(),
     ),
   );
 }

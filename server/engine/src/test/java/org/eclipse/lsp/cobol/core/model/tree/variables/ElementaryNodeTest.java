@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -174,6 +174,9 @@ class ElementaryNodeTest {
     assertEquals(EffectiveDataType.STRING, node.getEffectiveDataType());
 
     node = getNode("PIC 99A(3)", UsageFormat.COMPUTATIONAL_5);
+    assertEquals(EffectiveDataType.STRING, node.getEffectiveDataType());
+
+    node = getNode("PIC U(3)", UsageFormat.COMPUTATIONAL_5);
     assertEquals(EffectiveDataType.STRING, node.getEffectiveDataType());
   }
 }

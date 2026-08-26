@@ -1,6 +1,40 @@
 # Changelog
 All notable changes to the COBOL Language Support extension are documented in this file.
 
+## [2.5.1](https://github.com/eclipse-che4z/che-che4z-lsp-for-cobol/compare/2.5.0...2.5.1) (2026-06-30)
+
+#### Changed
+- Readme update
+- Miscellaneous bug fixes
+
+## [2.5.0](https://github.com/eclipse-che4z/che-che4z-lsp-for-cobol/compare/2.4.3...2.5.0) (2026-05-26)
+
+#### Fixed
+- Allow fullselect as an option after db2 IN keyword
+- Allow PARAGRAPH as a variable name
+- Allow SQL expressions prior to db2 LIKE keyword
+- Apply REPLACE statements after evaluating COPY statements
+- Relax ordering requirements on FETCH FIRST in ROWS and other clauses
+- UTF8 PIC clauses not recognized as alphanumeric
+- Fix wrong redirection of procedures in control flow graph
+- Miscellaneous bug fixes
+
+#### Changed
+- Remote copybooks are now opened directly in Zowe Explorer rather than being downloaded to the workspace
+- Readme update and redesign
+- Improve replacing performance
+
+#### Added
+- Synchronous copybook resolution
+- Zowe request throttling
+- Unused variables diagnostics support
+- Support copybooks in TAR files
+- Support British Pound sign
+- Add hover information to paragraphs
+- Allow to specify Java location
+- Bulk copybook prefetching
+- Introduce setting that enables use of comma as a decimal marker in SQL statements
+
 ## [2.4.3](https://github.com/eclipse-che4z/che-che4z-lsp-for-cobol/compare/2.4.2...2.4.3) (2025-07-23)
 
 #### Changed

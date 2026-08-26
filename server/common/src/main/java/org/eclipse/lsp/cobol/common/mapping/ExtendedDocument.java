@@ -9,13 +9,15 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.mapping;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp4j.Location;
@@ -68,6 +70,22 @@ public class ExtendedDocument {
       sb.append(baseText.getLines().get(i).toString());
       if (i != endLine) {
         sb.append("\r\n");
+      }
+    }
+    return sb.toString();
+  }
+
+  public String getBaseText(int startLine, int endLine) {
+    endLine = Math.min(endLine, baseText.getLines().size() - 1);
+    int estimatedSize = 0;
+    for (int i = startLine; i <= endLine; i++) {
+      estimatedSize += baseText.getLines().get(i).size() + 1;
+    }
+    StringBuilder sb = new StringBuilder(estimatedSize);
+    for (int i = startLine; i <= endLine; i++) {
+      baseText.getLines().get(i).appendString(sb);
+      if (i != endLine) {
+        sb.append('\n');
       }
     }
     return sb.toString();
@@ -143,6 +161,35 @@ public class ExtendedDocument {
   public void replace(Range range, String newText) {
     Range updatedRange = updateRangeDueToChanges(range);
     currentText.replace(updatedRange, newText, mapLocation(range));
+    dirty = true;
+  }
+
+  /**
+   * Replaces given range of text with a new text using replacement map
+   *
+   * @param range - range of text to replace
+   * @param statementRange - a statement range within the text range
+   * @param statementMap - a map of token names and its ranges from the original text
+   * @param replacementMap - a new text replacement map
+   * @return a HashMap of mapped tokens
+   */
+  public Map<String, TextMapReplacer.Token> replace(
+      Range range, Range statementRange, Map<String, Range> statementMap, String replacementMap) {
+    Range updatedRange = updateRangeDueToChanges(range);
+    Range updatedStatementRange = updateRangeDueToChanges(statementRange);
+    Map<String, Range> updatedStatementMap =
+        statementMap.entrySet().stream()
+            .collect(
+                Collectors.toMap(Map.Entry::getKey, e -> updateRangeDueToChanges(e.getValue())));
+
+    dirty = true;
+    return currentText.replace(
+        updatedRange, updatedStatementRange, updatedStatementMap, replacementMap);
+  }
+
+  public void delete(int lineNumber) {
+    int deleteLine = updateLineDueToChanges(lineNumber);
+    currentText.delete(deleteLine);
     dirty = true;
   }
 

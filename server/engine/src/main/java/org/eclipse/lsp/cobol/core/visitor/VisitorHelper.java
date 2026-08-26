@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.core.visitor;
@@ -105,7 +105,8 @@ public class VisitorHelper {
       List<org.eclipse.lsp.cobol.core.CobolParser.DataPictureClauseContext> clauses) {
     List<String> list = new ArrayList<>(clauses.size());
     for (CobolParser.DataPictureClauseContext clause : clauses) {
-      list.add(clause.pictureString().getText());
+      final PictureStringContext picture = clause.pictureString();
+      if (picture != null) list.add(clause.pictureString().getText());
     }
     return list;
   }

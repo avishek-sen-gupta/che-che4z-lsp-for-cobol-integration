@@ -9,13 +9,14 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.common.model.tree.variable;
 
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import lombok.EqualsAndHashCode;
@@ -27,6 +28,7 @@ import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.NodeType;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp4j.Location;
+import org.eclipse.lsp4j.MarkupContent;
 
 /** The class represents variable usage in COBOL program. */
 @ToString(callSuper = true)
@@ -81,7 +83,9 @@ public class VariableUsageNode extends Node implements DefinedAndUsedStructure, 
   }
 
   @Override
-  public String getFormattedDisplayString() {
-    return getDefinition().map(VariableNode::getFullVariableDescription).orElse("");
+  public List<MarkupContent> getFormattedDisplayString() {
+    return getDefinition()
+        .map(VariableNode::getFullVariableDescription)
+        .orElse(Collections.emptyList());
   }
 }

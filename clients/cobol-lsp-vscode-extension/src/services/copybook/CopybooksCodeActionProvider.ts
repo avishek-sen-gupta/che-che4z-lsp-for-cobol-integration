@@ -9,11 +9,11 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as vscode from "vscode";
 import { QUICKFIX_GOTOSETTINGS } from "../../constants";
-import { registerEvent } from "../reporter";
+import { telemetryEvent } from "../reporter";
 
 export class CopybooksCodeActionProvider implements vscode.CodeActionProvider {
   public provideCodeActions(
@@ -26,7 +26,7 @@ export class CopybooksCodeActionProvider implements vscode.CodeActionProvider {
       return [];
     }
     // Telemetry should be collected only if shouldHaveCodeAction is true
-    registerEvent(
+    telemetryEvent(
       "QuickFix for copybook activation",
       ["COBOL", "hover", "copybook", "quickfix"],
       "User try to understand the syntax error for a missing copybook",

@@ -9,14 +9,14 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as vscode from "vscode";
 import {
   QUICKFIX_UPDATE_DIALECTSSETTINGS,
   QUICKFIX_UPDATE_SERVER_TO_JAVA,
 } from "../../constants";
-import { registerEvent } from "../reporter";
+import { telemetryEvent } from "../reporter";
 
 export class ServerRuntimeCodeActionProvider
   implements vscode.CodeActionProvider
@@ -31,7 +31,7 @@ export class ServerRuntimeCodeActionProvider
       return [];
     }
     // Telemetry should be collected only if shouldHaveCodeAction is true
-    registerEvent(
+    telemetryEvent(
       "QuickFix for server type",
       ["COBOL", "native server", "server type", "quickfix"],
       "User is trying to fix in compatible server type and dialects",

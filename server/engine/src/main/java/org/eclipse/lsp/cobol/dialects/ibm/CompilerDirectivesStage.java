@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.ibm;
@@ -38,7 +38,7 @@ public class CompilerDirectivesStage
     implements Stage<AnalysisContext, Void, List<CompilerDirectiveNode>> {
   private static final Pattern COMPILER_DIRECTIVE_LINE =
       Pattern.compile("(?i)(\\d.{5}.*|\\s*+)\\*?(CBL|PROCESS)\\s+(?<directives>.+)");
-  private static final Pattern NEW_LINE_PATTERN = Pattern.compile("\n\r?");
+  private static final Pattern NEW_LINE_PATTERN = Pattern.compile("\r?\n");
   private static final Pattern DIALECT_FILLER_PATTERN =
       Pattern.compile(String.format("^[%s%s]*$", "\\s", CobolDialect.FILLER));
   private final MessageService messageService;
@@ -82,6 +82,7 @@ public class CompilerDirectivesStage
       parser.addErrorListener(new CompilerDirectivesErrorListener(ctx, startPosition));
       new CompilerDirectivesVisitor(ctx, messageService, startPosition)
           .visit(parser.compilerOptions());
+      ctx.getExtendedDocument().commitTransformations();
     }
   }
 

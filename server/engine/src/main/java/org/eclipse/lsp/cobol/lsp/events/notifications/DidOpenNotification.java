@@ -9,13 +9,12 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.events.notifications;
 
 import org.eclipse.lsp.cobol.lsp.LspNotification;
-import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
 import org.eclipse.lsp.cobol.lsp.handlers.text.DidOpenHandler;
 import org.eclipse.lsp4j.DidOpenTextDocumentParams;
 
@@ -31,6 +30,6 @@ public class DidOpenNotification implements LspNotification {
 
   @Override
   public void execute() {
-    didOpenHandler.didOpen(params, SourceUnitGraph.EventSource.IDE);
+    didOpenHandler.didOpen(params);
   }
 }

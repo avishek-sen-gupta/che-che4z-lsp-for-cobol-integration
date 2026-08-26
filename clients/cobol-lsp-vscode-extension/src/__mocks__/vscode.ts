@@ -9,33 +9,77 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import * as path from "path";
-import type {
-  CompletionItem as VSCodeCompletionItem,
-  OutputChannel as OutputChannelType,
-  Position as PositionType,
-  Uri as UriType,
+import {
+  type CompletionItem as VSCodeCompletionItem,
+  type LogOutputChannel as LogOutputChannelType,
+  type Position as PositionType,
+  type Uri as UriType,
+  type TextDocument,
 } from "vscode";
-import { Uri as UriMock } from "./UriMock";
+import { URI, Utils } from "vscode-uri";
 
-import { readFile } from "fs/promises";
+export const readDirectoryResult: {
+  [path: string]:
+    | (string | { name: string; mode?: string } | [string, FileType])[]
+    | Error;
+} = {};
+
+export const readFileResult: {
+  [path: string]: string | Error;
+} = {};
+
+export const findFilesResult: {
+  [path: string]: URI[];
+} = {};
+
+export const showQuickPickMock = jest.fn();
+
+const workspaceFoldersMock = [
+  {
+    name: "workspace",
+    uri: URI.file("/workspace"),
+    index: 0,
+  },
+  {
+    name: "other",
+    uri: URI.file("/other"),
+    index: 1,
+  },
+];
+export const getWorkspaceFolderResult = workspaceFoldersMock[0];
+
+export const getConfigurationResult: { [key: string]: unknown } = {
+  "cobol-lsp.smart-tab": undefined,
+};
+
+export const diagnosticsCollectionMock = {
+  set: jest.fn(),
+  clear: jest.fn(),
+  delete: jest.fn(),
+};
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace workspace {
-  export const workspaceFolders = [
-    {
-      uri: UriMock.parse("/"),
+  export const workspaceFolders = workspaceFoldersMock;
+
+  export function registerFileSystemProvider(
+    _scheme: string,
+    _provider: unknown,
+    _options?: {
+      readonly isCaseSensitive?: boolean;
+      readonly isReadonly?: boolean;
     },
-  ];
+  ): Disposable {
+    return new Disposable();
+  }
+
   export function getConfiguration() {
     return {
       get: (key: string) => {
-        if ("cobol-lsp.smart-tab" === key) {
-          return undefined;
-        }
-        return jest.fn();
+        return getConfigurationResult[key];
       },
     };
   }
@@ -44,33 +88,79 @@ export namespace workspace {
       onDidCreate: jest.fn(),
       onDidDelete: jest.fn(),
       onDidChange: jest.fn(),
+      dispose: jest.fn(),
     };
   }
   export const fs = {
-    readFile: async (uri: UriType): Promise<Uint8Array | undefined> => {
-      const path = uri.fsPath;
-      try {
-        return await readFile(path);
-      } catch (_err) {
-        // ignore
+    readFile: jest.fn().mockImplementation((uri: UriType) => {
+      const result = readFileResult[uri.path];
+      if (!result) {
+        throw new FileNotFound();
       }
-    },
+      if (result instanceof Error) {
+        throw result;
+      } else {
+        return Promise.resolve(new TextEncoder().encode(result));
+      }
+    }),
     writeFile: jest.fn(),
     delete: jest.fn().mockReturnValue(true),
-    readDirectory: jest.fn().mockResolvedValue([["fileName", 2]]),
+    readDirectory: jest.fn().mockImplementation((uri: UriType) => {
+      const resultKey = Object.keys(readDirectoryResult).find(
+        (key: string) => uri.path === key,
+      );
+      if (!resultKey) {
+        return Promise.resolve([]);
+      }
+      const result = readDirectoryResult[resultKey];
+      if (result instanceof Error) {
+        throw result;
+      } else {
+        return Promise.resolve(
+          result.map((file) => {
+            if (typeof file === "string") {
+              return [`${file}.cpy`, FileType.File];
+            } else if (Array.isArray(file)) {
+              return file;
+            } else if (typeof file === "object") {
+              return [
+                file.name,
+                file.mode?.startsWith("d") ? FileType.Directory : FileType.File,
+              ];
+            }
+          }),
+        );
+      }
+    }),
     createDirectory: jest.fn(),
+    stat: jest.fn(),
   };
 
   export const onDidChangeConfiguration = jest
     .fn()
     .mockReturnValue("onDidChangeConfiguration");
-  export const textDocuments = [];
-  export function getWorkspaceFolder() {}
-  export async function findFiles() {
-    return Promise.resolve([]);
+  export const textDocuments: TextDocument[] = [
+    {
+      uri: URI.file("/workspace/edited"),
+      getText: jest.fn().mockReturnValue("EDITED"),
+    } as unknown as TextDocument,
+  ];
+  export function getWorkspaceFolder() {
+    return workspaceFolders[0];
   }
+  export const findFiles = jest
+    .fn()
+    .mockImplementation((pattern: { baseUri: URI }) => {
+      return Promise.resolve(findFilesResult[pattern.baseUri.path] ?? []);
+    });
   export const onDidChangeTextDocument = jest.fn();
   export const onDidCloseTextDocument = jest.fn();
+  export const asRelativePath = jest
+    .fn()
+    .mockImplementation((documentUri: UriType) => {
+      const wsPath = getWorkspaceFolder().uri.fsPath;
+      return path.relative(wsPath, documentUri.fsPath);
+    });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -92,6 +182,7 @@ export namespace window {
     .fn()
     .mockImplementation(() => Promise.resolve());
   export const showInformationMessage = jest.fn().mockReturnValue("Ok");
+  export const showInputBox = jest.fn();
   export const createStatusBarItem = () => {
     return { show: () => {} };
   };
@@ -100,7 +191,7 @@ export namespace window {
     onDidChangeSelection: jest.fn(),
   });
   export const setStatusBarMessage = jest.fn().mockResolvedValue(true);
-  export const createOutputChannel = (name: string): OutputChannelType => ({
+  export const createOutputChannel = (name: string): LogOutputChannelType => ({
     name,
     append: jest.fn(),
     appendLine: jest.fn(),
@@ -109,6 +200,13 @@ export namespace window {
     show: jest.fn(),
     hide: jest.fn(),
     dispose: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    trace: jest.fn(),
+    warn: jest.fn(),
+    onDidChangeLogLevel: jest.fn(),
+    logLevel: 2,
   });
   export const activeTextEditor = {
     document: {
@@ -134,12 +232,14 @@ export namespace window {
     .mockImplementation((_options, task: () => void) => {
       task();
     });
+  export const showQuickPick = showQuickPickMock;
 }
 export enum StatusBarAlignment {
   Right,
 }
 
-export const Uri = UriMock;
+export const Uri = URI;
+Object.assign(Uri, Utils);
 
 export enum ConfigurationTarget {
   Global = 1,
@@ -226,13 +326,12 @@ export const TextEditorEdit = {
 export const languages = {
   registerCodeActionsProvider: jest.fn(),
   registerCompletionItemProvider: jest.fn(),
-  createDiagnosticCollection: jest.fn().mockReturnValue({
-    clear: jest.fn(),
-    delete: jest.fn(),
-  }),
+  createDiagnosticCollection: jest
+    .fn()
+    .mockReturnValue(diagnosticsCollectionMock),
 };
 
-class FileNotFound extends Error {
+export class FileNotFound extends Error {
   code: string;
   constructor() {
     super();
@@ -244,12 +343,15 @@ export const FileSystemError = {
   FileNotFound: () => {
     return new FileNotFound();
   },
+  NoPermissions: () => {
+    return new Error("No Permission");
+  },
 };
 
 export const RelativePattern = jest
   .fn()
-  .mockImplementation((base: string, pattern: string) => ({
-    base,
+  .mockImplementation((baseUri: URI, pattern: string) => ({
+    baseUri,
     pattern,
   }));
 
@@ -267,4 +369,52 @@ export enum DiagnosticSeverity {
   Warning = 1,
   Information = 2,
   Hint = 3,
+}
+
+export enum FileType {
+  Unknown = 0,
+  File = 1,
+  Directory = 2,
+  SymbolicLink = 64,
+}
+
+export class Disposable {
+  /**
+   * Creates a new Disposable calling the provided function
+   * on dispose.
+   * @param callOnDispose Function that disposes something.
+   */
+  // eslint-disable-next-line
+  constructor(private callOnDispose?: Function) {}
+  /**
+   * Dispose this object.
+   */
+  // eslint-disable-next-line
+  public dispose(): any {
+    this.callOnDispose?.();
+  }
+}
+
+export class EventEmitter<T> {
+  event: Event<T>;
+  constructor() {
+    this.event = () => {};
+  }
+  fire(data: T) {
+    this.event(() => data);
+  }
+  dispose() {}
+}
+export interface Event<T> {
+  (
+    listener: (e: T) => unknown,
+    thisArgs?: unknown,
+    disposables?: unknown[],
+  ): unknown;
+}
+
+export enum FileChangeType {
+  Changed = 1,
+  Created = 2,
+  Deleted = 3,
 }

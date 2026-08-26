@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import {
   CFASTNode,
@@ -426,6 +426,35 @@ export class CicsReturnInstruction extends SimpleCobolInstruction {
     return [];
   }
 }
+
+/**
+ * EXEC CICS ABEND instruction
+ */
+export class CicsAbendInstruction extends SimpleCobolInstruction {
+  public constructor(
+    node: CFASTNode,
+    private cancel: boolean,
+  ) {
+    super(node);
+  }
+
+  public override execute(context: VmContext): number[] {
+    this.markProcessed();
+
+    if (this.cancel) {
+      return [];
+    }
+
+    const position = context.getHandleAbendEntry();
+
+    if (position > 0) {
+      return [position + 1];
+    }
+
+    return [];
+  }
+}
+
 
 /**
  * EXEC SQL WHENEVER instruction

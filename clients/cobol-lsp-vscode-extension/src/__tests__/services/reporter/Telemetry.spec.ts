@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 const USERNAME: string = "usernameToAnonymize";
 jest.mock("node:os", () => ({
@@ -24,8 +24,8 @@ import * as path from "path";
 import { TelemetryEventMeasurements } from "../../../services/reporter/model";
 import {
   anonymizeContent,
-  registerEvent,
-  registerExceptionEvent,
+  telemetryEvent,
+  telemetryExceptionEvent,
   setReporter,
 } from "../../../services/reporter";
 
@@ -52,10 +52,10 @@ function runScenario(
   telemetryMeasurements?: TelemetryEventMeasurements,
 ) {
   if (eventType === "log") {
-    registerEvent(eventName!, categories, undefined, telemetryMeasurements);
+    telemetryEvent(eventName!, categories, undefined, telemetryMeasurements);
     expect(spySendTelemetry).toHaveBeenCalledTimes(expectedNumberOfCalls);
   } else {
-    registerExceptionEvent(eventName, rootCause!, categories);
+    telemetryExceptionEvent(eventName, rootCause!, categories);
     expect(spySendExceptionTelemetry).toHaveBeenCalledTimes(
       expectedNumberOfCalls,
     );

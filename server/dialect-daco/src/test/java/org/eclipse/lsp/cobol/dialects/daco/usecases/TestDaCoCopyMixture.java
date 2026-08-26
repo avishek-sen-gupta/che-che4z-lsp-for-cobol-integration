@@ -8,18 +8,24 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  */
 package org.eclipse.lsp.cobol.dialects.daco.usecases;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
+import org.eclipse.lsp.cobol.common.error.ErrorSource;
 import org.eclipse.lsp.cobol.dialects.daco.DaCoDialect;
 import org.eclipse.lsp.cobol.dialects.idms.IdmsDialect;
 import org.eclipse.lsp.cobol.test.CobolText;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
+import org.eclipse.lsp4j.Range;
 import org.junit.jupiter.api.Test;
 
 /** A test case for COPY FROM statement */
@@ -47,8 +53,8 @@ public class TestDaCoCopyMixture {
           + "           03 COPY MAID {~DC1!DaCo}.\n"
           + "           03 COPY IDMS {~IC1!IDMS}.\n"
           + "       PROCEDURE DIVISION.\n"
-          + "           DISPLAY {$DACO-NODE} OF {$ROOT}.\n"
-          + "           DISPLAY {$IDMS-NODE} OF {$ROOT}.\n"
+          + "           DISPLAY {_{$DACO-NODE} OF {$ROOT}|1_}.\n"
+          + "           DISPLAY {_{$IDMS-NODE} OF {$ROOT}|2_}.\n"
           + "           DISPLAY {$DACO-NODE} OF {$SUBNODE} OF {$ROOT}.\n"
           + "           DISPLAY {$IDMS-NODE} OF {$SUBNODE} OF {$ROOT}.\n"
           + "           DISPLAY {$DACO-NODE} OF {$ISUBNODE} OF {$ROOT}.\n"
@@ -67,14 +73,28 @@ public class TestDaCoCopyMixture {
             new CobolText("ISC", IdmsDialect.NAME, "       02  {$*ISUBNODE}."),
             new CobolText("DSC", DaCoDialect.NAME, "       02  {$*DSUBNODE}.\n"),
             new CobolText("CC", "       02  {$*SUBNODE}.\n")),
-        ImmutableMap.of(),
+        ImmutableMap.of(
+            "1",
+            new Diagnostic(
+                new Range(),
+                "semantics.ambiguous",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText()),
+            "2",
+            new Diagnostic(
+                new Range(),
+                "semantics.ambiguous",
+                DiagnosticSeverity.Error,
+                ErrorSource.PARSING.getText())),
         ImmutableList.of(),
         new AnalysisConfig(
             CopybookProcessingMode.ENABLED,
             ImmutableList.of(DaCoDialect.NAME, IdmsDialect.NAME),
             true,
-                ImmutableMap.of(), false,
-            ImmutableList.of()
-        ));
+            false,
+            SqlProcessing.ENABLED,
+            SqlDecimalComma.DISABLED,
+            ImmutableList.of(),
+            ImmutableMap.of()));
   }
 }

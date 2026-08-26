@@ -28,9 +28,10 @@ public interface Db2SqlVisitorBuilder {
      * @param context
      * @param messageService
      * @param copybookService
+     * @param isSqlProcessingEnabled
      * @return MarkerDb2SqlVisitor
      */
-    MarkerDb2SqlVisitor visitor(DialectProcessingContext context, MessageService messageService, CopybookService copybookService);
+    MarkerDb2SqlVisitor visitor(DialectProcessingContext context, MessageService messageService, CopybookService copybookService, boolean isSqlProcessingEnabled);
     Db2SqlVisitorBuilder ORIGINAL = Db2SqlVisitor::new;
     Db2SqlVisitorBuilder SUBSTITUTING = Db2SqlSubstitutingVisitor::new;
 }

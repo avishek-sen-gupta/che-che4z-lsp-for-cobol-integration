@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
 /*
  * Copyright (c) 2025 Broadcom.
  * The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
@@ -10,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 import { parentPort } from "worker_threads";
 import { ControlFlowGraphBuilder } from "@code4z/analysis/lib/graphbuilder";
@@ -58,6 +57,10 @@ export class Logger implements Channel {
     });
     this.messages = sendMessagesIfNeeded(this.messages);
   }
+  flush(): void {
+    postMessage({ type: "log", payload: this.messages });
+    this.messages = [];
+  }
 }
 
 function processMessage(message: WorkerMessage): void {
@@ -69,6 +72,7 @@ function processMessage(message: WorkerMessage): void {
         graphs: [],
         locations: [],
         diagnostics: new Map(),
+        events: [],
       },
     });
     return;
@@ -80,8 +84,13 @@ function processMessage(message: WorkerMessage): void {
       message.severity,
       channel,
     );
+    channel.info("Analysis started");
+    channel.flush();
+
     const result = cfgBuilder.build(message.programs);
     const graphs = result.enters.map((e) => e.normalize());
+
+    channel.info("Analysis finished");
 
     postMessage({
       type: "result",
@@ -89,12 +98,16 @@ function processMessage(message: WorkerMessage): void {
         graphs: graphs,
         locations: result.locations,
         diagnostics: result.diagnostics,
+        events: result.events,
       },
     });
   } catch (error) {
-    channel.error(`${error}`);
+    postMessage({
+      type: "error",
+      payload: String(error),
+    });
   } finally {
-    postMessage({ type: "log", payload: channel.messages });
+    channel.flush();
   }
 }
 

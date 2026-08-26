@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -33,10 +33,13 @@ public enum SettingsParametersEnum {
   LOGGING_LEVEL("logging.level.root"),
   DIALECTS("dialects"),
   CICS_TRANSLATOR_ENABLED("cics.translator"),
+  SQL_PROCESSING_ENABLED_SETTING("target-sql-backend-enable-processing"),
+  SQL_BACKEND_SETTING("target-sql-backend"),
+  SQL_DECIMAL_COMMA_ALLOWED("sql-decimal-comma-allowed"),
   COMPILER_OPTIONS("compiler.options"),
-  DIALECT_REGISTRY("dialect.registry"),
   COBOL_PROGRAM_LAYOUT("cobol.program.layout"),
-  ANALYSIS_MODE("analysis-mode");
+  ANALYSIS_MODE("analysis-mode"),
+  UNUSED_VARIABLE_SEVERITY("unused-variable-severity");
 
   public final String label;
 

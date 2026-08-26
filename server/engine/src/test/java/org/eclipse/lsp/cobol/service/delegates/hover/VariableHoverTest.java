@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service.delegates.hover;
@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.lsp.SourceUnitGraph;
 import org.eclipse.lsp.cobol.service.CobolDocumentModel;
 import org.eclipse.lsp.cobol.test.engine.UseCaseEngine;
@@ -29,23 +30,34 @@ import org.eclipse.lsp4j.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Test {@link VariableHover} */
+/** Test {@link DefinedAndUsedStructureHoverProvider} */
 class VariableHoverTest {
-  private final VariableHover variableHover = new VariableHover();
-  SourceUnitGraph documentGraph;
-
-  @BeforeEach
-  void setUp() {
-    this.documentGraph = mock(SourceUnitGraph.class);
-    when(documentGraph.isUserSuppliedCopybook(anyString())).thenReturn(false);
-  }
-
+  public static final String FD_SOURCE_UNIT =
+      "       IDENTIFICATION DIVISION.\n"
+          + "       PROGRAM-ID. TEST1.\n"
+          + "       ENVIRONMENT DIVISION.\n"
+          + "       INPUT-OUTPUT SECTION.\n"
+          + "       FILE-CONTROL.\n"
+          + "           SELECT {$ACCTFILE}\n"
+          + "               ASSIGN        TO UT-ACCTFILE\n"
+          + "               ORGANIZATION  IS INDEXED\n"
+          + "               ACCESS MODE   IS DYNAMIC\n"
+          + "               RECORD KEY    IS {$ACCOUNT-KEY}\n"
+          + "               FILE STATUS   IS {$FS-ACCTFILE}.\n"
+          + "       DATA DIVISION.\n"
+          + "       FILE SECTION.\n"
+          + "       FD  {$*ACCTFILE}                          IS EXTERNAL\n"
+          + "           DATA RECORD IS {$ACCOUNT-RECORD}.\n"
+          + "       01  {$*ACCOUNT-RECORD}.\n"
+          + "           03  {$*ACCOUNT-KEY}.\n"
+          + "               05  {$*ACCOUNT-ID}                 PIC 9(06)  VALUE ZERO.\n"
+          + "       WORKING-STORAGE SECTION.\n"
+          + "       77  {$*FS-ACCTFILE}                    PIC 9(02) VALUE ZERO.";
   private static final String HEADER =
       "       Identification Division.\n"
           + "       Program-id. TEST1.\n"
           + "       Data Division.\n"
           + "       Working-Storage Section.\n";
-
   private static final String FULL_TEXT =
       HEADER
           + "       01 {$*TEST2} PIC 9.\n"
@@ -58,6 +70,15 @@ class VariableHoverTest {
           + "           88 {$*COND-ITEM2} VALUES 1 THRU 3\n"
           + "                                4 THROUGH 5.\n"
           + "       01 {$*ANOTHER} PIC X(6) USAGE UTF-8.";
+  private final DefinedAndUsedStructureHoverProvider variableHover =
+      new DefinedAndUsedStructureHoverProvider();
+  SourceUnitGraph documentGraph;
+
+  @BeforeEach
+  void setUp() {
+    this.documentGraph = mock(SourceUnitGraph.class);
+    when(documentGraph.isUserSuppliedCopybook(anyString())).thenReturn(false);
+  }
 
   @Test
   void getHoverForNullDocument() {
@@ -78,40 +99,68 @@ class VariableHoverTest {
   void getHoverForOneVariable() {
     Hover hover = variableHover.getHover(getModel(FULL_TEXT), getPosition(4, 12), documentGraph);
     assertNotNull(hover);
-    MarkedString markedString = hover.getContents().getLeft().get(0).getRight();
-    assertEquals("cobol", markedString.getLanguage());
-    assertEquals("01 TEST2 PIC 9.", markedString.getValue());
+    MarkupContent markupContent = hover.getContents().getRight();
+    assertEquals(MarkupKind.MARKDOWN, markupContent.getKind());
+    assertEquals(
+        "```cobol\n" + "       01 TEST2 PIC 9.\n" + "\n" + "```", markupContent.getValue());
   }
 
   @Test
   void getHoverForStructure() {
     String result =
-        "01 TOP2.\n"
-            + "  05 MIDDLE-2.\n"
-            + "    10 LEAF-2 PIC 9.\n"
-            + "      88 COND-ITEM1 VALUE 0.\n"
-            + "      88 COND-ITEM2 VALUES 1 THRU 3\n"
-            + "                           4 THROUGH 5.";
+        "```cobol\n"
+            + "       01 TOP2.\n"
+            + "         05 MIDDLE-2.\n"
+            + "           10 LEAF-2 PIC 9.\n"
+            + "             88 COND-ITEM1 VALUE 0.\n"
+            + "             88 COND-ITEM2 VALUES 1 THRU 3\n"
+            + "                                  4 THROUGH 5.\n"
+            + "\n"
+            + "```";
 
     Hover hover = variableHover.getHover(getModel(FULL_TEXT), getPosition(8, 16), documentGraph);
     assertNotNull(hover);
-    MarkedString markedString = hover.getContents().getLeft().get(0).getRight();
-    assertEquals("cobol", markedString.getLanguage());
-    assertEquals(result, markedString.getValue());
+    MarkupContent markupContent = hover.getContents().getRight();
+    assertEquals(MarkupKind.MARKDOWN, markupContent.getKind());
+    assertEquals(result, hover.getContents().getRight().getValue());
   }
 
   @Test
   void getHoverWithUsage() {
     Hover hover = variableHover.getHover(getModel(FULL_TEXT), getPosition(13, 16), documentGraph);
     assertNotNull(hover);
-    MarkedString markedString = hover.getContents().getLeft().get(0).getRight();
-    assertEquals("cobol", markedString.getLanguage());
-    assertEquals("01 ANOTHER PIC X(6) USAGE UTF-8.", markedString.getValue());
+    MarkupContent markupContent = hover.getContents().getRight();
+    assertEquals(MarkupKind.MARKDOWN, markupContent.getKind());
+    assertEquals(
+        "```cobol\n" + "       01 ANOTHER PIC X(6) USAGE UTF-8.\n" + "\n" + "```",
+        markupContent.getValue());
+  }
+
+  @Test
+  void testFDVariableHover() {
+    Hover hover =
+        variableHover.getHover(getModel(FD_SOURCE_UNIT), getPosition(14, 30), documentGraph);
+    assertNotNull(hover);
+    MarkupContent markupContent = hover.getContents().getRight();
+    assertEquals(MarkupKind.MARKDOWN, markupContent.getKind());
+    assertEquals(
+        "```cobol\n"
+            + "       01 ACCOUNT-RECORD.\n"
+            + "         03 ACCOUNT-KEY.\n"
+            + "\n"
+            + "       FD  ACCTFILE                          IS EXTERNAL\n"
+            + "       DATA RECORD IS ACCOUNT-RECORD.\n"
+            + "\n"
+            + "```",
+        markupContent.getValue());
   }
 
   private CobolDocumentModel getModel(String text) {
-    return new CobolDocumentModel(
-        DOCUMENT_URI, text, UseCaseEngine.runTest(text, ImmutableList.of(), ImmutableMap.of()));
+    CobolDocumentModel cobolDocumentModel =
+        new CobolDocumentModel(
+            DOCUMENT_URI, text, UseCaseEngine.runTest(text, ImmutableList.of(), ImmutableMap.of()));
+    cobolDocumentModel.setLanguageId(CobolLanguageId.COBOL.getId());
+    return cobolDocumentModel;
   }
 
   private TextDocumentPositionParams getPosition(int line, int character) {

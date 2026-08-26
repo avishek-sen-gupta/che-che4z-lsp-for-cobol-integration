@@ -9,7 +9,7 @@
       * SPDX-License-Identifier: EPL-2.0                             *
       *                                                              *
       * Contributors:                                                *
-      *   Broadcom, Inc. - initial API and implementation            *
+      *   Broadcom - initial API and implementation            *
       ****************************************************************
         01  A.     
         02  B    PIC S99.

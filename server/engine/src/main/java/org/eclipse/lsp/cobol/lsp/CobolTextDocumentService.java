@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp;
@@ -24,6 +24,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.core.model.extendedapi.ExtendedApiResult;
 import org.eclipse.lsp.cobol.lsp.events.notifications.DidChangeNotification;
+import org.eclipse.lsp.cobol.lsp.events.notifications.DidOpenNotification;
 import org.eclipse.lsp.cobol.lsp.events.queries.CodeActionQuery;
 import org.eclipse.lsp.cobol.lsp.handlers.extended.AnalysisHandler;
 import org.eclipse.lsp.cobol.lsp.handlers.text.*;
@@ -128,7 +129,7 @@ public class CobolTextDocumentService implements TextDocumentService, ExtendedAp
 
   @Override
   public void didOpen(DidOpenTextDocumentParams params) {
-    didOpenHandler.createEvent(params).execute();
+    lspMessageBroker.notify(new DidOpenNotification(params, didOpenHandler));
   }
 
   @SneakyThrows

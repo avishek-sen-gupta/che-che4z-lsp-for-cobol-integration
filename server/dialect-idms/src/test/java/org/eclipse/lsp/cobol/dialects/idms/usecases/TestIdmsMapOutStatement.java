@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.idms.usecases;
@@ -30,6 +30,9 @@ class TestIdmsMapOutStatement {
   private static final String DEFS =
       "        IDENTIFICATION DIVISION.\n"
           + "        PROGRAM-ID. test1.\n"
+          + "        ENVIRONMENT DIVISION.\n"
+          + "        IDMS-CONTROL SECTION.\n"
+          + "            PROTOCOL. MODE IS IDMS-DC.\n"
           + "       DATA DIVISION.\n"
           + "       WORKING-STORAGE SECTION.\n"
           + "       01 {$*MFLD} PIC X(8).\n"

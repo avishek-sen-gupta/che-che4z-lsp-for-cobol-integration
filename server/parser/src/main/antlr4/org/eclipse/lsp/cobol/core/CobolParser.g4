@@ -9,6 +9,25 @@
 parser grammar CobolParser;
 options {tokenVocab = CobolLexer; superClass = MessageServiceParser;}
 
+@members {
+  private void diagnoseUnexpectedDot(TokenStream _input, Token t) {
+    if (!(_input instanceof CommonTokenStream))
+      return;
+    CommonTokenStream stream = (CommonTokenStream)_input;
+    int index = t.getTokenIndex();
+
+    while (--index >= 0) {
+      final Token prev = stream.get(index);
+      if (prev.getType() == CobolLexer.UNKNOWN_EXEC)
+        return;
+      final int prevType = prev.getType();
+      if (prevType != CobolLexer.WS && prevType != CobolLexer.NEWLINE)
+        break;
+    }
+    notifyError(t, "ErrorStrategy.reportInputMismatch", t.getText());
+  }
+}
+
 startRule : compilationUnit EOF;
 
 compilationUnit
@@ -586,6 +605,7 @@ dataDescriptionEntry
    | dataDescriptionEntryFormat1Level77
    | dataDescriptionEntryFormat3
    | dialectDescriptionEntry
+   | d=DOT_FS { diagnoseUnexpectedDot(_input, $d); }
    ;
 
 dataDescriptionEntryFormat1
@@ -659,7 +679,7 @@ dataOccursSort
    ;
 
 dataPictureClause
-   : (PICTURE | PIC) PICTUREIS? pictureString
+   : (PICTURE | PIC) PICTUREIS? pictureString dataDateFormatClause?
    ;
 
 pictureString
@@ -697,6 +717,10 @@ dataSignClause
 
 dataSynchronizedClause
    : (SYNCHRONIZED | SYNC) (LEFT | RIGHT)?
+   ;
+
+dataDateFormatClause
+   : DATE FORMAT IS? DATE_PATTERN
    ;
 
 dataUsageClause
@@ -2311,6 +2335,7 @@ fileName
 
 functionName
    : INTEGER | LENGTH | RANDOM | SUM | MAX | WHEN_COMPILED | cobolWord
+   | DATEVAL | UNDATE | YEARWINDOW
    ;
 
 indexName
@@ -2442,7 +2467,8 @@ allowedCobolKeywords
    | REMARKS | RESUME | TIMER | TODAYS_DATE | TODAYS_NAME | YEAR | YYYYDDD | YYYYMMDD | WHEN_COMPILED
    | DISK | KEYBOARD | PORT | READER | REMOTE | VIRTUAL | LIBRARY | DEFINITION | PARSE | BOOL | ESCAPE | INITIALIZED
    | LOC | BYTITLE | BYFUNCTION | ABORT | ORDERLY | ASSOCIATED_DATA | ASSOCIATED_DATA_LENGTH
-   | VOLATILE
+   | VOLATILE | PARAGRAPH
+   | DATEVAL | FORMAT | UNDATE | YEARWINDOW | DATE_PATTERN
    ;
 
 dialectNodeFiller

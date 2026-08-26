@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service.settings;
@@ -19,6 +19,7 @@ import static org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum.*;
 import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.inject.Provider;
 import com.google.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -28,9 +29,11 @@ import java.util.stream.Stream;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
+import org.eclipse.lsp.cobol.common.DialectRegistryItem;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 import org.eclipse.lsp.cobol.core.engine.dialects.DialectService;
-import org.eclipse.lsp.cobol.service.utils.ServerTypeUtil;
+import org.eclipse.lsp.cobol.lsp.DialectItemDTO;
+import org.eclipse.lsp.cobol.lsp.jrpc.CobolLanguageClient;
 
 /** This service fetches configuration settings from the client. */
 @Slf4j
@@ -38,12 +41,16 @@ import org.eclipse.lsp.cobol.service.utils.ServerTypeUtil;
 public class CachingConfigurationService implements ConfigurationService {
   private final SettingsService settingsService;
   private final DialectService dialectService;
+  private final Provider<CobolLanguageClient> clientProvider;
 
   @Inject
   public CachingConfigurationService(
-      SettingsService settingsService, DialectService dialectService) {
+      SettingsService settingsService,
+      DialectService dialectService,
+      final Provider<CobolLanguageClient> clientProvider) {
     this.settingsService = settingsService;
     this.dialectService = dialectService;
+    this.clientProvider = clientProvider;
   }
 
   private CompletableFuture<ConfigurationEntity> createConfigFuture(String documentURI) {
@@ -53,8 +60,10 @@ public class CachingConfigurationService implements ConfigurationService {
                 DIALECTS.label,
                 SUBROUTINE_LOCAL_PATHS.label,
                 CICS_TRANSLATOR_ENABLED.label,
-                DIALECT_REGISTRY.label,
-                COMPILER_OPTIONS.label));
+                SQL_PROCESSING_ENABLED_SETTING.label,
+                SQL_DECIMAL_COMMA_ALLOWED.label,
+                COMPILER_OPTIONS.label,
+                UNUSED_VARIABLE_SEVERITY.label));
 
     List<String> dialectsSections =
         Stream.concat(
@@ -64,15 +73,21 @@ public class CachingConfigurationService implements ConfigurationService {
 
     settingsList.addAll(dialectsSections);
 
-    return Optional.ofNullable(settingsService.fetchConfigurations(documentURI, settingsList))
-        .map(
-            c ->
-                c.thenApply(
-                    future ->
-                        Optional.ofNullable(future)
-                            .map(list -> parseConfig(list, dialectsSections))
-                            .orElse(new ConfigurationEntity())))
-        .orElse(CompletableFuture.completedFuture(new ConfigurationEntity()));
+    final CompletableFuture<List<Object>> configFuture =
+        settingsService.fetchConfigurations(documentURI, settingsList);
+    if (configFuture == null) {
+      // FIXME: Tests should be adjusted instead of testing for null
+      return CompletableFuture.completedFuture(new ConfigurationEntity());
+    }
+
+    final CompletableFuture<List<DialectItemDTO>> dialectsFuture =
+        clientProvider.get().availableDialects();
+
+    return configFuture.thenCombine(
+        dialectsFuture,
+        (config, dialects) -> {
+          return parseConfig(config, dialectsSections, ConfigHelper.parseDialectRegistry(dialects));
+        });
   }
 
   @Override
@@ -81,9 +96,6 @@ public class CachingConfigurationService implements ConfigurationService {
     try {
       AnalysisConfig config =
           AnalysisConfigHelper.fromConfigEntity(mode, createConfigFuture(scopeURI).get());
-      if (ServerTypeUtil.isNativeServerType()) {
-        return config;
-      }
       if (dialectService.updateDialects(config.getDialectRegistry())) {
         // if list of dialects were changed - request config one more time
         config = AnalysisConfigHelper.fromConfigEntity(mode, createConfigFuture(scopeURI).get());
@@ -122,23 +134,30 @@ public class CachingConfigurationService implements ConfigurationService {
   }
 
   private ConfigurationEntity parseConfig(
-      List<Object> clientConfig, List<String> dialectsSections) {
+      List<Object> clientConfig,
+      List<String> dialectsSections,
+      List<DialectRegistryItem> dialects) {
     return Optional.ofNullable(clientConfig)
-        .map(cc -> this.parseSettings(cc, dialectsSections))
+        .map(cc -> this.parseSettings(cc, dialectsSections, dialects))
         .orElseGet(ConfigurationEntity::new);
   }
 
   private ConfigurationEntity parseSettings(
-      List<Object> clientConfig, List<String> dialectsSections) {
+      List<Object> clientConfig,
+      List<String> dialectsSections,
+      List<DialectRegistryItem> dialects) {
 
     return new ConfigurationEntity(
         ConfigHelper.parseDialects((JsonArray) clientConfig.get(0)),
         ConfigHelper.parseSubroutineFolder((JsonElement) clientConfig.get(1)),
         ConfigHelper.parseCicsTranslatorOption((JsonElement) clientConfig.get(2)),
-        ConfigHelper.parseDialectRegistry((JsonArray) clientConfig.get(3)),
-        ConfigHelper.parseCompilerOptions(clientConfig.get(4)),
+        dialects,
+        ConfigHelper.parseSQLProcessingEnabled((JsonElement) clientConfig.get(3)),
+        ConfigHelper.parseSQLDecimalCommaAllowed((JsonElement) clientConfig.get(4)),
+        ConfigHelper.parseCompilerOptions(clientConfig.get(5)),
+        ConfigHelper.parseUnusedVariableSeverity((JsonElement) clientConfig.get(6)),
         getDialectsSettings(
-            clientConfig.subList(5, 5 + dialectsSections.size()).toArray(),
+            clientConfig.subList(7, 7 + dialectsSections.size()).toArray(),
             dialectsSections.toArray()));
   }
 

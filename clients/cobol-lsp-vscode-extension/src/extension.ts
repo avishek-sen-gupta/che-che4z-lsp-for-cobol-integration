@@ -9,25 +9,36 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
-import { __ExtensionApi } from "@code4z/cobol-dialect-api";
-import { isV1RuntimeDialectDetail } from "./dialect/utils";
-import { fetchCopybookCommand } from "./commands/FetchCopybookCommand";
+import type { Middleware } from "vscode-languageclient";
 import { gotoCopybookSettings } from "./commands/OpenSettingsCommand";
+import type {
+  __ExtensionApi,
+  CopyStatementParser,
+  V2DialectDetail,
+  V2StartProcessingHandler,
+} from "@code4z/cobol-dialect-api";
 import {
-  ANALYSIS_MODE,
-  E4E_INCOMPATIBLE,
+  isV1RuntimeDialectDetail,
+  isV2RuntimeDialectDetail,
+} from "./dialect/utils";
+import {
   EXP_LANGUAGE_ID,
   FAIL_CREATE_COPYBOOK_FOLDER_MSG,
   FAIL_CREATE_GLOBAL_STORAGE_MSG,
   HP_LANGUAGE_ID,
   LANGUAGE_ID,
   ZOWE_FOLDER,
+  ZOWE_FSP_CACHE,
 } from "./constants";
-import { CopybookDownloadService } from "./services/copybook/CopybookDownloadService";
+import type { ExternalAPIsService } from "./services/ExternalAPIsService";
+import {
+  deleteDiagnostics,
+  initializeExternalAPIs,
+} from "./services/ExternalAPIsService";
 import { CopybooksCodeActionProvider } from "./services/copybook/CopybooksCodeActionProvider";
 
 import { RunAnalysis } from "./commands/RunAnalysisCLI";
@@ -35,10 +46,7 @@ import { RunAnalysis } from "./commands/RunAnalysisCLI";
 import { clearCache } from "./commands/ClearCopybookCacheCommand";
 import { CommentAction, commentCommand } from "./commands/CommentCommand";
 import { initSmartTab, RangeTabShiftStore } from "./commands/SmartTabCommand";
-import {
-  CopyStatementParser,
-  DialectRegistry,
-} from "./services/DialectRegistry";
+import { DialectRegistry } from "./dialect/DialectRegistry";
 import { LanguageClientService } from "./services/LanguageClientService";
 import { lspConfigHandler, SettingsService } from "./services/Settings";
 import {
@@ -49,13 +57,11 @@ import { resolveSubroutineURI } from "./services/util/SubroutineUtils";
 import { ServerRuntimeCodeActionProvider } from "./services/nativeLanguageClient/serverRuntimeCodeActionProvider";
 import { ConfigurationWatcher } from "./services/util/ConfigurationWatcher";
 import * as path from "node:path";
-import { Utils } from "./services/util/Utils";
-import { getE4EAPI } from "./services/copybook/E4ECopybookService";
 import { getErrorMessage } from "./services/util/ErrorsUtils";
 import {
   initTelemetry,
-  registerEvent,
-  registerExceptionEvent,
+  telemetryEvent,
+  telemetryExceptionEvent,
 } from "./services/reporter";
 import { CopybooksCompletionProvider } from "./services/copybook/CopybooksCompletionProvider";
 import { SubroutinesCompletionsProvider } from "./services/subroutines/SubroutinesCompletionsProvider";
@@ -63,186 +69,110 @@ import {
   AnalysisResult,
   ControlFlowAnalysisService,
 } from "./services/ControlFlowService";
-import { DownloadDiagnosticsService } from "./services/DiagnosticsService";
+import {
+  readFileContent,
+  resolveCopybookURI,
+  ZoweCache,
+} from "./services/copybook/CopybookMessageHandler";
+import { invalidateConfig } from "./services/ProcessorGroupsLoader";
+import { outputChannel } from "./services/util/OutputChannel";
+import { DialectService } from "./dialect/DialectService";
+import { createSampleConfiguration } from "./commands/CreateSampleConfiguration";
+import { RENUM_LEFT, RENUM_RIGHT, RenumHandler } from "./commands/RenumCommand";
+import { TarCopybookFileSystemProvider } from "./provider/TarCopybookFileSystemProvider";
+import { getTarCached } from "./services/util/TarUtil";
 
 interface __AnalysisApi {
   analysis(uri: string, text: string, pos?: vscode.Position): Promise<unknown>;
   getControlFlowAnalysis(documentUri: string): Promise<AnalysisResult>;
 }
 
-let languageClientService: LanguageClientService;
-let outputChannel: vscode.OutputChannel;
-let controlFlowChannel: vscode.LogOutputChannel;
-let analysisService: ControlFlowAnalysisService;
 const API_VERSION: string = "1.0.1";
-
-async function initialize(context: vscode.ExtensionContext) {
-  // We need lazy initialization to be able to mock this for unit testing
-  outputChannel = vscode.window.createOutputChannel("COBOL Language Support");
-  controlFlowChannel = vscode.window.createOutputChannel(
-    "COBOL Language Support Control Flow",
-    { log: true },
-  );
-
-  analysisService = new ControlFlowAnalysisService(
-    outputChannel,
-    controlFlowChannel,
-  );
-  try {
-    await vscode.workspace.fs.createDirectory(context.globalStorageUri);
-  } catch (error) {
-    const message = `${FAIL_CREATE_GLOBAL_STORAGE_MSG}: ${getErrorMessage(
-      error,
-    )}`;
-    outputChannel.appendLine(message);
-    throw Error(message);
-  }
-  const maybeE4E = await getE4EAPI();
-  const maybeZowe = await Utils.getZoweExplorerAPI();
-  const copyBooksDownloader = new CopybookDownloadService(
-    context.globalStorageUri.fsPath,
-    maybeZowe && "api" in maybeZowe ? maybeZowe.api : undefined,
-    maybeE4E && "api" in maybeE4E ? maybeE4E.api : undefined,
-    outputChannel,
-    new DownloadDiagnosticsService(),
-  );
-
-  if (maybeZowe && "futureApi" in maybeZowe) {
-    void maybeZowe.futureApi.then((api) => {
-      if (api) copyBooksDownloader.explorerAppeared(api.api);
-    });
-  }
-
-  if (!maybeE4E) outputChannel.appendLine(E4E_INCOMPATIBLE);
-  else if ("futureApi" in maybeE4E)
-    void maybeE4E.futureApi.then((api) => {
-      if (api) copyBooksDownloader.e4eAppeared(api.api);
-      else outputChannel.appendLine(E4E_INCOMPATIBLE);
-    });
-
-  languageClientService = new LanguageClientService(
-    outputChannel,
-    context.globalStorageUri,
-    {
-      executeCommand: (command, args, next) => {
-        if (command == "missing copybook") {
-          copyBooksDownloader.clearProfiles();
-        }
-        next(command, args);
-      },
-    },
-  );
-  const configurationWatcher = new ConfigurationWatcher();
-
-  return {
-    copyBooksDownloader,
-    configurationWatcher,
-  };
-}
 
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<__ExtensionApi & __AnalysisApi> {
   await initTelemetry(context);
-  DialectRegistry.clear();
-  const { copyBooksDownloader, configurationWatcher } =
-    await initialize(context);
-  initSmartTab(context);
-  registerEvent(
+  telemetryEvent(
     "log",
     ["bootstrap", "experiment-tag"],
     "Extension activation event was triggered",
   );
-  registerEvent(
+  telemetryEvent(
     "analysis-mode",
     ["bootstrap", "analysis-mode"],
-    `COBOL LS is being used in ${vscode.workspace.getConfiguration().get(ANALYSIS_MODE) as string} mode`,
+    `COBOL LS is being used in ${SettingsService.getAnalysisMode()} mode`,
   );
 
-  // Register Commands
-  registerCommands(context, copyBooksDownloader);
+  await createExtensionFolder(context);
 
-  registerCodeActions(context);
+  initSmartTab(context);
 
+  let externalApis: ExternalAPIsService | undefined = undefined;
+  const { cobolTarFsProvider, tarCache } = initTarFsProvider();
   context.subscriptions.push(
-    vscode.languages.registerCompletionItemProvider(
-      { language: LANGUAGE_ID },
-      new SnippetCompletionProvider(context),
+    vscode.workspace.registerFileSystemProvider(
+      TarCopybookFileSystemProvider.SCHEME,
+      cobolTarFsProvider,
+      {
+        isReadonly: true,
+      },
     ),
   );
 
-  context.subscriptions.push(
-    vscode.languages.registerCompletionItemProvider(
-      [LANGUAGE_ID, EXP_LANGUAGE_ID, HP_LANGUAGE_ID],
-      new CopybooksCompletionProvider(copyBooksDownloader, outputChannel),
-    ),
+  const languageClientService = await initializeLanguageClientService(context, {
+    executeCommand: (command, args, next) => {
+      if (command == "missing copybook") {
+        externalApis?.clearProfiles();
+        externalApis?.clearCache();
+      }
+      next(command, args);
+    },
+  });
+
+  const zoweCache = await makeZoweCache(
+    vscode.Uri.joinPath(context.globalStorageUri, ZOWE_FSP_CACHE),
+    languageClientService.invalidateConfiguration,
   );
 
-  context.subscriptions.push(
-    vscode.languages.registerCompletionItemProvider(
-      [LANGUAGE_ID, EXP_LANGUAGE_ID, HP_LANGUAGE_ID],
-      new SubroutinesCompletionsProvider(),
-    ),
-  );
+  attachEventHandlers(languageClientService, zoweCache);
 
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeTextDocument((event) =>
-      analysisService.invalidate(event.document.uri.toString(), false),
-    ),
+  externalApis = await initializeExternalAPIs(
+    context.globalStorageUri,
+    languageClientService.invalidateConfiguration,
+    tarCache,
   );
+  context.subscriptions.push(externalApis);
 
-  context.subscriptions.push(
-    vscode.workspace.onDidCloseTextDocument((document) => {
-      void analysisService.invalidate(document.uri.toString(), true);
-      copyBooksDownloader.clearE4EConfig(document.uri.toString());
+  const analysisService = new ControlFlowAnalysisService(
+    outputChannel,
+    vscode.window.createOutputChannel("COBOL Language Support Control Flow", {
+      log: true,
     }),
   );
-
-  configurationWatcher.watchConfigurationChanges();
-
-  try {
-    if (SettingsService.serverRuntime() === "NATIVE") {
-      languageClientService.enableNativeBuild();
-    } else {
-      await languageClientService.checkPrerequisites();
-    }
-  } catch (err) {
-    if (err instanceof Error) {
-      outputChannel.appendLine(err.toString());
-      languageClientService.enableNativeBuild();
-      registerExceptionEvent(
-        "RuntimeException",
-        err.toString(),
-        ["bootstrap", "experiment-tag"],
-        "Client has wrong Java version installed. Native builds activated.",
-      );
-    }
-  }
-
-  // Custom client handlers
-  languageClientService.addRequestHandler(
-    "cobol/resolveSubroutine",
-    resolveSubroutineURI,
-  );
-  languageClientService.addRequestHandler(
-    "copybook/resolve",
-    copyBooksDownloader.makeResolveCopybookHandler(),
-  );
-  languageClientService.addRequestHandler(
-    "copybook/download",
-    copyBooksDownloader.makeCopybookDownloadHandler(),
-  );
-  languageClientService.addRequestHandler(
-    "workspace/configuration",
-    (r: Parameters<typeof lspConfigHandler>[0]) =>
-      lspConfigHandler(r, outputChannel),
-  );
+  context.subscriptions.push(analysisService);
   languageClientService.addNotificationHandler(
     "cfast/ready",
     analysisService.makeControlFlowAstNotificationHandler(),
   );
 
-  await languageClientService.start();
+  DialectRegistry.clear();
+  const dialectService = new DialectService(
+    languageClientService,
+    zoweCache,
+    outputChannel,
+  );
+
+  registerCommands(context, externalApis);
+  registerEditorCommands(context);
+  registerCodeActions(context);
+  registerCompletions(context);
+  registerEvents(context, analysisService);
+
+  const configurationWatcher = new ConfigurationWatcher();
+  configurationWatcher.watchConfigurationChanges();
+
+  await languageClientService.start(context);
 
   // 'export' public api-surface
   return {
@@ -254,13 +184,39 @@ export async function activate(
         ) {
           throw Error("Invalid `dialect` argument" + JSON.stringify(dialect));
         }
-        return registerNewDialect(extensionId, {
+        return registerNewDialectV1(languageClientService, extensionId, {
           name: dialect.name,
           description: dialect.description,
           jar: vscode.Uri.parse(dialect.jar, true),
           snippets: vscode.Uri.parse(dialect.snippets, true),
           isCopyStatement: dialect.isCopyStatement,
         });
+      },
+    },
+    v2: {
+      async registerDialect(
+        extensionId: string,
+        dialect: V2DialectDetail,
+        handler: V2StartProcessingHandler,
+      ) {
+        if (
+          typeof extensionId !== "string" ||
+          !isV2RuntimeDialectDetail(dialect)
+        ) {
+          throw Error("Invalid `dialect` argument" + JSON.stringify(dialect));
+        }
+        return registerNewDialectV2(
+          languageClientService,
+          extensionId,
+          {
+            name: dialect.name,
+            description: dialect.description,
+            snippets: dialect.snippets,
+            isCopyStatement: dialect.isCopyStatement,
+          },
+          handler,
+          dialectService,
+        );
       },
     },
     version: API_VERSION,
@@ -276,6 +232,96 @@ export async function activate(
     },
   };
 }
+
+async function createExtensionFolder(context: vscode.ExtensionContext) {
+  try {
+    await vscode.workspace.fs.createDirectory(context.globalStorageUri);
+  } catch (error) {
+    const message = `${FAIL_CREATE_GLOBAL_STORAGE_MSG}: ${getErrorMessage(
+      error,
+    )}`;
+    outputChannel.appendLine(message);
+    telemetryExceptionEvent(
+      "GlobalStorageFolderCreationFailed",
+      message,
+      ["bootstrap", "folder-creation-failure"],
+      "The creation of `context.globalStorageUri` folder has failed",
+    );
+    throw Error(message);
+  }
+}
+
+async function makeZoweCache(
+  uri: vscode.Uri,
+  invalidationCallback: () => void | Promise<void>,
+) {
+  await vscode.workspace.fs.createDirectory(uri);
+  return new ZoweCache(uri, invalidationCallback);
+}
+
+function attachEventHandlers(
+  languageClientService: LanguageClientService,
+  zoweCache: ZoweCache,
+) {
+  languageClientService.addRequestHandler(
+    "cobol/resolveSubroutine",
+    resolveSubroutineURI,
+  );
+  languageClientService.addRequestHandler(
+    "workspace/configuration",
+    (r: Parameters<typeof lspConfigHandler>[0]) => lspConfigHandler(r),
+  );
+  languageClientService.addRequestHandler(
+    "copybook/resolve",
+    resolveCopybookURI,
+  );
+  languageClientService.addRequestHandler("file/content", (u: string) =>
+    readFileContent(u, zoweCache),
+  );
+  languageClientService.addRequestHandler("availableDialects", () =>
+    DialectRegistry.getDialects().map((d) => ({
+      protocolVersion: d.protocolVersion,
+      name: d.name,
+      description: d.description,
+      extensionId: d.extensionId,
+      ...(d.protocolVersion === 1 ? { uri: d.uri.toString() } : {}),
+    })),
+  );
+}
+
+async function initializeLanguageClientService(
+  context: vscode.ExtensionContext,
+  middleware: Middleware,
+) {
+  const languageClientService = new LanguageClientService(
+    outputChannel,
+    context.globalStorageUri,
+    middleware,
+  );
+  context.subscriptions.push(languageClientService);
+
+  try {
+    if (SettingsService.serverRuntime() === "NATIVE") {
+      languageClientService.enableNativeBuild();
+    } else {
+      await languageClientService.checkPrerequisites();
+    }
+  } catch (err) {
+    if (err instanceof Error) {
+      outputChannel.appendLine(err.toString());
+      languageClientService.enableNativeBuild();
+      telemetryExceptionEvent(
+        "RuntimeException",
+        err.toString(),
+        ["bootstrap", "experiment-tag"],
+        "Client has wrong Java version installed. Native builds activated.",
+      );
+    }
+  }
+
+  return languageClientService;
+}
+
 function findPosition(uri: string): vscode.Position {
   for (const e of vscode.window.visibleTextEditors) {
     if (e.document.uri.toString() === uri) {
@@ -288,11 +334,7 @@ function findPosition(uri: string): vscode.Position {
   return new vscode.Position(0, 0);
 }
 
-export function deactivate() {
-  return languageClientService.stop();
-}
-
-export interface DialectDetail {
+export interface DialectDetailV1 {
   name: string;
   description: string;
   jar: vscode.Uri;
@@ -300,9 +342,17 @@ export interface DialectDetail {
   isCopyStatement?: CopyStatementParser;
 }
 
-const registerNewDialect = async (
+export interface DialectDetailV2 {
+  name: string;
+  description: string;
+  snippets: vscode.Uri;
+  isCopyStatement?: CopyStatementParser;
+}
+
+const registerNewDialectV1 = async (
+  languageClientService: LanguageClientService,
   extensionId: string,
-  dialect: DialectDetail,
+  dialect: DialectDetailV1,
 ) => {
   outputChannel.appendLine(
     "Register new dialect: \r\n" + JSON.stringify(dialect),
@@ -317,10 +367,12 @@ const registerNewDialect = async (
   try {
     await vscode.workspace.fs.stat(dialect.snippets);
   } catch (_error) {
-    return Error(`Dialect snippets file ${dialect.jar.fsPath} does not exist`);
+    return Error(
+      `Dialect snippets file ${dialect.snippets.fsPath} does not exist`,
+    );
   }
 
-  DialectRegistry.register(
+  DialectRegistry.registerV1(
     extensionId,
     dialect.name,
     dialect.jar,
@@ -339,19 +391,50 @@ const registerNewDialect = async (
   return unregisterDialect;
 };
 
-function registerCommands(
-  context: vscode.ExtensionContext,
-  copyBooksDownloader: CopybookDownloadService,
-) {
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      "cobol-lsp.cpy-manager.fetch-copybook",
-      async (copybook: string, programName: string) => {
-        await fetchCopybookCommand(copybook, copyBooksDownloader, programName);
-      },
-    ),
+const registerNewDialectV2 = async (
+  languageClientService: LanguageClientService,
+  extensionId: string,
+  dialect: DialectDetailV2,
+  handler: V2StartProcessingHandler,
+  dialectService: DialectService,
+) => {
+  outputChannel.appendLine(
+    "Register new dialect: \r\n" + JSON.stringify(dialect),
   );
 
+  try {
+    await vscode.workspace.fs.stat(dialect.snippets);
+  } catch (_error) {
+    return Error(
+      `Dialect snippets file ${dialect.snippets.toString()} does not exist`,
+    );
+  }
+  DialectRegistry.registerV2(
+    extensionId,
+    dialect.name,
+    dialect.description,
+    dialect.snippets,
+    dialect.isCopyStatement,
+  );
+  dialectService.registerStartHandler(dialect.name, handler);
+
+  outputChannel.appendLine("Restart analysis");
+  await languageClientService.invalidateConfiguration();
+
+  const unregisterDialect: vscode.Disposable = new vscode.Disposable(
+    async () => {
+      dialectService.unregisterStartHandler(dialect.name);
+      DialectRegistry.unregister(dialect.name);
+      await languageClientService.invalidateConfiguration();
+    },
+  );
+  return unregisterDialect;
+};
+
+function registerCommands(
+  context: vscode.ExtensionContext,
+  externalApis: ExternalAPIsService,
+) {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "cobol-lsp.cpy-manager.goto-settings",
@@ -360,18 +443,13 @@ function registerCommands(
       },
     ),
   );
-  context.subscriptions.push(
-    vscode.window.onDidChangeActiveTextEditor((_e) =>
-      RangeTabShiftStore.reset(),
-    ),
-  );
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "cobol-lsp.clear.downloaded.copybooks",
       async () => {
         await clearCache(context.globalStorageUri);
-        copyBooksDownloader.clearCache();
+        externalApis.clearCache();
       },
     ),
   );
@@ -391,6 +469,7 @@ function registerCommands(
       commentCommand(CommentAction.UNCOMMENT);
     }),
   );
+
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "cobol-lsp.snippets.insertSnippets",
@@ -399,6 +478,7 @@ function registerCommands(
       },
     ),
   );
+
   context.subscriptions.push(
     vscode.commands.registerCommand("cobol-lsp.dialects.goto-settings", () =>
       vscode.commands.executeCommand(
@@ -451,11 +531,12 @@ function registerCommands(
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "cobol-lsp.analysis.runAnalysis",
+      "cobol-lsp.analysis.logCliAnalysisCommand",
       async () => {
         const tempAnalysis: RunAnalysis = new RunAnalysis(
           context.globalStorageUri,
           context.extensionUri,
+          outputChannel,
         );
         await tempAnalysis.runCobolAnalysisCommand();
       },
@@ -466,12 +547,49 @@ function registerCommands(
     vscode.commands.registerCommand(
       "cobol-lsp.cpy-manager.reenable.failed.zowe.requests",
       () => {
-        copyBooksDownloader.reenableFailedRequests();
+        externalApis.reenableFailedRequests();
       },
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "cobol-lsp.configuration.create-sample",
+      createSampleConfiguration,
     ),
   );
 }
 
+function registerEditorCommands(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand(
+      "cobol-lsp.editor.renumLeft",
+      (textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit) =>
+        RenumHandler(textEditor, edit, true, RENUM_LEFT),
+    ),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand(
+      "cobol-lsp.editor.renumRight",
+      (textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit) =>
+        RenumHandler(textEditor, edit, true, RENUM_RIGHT),
+    ),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand(
+      "cobol-lsp.editor.unNumberLeft",
+      (textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit) =>
+        RenumHandler(textEditor, edit, false, RENUM_LEFT),
+    ),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerTextEditorCommand(
+      "cobol-lsp.editor.unNumberRight",
+      (textEditor: vscode.TextEditor, edit: vscode.TextEditorEdit) =>
+        RenumHandler(textEditor, edit, false, RENUM_RIGHT),
+    ),
+  );
+}
 function registerCodeActions(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.languages.registerCodeActionsProvider(
@@ -485,4 +603,61 @@ function registerCodeActions(context: vscode.ExtensionContext) {
       new ServerRuntimeCodeActionProvider(),
     ),
   );
+}
+
+function registerEvents(
+  context: vscode.ExtensionContext,
+  analysisService: ControlFlowAnalysisService,
+) {
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor((_e) =>
+      RangeTabShiftStore.reset(),
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((event) =>
+      analysisService.invalidate(event.document.uri.toString(), false),
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.workspace.onDidCloseTextDocument((document) => {
+      void analysisService.invalidate(document.uri.toString(), true);
+      invalidateConfig(document.uri);
+      deleteDiagnostics(document.uri);
+    }),
+  );
+}
+
+function registerCompletions(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      { language: LANGUAGE_ID },
+      new SnippetCompletionProvider(context),
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      [LANGUAGE_ID, EXP_LANGUAGE_ID, HP_LANGUAGE_ID],
+      new CopybooksCompletionProvider(),
+    ),
+  );
+
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      [LANGUAGE_ID, EXP_LANGUAGE_ID, HP_LANGUAGE_ID],
+      new SubroutinesCompletionsProvider(),
+    ),
+  );
+}
+function initTarFsProvider() {
+  const emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
+  const tarCache = getTarCached(emitter);
+  const cobolTarFsProvider = new TarCopybookFileSystemProvider(
+    tarCache,
+    emitter,
+  );
+  return { cobolTarFsProvider, tarCache };
 }

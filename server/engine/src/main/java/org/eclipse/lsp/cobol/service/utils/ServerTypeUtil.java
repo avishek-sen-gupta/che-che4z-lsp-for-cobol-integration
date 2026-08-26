@@ -9,11 +9,13 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service.utils;
 
+import java.util.HashSet;
+import java.util.Set;
 import lombok.NonNull;
 import lombok.experimental.UtilityClass;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
@@ -29,7 +31,13 @@ public class ServerTypeUtil {
    * @return True, if server type is NATIVE and dialects are registered, false otherwise.
    */
   public boolean isInCompatibleServerTypeRegistered(@NonNull AnalysisConfig analysisConfig) {
-    return isNativeServerType() && !analysisConfig.getDialects().isEmpty();
+    if (!isNativeServerType()) {
+      return false;
+    }
+    Set<String> activeDialects = new HashSet<>(analysisConfig.getDialects());
+    return analysisConfig.getDialectRegistry().stream()
+        .filter(item -> activeDialects.contains(item.getName()))
+        .anyMatch(item -> item.getProtocolVersion() == 1);
   }
 
   /**

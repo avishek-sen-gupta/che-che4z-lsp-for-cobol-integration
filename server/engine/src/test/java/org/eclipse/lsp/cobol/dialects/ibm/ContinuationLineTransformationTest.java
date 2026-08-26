@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.ibm;
@@ -105,6 +105,18 @@ class ContinuationLineTransformationTest extends AbstractCobolLinePreprocessorTe
     lines.add("       VALUE 'as/BKP92S1OInterface\"'.");
     lines.add("       \"'\"");
     lines.add("       '\"'");
+
+    List<SyntaxError> errors = runTransformation(reduceLines(lines));
+
+    assertEquals(0, errors.size());
+  }
+
+  @Test
+  void testContinuationOfAlmostEmptyLine() {
+    List<String> lines = new ArrayList<>();
+
+    lines.add("000000                                                                 ");
+    lines.add("      -                                                                ");
 
     List<SyntaxError> errors = runTransformation(reduceLines(lines));
 

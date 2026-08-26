@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -72,7 +72,7 @@ class TestRenamesWithNonExistingName {
             "4",
             new Diagnostic(
                 new Range(),
-                "Variable VARNAME5 is not defined",
+                "Variable VARNAME5 does not exist in structure VARNAME4",
                 DiagnosticSeverity.Error,
                 ErrorSource.PARSING.getText())));
   }

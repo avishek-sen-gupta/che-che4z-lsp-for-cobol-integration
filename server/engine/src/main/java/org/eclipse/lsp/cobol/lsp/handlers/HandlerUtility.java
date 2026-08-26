@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.lsp.handlers;
@@ -76,8 +76,8 @@ public class HandlerUtility {
     diagnostic.setMessage(err.getSuggestion());
     diagnostic.setRange(err.getLocation().getLocation().getRange());
     diagnostic.setCode(ofNullable(err.getErrorCode()).map(ErrorCode::getLabel).orElse(null));
-    diagnostic.setRelatedInformation(
-        ofNullable(err.getRelatedInformation()).map(Collections::singletonList).orElse(null));
+    diagnostic.setRelatedInformation(err.getRelatedInformation());
+    if (err.getTags() != null && !err.getTags().isEmpty()) diagnostic.setTags(err.getTags());
     return diagnostic;
   }
 }

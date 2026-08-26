@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.dialects.daco.processors.implicit;
@@ -27,7 +27,7 @@ class GeneratorHelper {
   public GroupItemNode createGroupNode(int level, String name) {
     Locality locality =
         Locality.builder().uri(ImplicitCodeUtils.createFullUrl("daco-implicit-code")).build();
-    return new GroupItemNode(locality, level, name, false, false, UsageFormat.UNDEFINED);
+    return new GroupItemNode(locality, level, name, false, false, UsageFormat.UNDEFINED, false);
   }
 
   public ElementaryItemNode createElementaryNode(

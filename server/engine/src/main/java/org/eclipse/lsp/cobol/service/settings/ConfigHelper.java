@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.service.settings;
@@ -26,7 +26,11 @@ import java.util.Optional;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.common.DialectRegistryItem;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.SQLBackend;
+import org.eclipse.lsp.cobol.common.error.ErrorSeverity;
+import org.eclipse.lsp.cobol.lsp.DialectItemDTO;
 
 /** Config helper class */
 @Slf4j
@@ -50,39 +54,28 @@ public class ConfigHelper {
   /**
    * Parse dialect registry client configurations to {@link List<DialectRegistryItem>}
    *
-   * @param jsonArray client dialect registry configuration
+   * @param dialects client dialect registry configuration
    * @return {@link List<DialectRegistryItem>}
    */
-  public List<DialectRegistryItem> parseDialectRegistry(JsonArray jsonArray) {
-    return Streams.stream(jsonArray)
-        .map(JsonElement::getAsJsonObject)
+  public List<DialectRegistryItem> parseDialectRegistry(List<DialectItemDTO> dialects) {
+    return dialects.stream()
         .filter(Objects::nonNull)
         .map(
             o -> {
-              URI uri;
-              try {
-                JsonObject jsonUri = o.get("uri").getAsJsonObject();
-                String path = getAsString(jsonUri, "path");
-                String scheme = getAsString(jsonUri, "scheme");
-                String host = getAsString(jsonUri, "host");
-                String fragment = getAsString(jsonUri, "fragment");
-                uri = new URI(scheme, host, path, fragment);
-              } catch (Exception e) {
-                LOG.warn("Cannot parse dialect registry item {}", o, e);
-                return null;
+              URI uri = null;
+              if (o.getUri() != null) {
+                try {
+                  uri = new URI(o.getUri());
+                } catch (Exception e) {
+                  LOG.warn("Cannot parse dialect registry item {}", o, e);
+                  return null;
+                }
               }
               return new DialectRegistryItem(
-                  o.get("name").getAsString(),
-                  uri,
-                  o.get("description").getAsString(),
-                  o.get("extensionId").getAsString());
+                  o.getName(), o.getProtocolVersion(), uri, o.getDescription(), o.getExtensionId());
             })
         .filter(Objects::nonNull)
         .collect(toList());
-  }
-
-  private String getAsString(JsonObject json, String field) {
-    return Optional.ofNullable(json.get(field)).map(JsonElement::getAsString).orElse(null);
   }
 
   /**
@@ -98,6 +91,22 @@ public class ConfigHelper {
   }
 
   /**
+   * Parse SQL Decimal Comma Allowed configurations to {@link SqlProcessing}
+   *
+   * @param sqlDecimalCommaAllowed SQL Decimal Comma allowed checkbox state from configuration
+   * @return Enabled if checked or Disabled otherwise, Disabled in the case of an invalid state
+   */
+  public SqlDecimalComma parseSQLDecimalCommaAllowed(JsonElement sqlDecimalCommaAllowed) {
+    if (sqlDecimalCommaAllowed.isJsonPrimitive()
+        && sqlDecimalCommaAllowed.getAsJsonPrimitive().isBoolean()) {
+      return sqlDecimalCommaAllowed.getAsBoolean()
+          ? SqlDecimalComma.ENABLED
+          : SqlDecimalComma.DISABLED;
+    }
+    return SqlDecimalComma.DISABLED;
+  }
+
+  /**
    * Parse CICS translator client configurations to {@link Boolean}
    *
    * @param options CICS translator client configuration
@@ -109,6 +118,35 @@ public class ConfigHelper {
     } else {
       return options.getAsBoolean();
     }
+  }
+
+  /**
+   * Parse SQL Processing Enabled configurations to {@link SqlProcessing}
+   *
+   * @param options SQL Processing checkbox state from configuration
+   * @return Enabled if checked or Disabled otherwise, Enabled in the case of an invalid state
+   */
+  public SqlProcessing parseSQLProcessingEnabled(JsonElement options) {
+    if (options.isJsonPrimitive() && options.getAsJsonPrimitive().isBoolean()) {
+      return options.getAsBoolean() ? SqlProcessing.ENABLED : SqlProcessing.DISABLED;
+    }
+    return SqlProcessing.ENABLED;
+  }
+
+  /**
+   * Parse Unused variable severity level
+   *
+   * @param options Configuration option
+   * @return SeverityLevel
+   */
+  public ErrorSeverity parseUnusedVariableSeverity(JsonElement options) {
+    if (options.isJsonPrimitive() && options.getAsJsonPrimitive().isString()) {
+      try {
+        return ErrorSeverity.valueOf(options.getAsString());
+      } catch (IllegalArgumentException e) {
+      }
+    }
+    return null;
   }
 
   /**

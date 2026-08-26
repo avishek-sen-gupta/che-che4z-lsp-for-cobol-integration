@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.usecases;
@@ -20,6 +20,9 @@ import com.google.gson.Gson;
 import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
+import org.eclipse.lsp.cobol.common.DialectRegistryItem;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
 import org.eclipse.lsp.cobol.common.copybook.SQLBackend;
 
@@ -31,9 +34,11 @@ public class DialectConfigs {
         CopybookProcessingMode.DISABLED,
         ImmutableList.of("IDMS"),
         true,
-            ImmutableMap.of(), false,
-        ImmutableList.of()
-    );
+        false,
+        SqlProcessing.ENABLED,
+        SqlDecimalComma.DISABLED,
+        ImmutableList.of(new DialectRegistryItem("IDMS", 1, null, "", "")),
+        ImmutableMap.of());
   }
 
   /**
@@ -48,12 +53,16 @@ public class DialectConfigs {
         CopybookProcessingMode.DISABLED,
         ImmutableList.of("DaCo", "IDMS"),
         true,
-            ImmutableMap.of(
-                "daco.predefined-sections",
-                new Gson().toJsonTree(list),
-                "target-sql-backend",
-                new Gson().toJsonTree(SQLBackend.DB2_SERVER)), false,
-        ImmutableList.of()
-    );
+        false,
+        SqlProcessing.ENABLED,
+        SqlDecimalComma.DISABLED,
+        ImmutableList.of(
+            new DialectRegistryItem("DaCo", 1, null, "", ""),
+            new DialectRegistryItem("IDMS", 1, null, "", "")),
+        ImmutableMap.of(
+            "daco.predefined-sections",
+            new Gson().toJsonTree(list),
+            "target-sql-backend",
+            new Gson().toJsonTree(SQLBackend.DB2_SERVER)));
   }
 }

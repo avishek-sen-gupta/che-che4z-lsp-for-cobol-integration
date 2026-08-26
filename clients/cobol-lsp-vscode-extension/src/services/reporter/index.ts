@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *   Broadcom, Inc. - initial API and implementation
+ *   Broadcom - initial API and implementation
  */
 
 import * as vscode from "vscode";
@@ -41,7 +41,7 @@ export async function initTelemetry(context: vscode.ExtensionContext) {
  * @param notes optional brief description
  * @param telemetryMeasurement optional set of numeric data with a key name
  */
-export function registerEvent(
+export function telemetryEvent(
   eventName: string,
   categories?: string[],
   notes?: string,
@@ -74,7 +74,7 @@ export function registerEvent(
  * @param notes optional brief description
  * @param telemetryMeasurement optional set of numeric data with a key name
  */
-export function registerExceptionEvent(
+export function telemetryExceptionEvent(
   eventName = "RuntimeException",
   rootCause: string,
   categories?: string[],

@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 package org.eclipse.lsp.cobol.positive;
@@ -38,6 +38,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.eclipse.lsp.cobol.ConfigurableTest;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
+import org.eclipse.lsp.cobol.common.SqlDecimalComma;
+import org.eclipse.lsp.cobol.common.SqlProcessing;
 import org.eclipse.lsp.cobol.common.copybook.SQLBackend;
 import org.eclipse.lsp.cobol.test.CobolText;
 import org.eclipse.lsp.cobol.test.engine.UseCase;
@@ -256,9 +258,11 @@ class PositiveTest extends ConfigurableTest {
           ENABLED,
           ImmutableList.of("IDMS"),
           true,
-              ImmutableMap.of("target-sql-backend", new Gson().toJsonTree(SQLBackend.DB2_SERVER)), false,
-          ImmutableList.of()
-      );
+          false,
+          SqlProcessing.ENABLED,
+          SqlDecimalComma.DISABLED,
+          ImmutableList.of(),
+          ImmutableMap.of("target-sql-backend", new Gson().toJsonTree(SQLBackend.DB2_SERVER)));
     }
     return AnalysisConfig.defaultConfig(ENABLED);
   }

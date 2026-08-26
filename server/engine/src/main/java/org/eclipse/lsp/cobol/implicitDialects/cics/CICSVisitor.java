@@ -9,7 +9,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *
  * Contributors:
- *    Broadcom, Inc. - initial API and implementation
+ *    Broadcom - initial API and implementation
  *
  */
 
@@ -49,7 +49,7 @@ import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.message.MessageTemplate;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.CodeBlockUsageNode;
-import org.eclipse.lsp.cobol.common.model.tree.CompilerDirectiveNode;
+import org.eclipse.lsp.cobol.common.model.tree.ExecCicsAbendNode;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.StopNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.QualifiedReferenceNode;
@@ -116,9 +116,22 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
         (ctx.allCicsRule() != null
             && ctx.allCicsRule().size() > 0
             && ctx.allCicsRule().get(0).cics_handle() != null);
+    boolean isAbend =
+        (ctx.allCicsRule() != null
+            && ctx.allCicsRule().size() > 0
+            && ctx.allCicsRule().get(0).cics_abend() != null);
 
     if (isReturn) {
       return addTreeNode(ctx, ExecCicsReturnNode::new);
+    } else if (isAbend) {
+      boolean cancel =
+          Optional.ofNullable(ctx.allCicsRule().get(0).cics_abend())
+              .map(CICSParser.Cics_abendContext::cics_abend_opts)
+              .map(CICSParser.Cics_abend_optsContext::CANCEL)
+              .filter(s -> s.size() > 0)
+              .isPresent();
+
+      return addTreeNode(ctx, locality -> new ExecCicsAbendNode(locality, cancel));
     } else if (isHandle) {
       boolean isProgram =
           Optional.ofNullable(ctx.allCicsRule().get(0).cics_handle())
@@ -158,7 +171,7 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
   }
 
   @Override
-  public List<Node> visitCicsDfhRespLiteral(CICSParser.CicsDfhRespLiteralContext ctx) {
+  public List<Node> visitCicsDfhResp(CICSParser.CicsDfhRespContext ctx) {
     addReplacementContext(ctx);
     return visitChildren(ctx);
   }
@@ -185,18 +198,7 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
   }
 
   @Override
-  public List<Node> visitCompilerXOptsOption(CICSParser.CompilerXOptsOptionContext ctx) {
-    if (Objects.nonNull(ctx.EXCI())) {
-      return addTreeNode(
-          ctx,
-          locality ->
-              new CompilerDirectiveNode(locality, ctx.EXCI().getText(), CICSDialect.DIALECT_NAME));
-    }
-    return visitChildren(ctx);
-  }
-
-  @Override
-  public List<Node> visitCicsDfhValueLiteral(CICSParser.CicsDfhValueLiteralContext ctx) {
+  public List<Node> visitCicsDfhValue(CICSParser.CicsDfhValueContext ctx) {
     addReplacementContext(ctx);
     return visitChildren(ctx);
   }
@@ -380,7 +382,7 @@ class CICSVisitor extends ErrorHandlingCICSVisitor {
 
   private CICSCheckUtilityParameters getCheckParams() {
     CICSCheckUtilityParameters cicsCheckUtilityParameters = new CICSCheckUtilityParameters();
-    final List<String> opts = context.getPreprocessorsDirectives().get("CICS");
+    final List<String> opts = context.getPreprocessorsDirectives().get(CICSDialect.DIALECT_NAME);
     if (opts == null || opts.isEmpty()) {
       // This is a special case to reduce false positives until we have CICS configuration
       cicsCheckUtilityParameters.spEnabled = true;
