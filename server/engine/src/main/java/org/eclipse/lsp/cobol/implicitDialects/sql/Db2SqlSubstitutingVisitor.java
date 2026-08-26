@@ -34,7 +34,6 @@ import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.variable.*;
-import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
 import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.core.visitor.VisitorHelper;
@@ -208,7 +207,7 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         return hostVariableDefinitionNode;
     }
 
-    private List<Node> createHostVariableDefinitionNode(AnnotatedParserRuleContext ctx, ParserRuleContext levelCtx, ParserRuleContext nameCtx) {
+    private List<Node> createHostVariableDefinitionNode(ParserRuleContext ctx, ParserRuleContext levelCtx, ParserRuleContext nameCtx) {
 //        addReplacementContext(ctx);
         replaceWithMetadata(ctx);
         Locality statementLocality = getLocality(this.context.getExtendedDocument().mapLocation(constructRange(ctx)));
@@ -311,7 +310,7 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         return builder.build();
     }
 
-    private void addReplacementContext(AnnotatedParserRuleContext ctx) {
+    private void addReplacementContext(ParserRuleContext ctx) {
         getAllTerminalNodes(ctx)
                 .forEach(
                         node ->
@@ -483,11 +482,11 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
         return addTreeNode(ctx, locality -> new VariableUsageNode(finalName, locality));
     }
 
-    private void replaceWithMetadata(AnnotatedParserRuleContext ctx) {
+    private void replaceWithMetadata(ParserRuleContext ctx) {
         replaceWithMetadata(ctx, "");
     }
 
-    private void addReplacementContext(AnnotatedParserRuleContext ctx, String prefix) {
+    private void addReplacementContext(ParserRuleContext ctx, String prefix) {
         getAllTerminalNodes(ctx)
                 .forEach(
                         node ->
@@ -499,7 +498,7 @@ class Db2SqlSubstitutingVisitor extends MarkerDb2SqlVisitor {
                                                         + StringUtils.repeat(CobolDialect.FILLER, node.getText().length())));
     }
 
-    private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
+    private void replaceWithMetadata(ParserRuleContext ctx, String staticPrefix) {
         PersistentData.record(ctx, LocalisedDialect.DB2_SQL);
         addReplacementContext(ctx, staticPrefix);
         extractions++;

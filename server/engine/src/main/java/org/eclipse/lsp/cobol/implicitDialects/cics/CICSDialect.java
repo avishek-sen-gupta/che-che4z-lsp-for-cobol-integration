@@ -21,8 +21,6 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
 import org.eclipse.lsp.cobol.common.copybook.CopybookService;
 import org.eclipse.lsp.cobol.common.dialects.CobolDialect;
@@ -34,9 +32,6 @@ import org.eclipse.lsp.cobol.common.model.tree.CompilerDirectiveNode;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.ProgramNode;
 import org.eclipse.lsp.cobol.common.model.tree.SectionNode;
-import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
-import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
-import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.common.processor.ProcessingPhase;
 import org.eclipse.lsp.cobol.common.processor.ProcessorDescription;
 import org.eclipse.lsp.cobol.implicitDialects.cics.nodes.ExecCicsNode;
@@ -57,21 +52,20 @@ public class CICSDialect implements CobolDialect {
     this(copybookService, messageService, CICSVisitorBuilder.ORIGINAL);
   }
 
-    public CICSDialect(CopybookService copybookService, MessageService messageService, CICSVisitorBuilder visitorBuilder) {
-        this.copybookService = copybookService;
-        this.messageService = messageService;
-        this.visitorBuilder = visitorBuilder;
-    }
+  public CICSDialect(CopybookService copybookService, MessageService messageService, CICSVisitorBuilder visitorBuilder) {
+    this.copybookService = copybookService;
+    this.messageService = messageService;
+    this.visitorBuilder = visitorBuilder;
+  }
 
-    @Override
+  @Override
   public String getName() {
     return DIALECT_NAME;
   }
 
   @Override
   public ResultWithErrors<DialectOutcome> processText(DialectProcessingContext context) {
-//    CICSVisitor cicsVisitor = new CICSVisitor(context, messageService, 0);
-      ErrorHandlingCICSVisitor cicsVisitor = visitorBuilder.visitor(context, messageService);
+    ErrorHandlingCICSVisitor cicsVisitor = visitorBuilder.visitor(context, messageService);
 
     List<SyntaxError> parseError = new ArrayList<>();
 
@@ -130,19 +124,7 @@ public class CICSDialect implements CobolDialect {
     parser.setErrorHandler(new CICSErrorStrategy(messageService));
 
     CICSParser.StartRuleContext result = parser.startRule();
-    setDialectRecursively(result, LocalisedDialect.CICS);
-    PersistentData.addDialectTree(result);
     errors.addAll(listener.getErrors());
     return result;
   }
-
-    private void setDialectRecursively(ParseTree node, LocalisedDialect dialect) {
-        if (node instanceof TerminalNode) return;
-        AnnotatedParserRuleContext annotatedNode = (AnnotatedParserRuleContext) node;
-        annotatedNode.dialect = dialect;
-        if (annotatedNode.children == null) return;
-        for (ParseTree child: annotatedNode.children) {
-            setDialectRecursively(child, dialect);
-        }
-    }
 }

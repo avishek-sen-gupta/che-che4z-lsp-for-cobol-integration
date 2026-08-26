@@ -7,6 +7,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
+
 import org.antlr.v4.runtime.CommonToken;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -138,5 +144,32 @@ class PersistentDataTest {
     assertNull(PersistentData.fragmentAt(1, 0));
     assertNull(PersistentData.claim(1, 0));
     assertFalse(PersistentData.isCovered(1, 0));
+  }
+
+  @Test
+  void persistentDataExposesOnlyThePositionalApi() {
+    Set<String> methodNames = new TreeSet<>();
+    for (Method m : PersistentData.class.getDeclaredMethods()) {
+      if (m.isSynthetic()) continue;
+      methodNames.add(m.getName());
+    }
+
+    assertEquals(
+        new TreeSet<>(
+            Arrays.asList(
+                "claim", "fragmentAt", "fragmentCount", "isCovered", "record", "reset")),
+        methodNames,
+        "The guid-keyed API (next/addDialectTree/getDialectNode/dialect/treeCount) must be gone");
+
+    Set<String> fieldNames = new TreeSet<>();
+    for (Field f : PersistentData.class.getDeclaredFields()) {
+      if (f.isSynthetic()) continue;
+      fieldNames.add(f.getName());
+    }
+
+    assertEquals(
+        new TreeSet<>(Arrays.asList("claimed", "fragments")),
+        fieldNames,
+        "Only the fragments list and claimed set may remain as static state");
   }
 }

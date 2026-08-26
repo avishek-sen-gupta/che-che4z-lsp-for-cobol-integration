@@ -18,8 +18,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.*;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.lang3.tuple.Pair;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
 import org.eclipse.lsp.cobol.common.copybook.CopybookModel;
@@ -34,9 +32,6 @@ import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.tree.CopyNode;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
-import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
-import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
-import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.common.utils.KeywordsUtils;
 import org.eclipse.lsp4j.Location;
 import org.eclipse.lsp4j.Position;
@@ -234,7 +229,6 @@ public final class IdmsDialect implements CobolDialect {
     List<Node> nodes = new ArrayList<>();
     nodes.addAll(visitor.visitStartRule(startRuleContext));
     nodes.addAll(context.getDialectNodes());
-      System.out.println("[INFO] Extracted " + visitor.getExtractions() + " nodes.");
 
     new ArrayList<>(nodes)
         .stream()
@@ -264,7 +258,6 @@ public final class IdmsDialect implements CobolDialect {
                         .mapLocation(e.getLocation().getLocation().getRange())
                         .getRange()));
 
-      PersistentData.addDialectTree(startRuleContext);
     return new ResultWithErrors<>(new DialectOutcome(nodes, context), errors);
   }
 
@@ -308,18 +301,7 @@ public final class IdmsDialect implements CobolDialect {
     parser.setErrorHandler(new CobolErrorStrategy(messageService));
 
     IdmsParser.StartRuleContext result = parser.startRule();
-    setDialectRecursively(result, LocalisedDialect.IDMS);
     errors.addAll(listener.getErrors());
     return result;
   }
-
-    private void setDialectRecursively(ParseTree node, LocalisedDialect dialect) {
-        if (node instanceof TerminalNode) return;
-        AnnotatedParserRuleContext annotatedNode = (AnnotatedParserRuleContext) node;
-        annotatedNode.dialect = dialect;
-        if (annotatedNode.children == null) return;
-        for (ParseTree child: annotatedNode.children) {
-            setDialectRecursively(child, dialect);
-        }
-    }
 }

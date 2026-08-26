@@ -26,7 +26,6 @@ import java.util.function.Function;
 import lombok.Getter;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.RuleContext;
-import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
 import org.eclipse.lsp.cobol.common.dialects.CobolDialect;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
@@ -259,7 +258,7 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
     context.getExtendedDocument().replace(DialectUtils.constructRange(ctx), newText);
   }
 
-    private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
+    private void replaceWithMetadata(ParserRuleContext ctx, String staticPrefix) {
         PersistentData.record(ctx, LocalisedDialect.IDMS);
         addReplacementContext(ctx, staticPrefix);
         extractions++;

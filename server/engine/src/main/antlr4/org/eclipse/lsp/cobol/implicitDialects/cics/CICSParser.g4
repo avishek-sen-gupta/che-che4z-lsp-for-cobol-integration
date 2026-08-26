@@ -12,7 +12,7 @@
  *   Broadcom - initial API and implementation
  */
 parser grammar CICSParser;
-options {tokenVocab = CICSLexer; superClass = MessageServiceParser; contextSuperClass = org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;}
+options {tokenVocab = CICSLexer; superClass = MessageServiceParser;}
 
 startRule: (cicsExecBlock | cicsDfhValue | cicsDfhResp | ~(EXEC_CICS|DFHRESP|DFHVALUE))* EOF;
 cicsExecBlock: EXEC_CICS (allCicsRule)* END_EXEC ;

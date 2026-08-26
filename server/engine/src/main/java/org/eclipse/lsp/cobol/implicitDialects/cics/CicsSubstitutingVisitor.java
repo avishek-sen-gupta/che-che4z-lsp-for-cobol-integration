@@ -38,7 +38,6 @@ import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.StopNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.QualifiedReferenceNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableUsageNode;
-import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
 import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.implicitDialects.cics.nodes.ExecCicsHandleNode;
@@ -228,7 +227,7 @@ class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
     return Locality.builder().uri(uri).range(range).build();
   }
 
-    private void replaceWithMetadata(AnnotatedParserRuleContext ctx, String staticPrefix) {
+    private void replaceWithMetadata(ParserRuleContext ctx, String staticPrefix) {
         PersistentData.record(ctx, LocalisedDialect.CICS);
         addReplacementContext(ctx, staticPrefix);
         extractions++;
@@ -244,11 +243,11 @@ class CicsSubstitutingVisitor extends ErrorHandlingCICSVisitor {
                         ctx.getStop().getCharPositionInLine() + ctx.getStop().getStopIndex() - ctx.getStop().getStartIndex() + 1)
         );
     }
-    private void addReplacementContext(AnnotatedParserRuleContext ctx) {
+    private void addReplacementContext(ParserRuleContext ctx) {
       addReplacementContext(ctx, "");
     }
 
-    private void addReplacementContext(AnnotatedParserRuleContext ctx, String prefix) {
+    private void addReplacementContext(ParserRuleContext ctx, String prefix) {
     getAllTerminalNodes(ctx)
         .forEach(
             node -> {
