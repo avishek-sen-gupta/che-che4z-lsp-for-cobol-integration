@@ -37,21 +37,23 @@ import org.eclipse.lsp.cobol.dialects.idms.IdmsParser.IdmsStatementsContext;
  * later produces in its place is purely positional, which is why the substitution has to stay
  * length-preserving and marker-free.
  *
- * <p>Three of the four overrides record and delegate to {@code super}. The fourth,
- * {@link #visitIdmsStatements}, cannot delegate for one of its two branches: when an IDMS statement
+ * <p>Four overrides record a fragment; three of those simply delegate to {@code super} afterwards.
+ * Two cannot delegate on one branch each, both for the same underlying reason: when an IDMS statement
  * carries a trailing COBOL imperative statement (the {@code ON} path-status form) upstream calls
  * {@code addReplacementImperativeStatementContext}, which uses {@code ExtendedDocument.clear(range)}
  * plus the literal text {@code "IF 1 + 1 = 2"}. {@code clear} bottoms out in
  * {@code ExtendedTextLine.clear(int, int)}, which writes a plain space rather than
  * {@link CobolDialect#FILLER}, so that path leaves no filler run for the COBOL parser to turn into a
- * {@code dialectNodeFiller} — and therefore no anchor to graft onto. This class blanks that case
- * itself with FILLER, prefixing {@code _IF_ } so the COBOL parser still matches a
- * {@code dialectIfStatment} and the trailing imperative statement stays reachable.
+ * {@code dialectNodeFiller} — and therefore no anchor to graft onto. Those two branches blank with
+ * FILLER instead, prefixing {@code _IF_ } so the COBOL parser still matches a
+ * {@code dialectIfStatment} and the trailing imperative statement stays reachable. They are
+ * {@link #visitIdmsStatements}, where the {@code ON} clause is the statement's own, and
+ * {@link #visitEraseStoreModifyLrStatementsOptions}, where it belongs to a nested clause and the
+ * enclosing statement has already been blanked by the time upstream would clear it.
  *
- * <p>{@code visitObtainLRStatement} and {@code visitEraseStoreModifyLrStatementsOptions} are
- * deliberately <em>not</em> overridden, even though they substitute: they use the same
- * space-clearing path, produce no filler anchor, and were never recorded by the fork either.
- * Recording them would create fragments the graft step never claims.
+ * <p>{@code visitObtainLRStatement} is deliberately <em>not</em> overridden, even though it
+ * substitutes: it was never recorded by the fork, and recording it would create a fragment the graft
+ * step never claims.
  *
  * <p>{@code visitSchemaSection} is deliberately not overridden either: {@code schemaSection} is a
  * direct alternative of {@code idmsSections}, which {@link #visitIdmsSections} already records, so
@@ -95,6 +97,30 @@ class IdmsSubstitutingVisitor extends IdmsVisitor {
   public List<Node> visitIdmsIfCondition(IdmsIfConditionContext ctx) {
     PersistentData.record(ctx, LocalisedDialect.IDMS);
     return super.visitIdmsIfCondition(ctx);
+  }
+
+  /**
+   * Records nothing — {@link #visitIdmsStatements} has already recorded the enclosing statement,
+   * {@code ON} clause included — but must still intervene on the {@code ON} path-status branch, for
+   * the same reason {@link #visitIdmsStatements} does.
+   *
+   * <p>This runs <em>after</em> the enclosing {@code idmsStatements} has been blanked, and upstream
+   * re-substitutes {@code ctx.getParent()} — the whole {@code eraseStatement}/{@code storeStatement}/
+   * {@code modifyStatement}, which shares its start token with the statement already blanked. So
+   * delegating here does not merely fail to add an anchor, it destroys the one already written: the
+   * space-clear overwrites every filler character the outer blanking produced, leaving a document
+   * with no {@code ZERO_WIDTH_SPACE} at all and a recorded fragment that the graft step can never
+   * claim. Blank the parent with FILLER behind the same {@code _IF_ } prefix instead, which keeps the
+   * anchor at the recorded fragment's own start position.
+   */
+  @Override
+  public List<Node> visitEraseStoreModifyLrStatementsOptions(
+      IdmsParser.EraseStoreModifyLrStatementsOptionsContext ctx) {
+    if (ctx.imperativeStatementCall() == null) {
+      return super.visitEraseStoreModifyLrStatementsOptions(ctx);
+    }
+    blankWithPrefix(ctx.getParent(), IF);
+    return visitChildren(ctx);
   }
 
   /**

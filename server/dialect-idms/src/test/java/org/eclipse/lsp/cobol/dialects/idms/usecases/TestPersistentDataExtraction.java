@@ -15,6 +15,10 @@
 package org.eclipse.lsp.cobol.dialects.idms.usecases;
 
 import com.google.common.collect.ImmutableList;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
 import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
@@ -239,6 +243,51 @@ class TestPersistentDataExtraction {
     assertEquals(2, PersistentData.fragmentCount(),
         "One IF <condition> + one INQUIRE MAP IF must produce exactly 2 extractions; "
             + "if the count differs from 2, double-extraction or missed extraction has occurred");
+  }
+
+  /**
+   * End-to-end counterpart of {@code IdmsSubstitutingVisitorEquivalenceTest}'s
+   * {@code nestedOnPathStatusClauseKeepsItsFillerAnchor}. That test pins the substituted document;
+   * this one pins that the COBOL parser actually accepts it, because the {@code _IF_ } prefix the
+   * subclass writes for a nested {@code ON} path-status clause is only useful if it matches
+   * {@code dialectIfStatment : DIALECT_IF dialectNodeFiller* ifThen ifElse? END_IF?}.
+   *
+   * <p>Before {@code visitEraseStoreModifyLrStatementsOptions} was overridden, upstream's
+   * space-clearing path removed every filler character from this program, so the statement was
+   * recorded but had no {@code dialectNodeFiller} left to be grafted onto.
+   */
+  @Test
+  void nestedOnPathStatusClauseIsExtractedAndStillParsesAsCobol() {
+    String source =
+        "        IDENTIFICATION DIVISION.\n"
+            + "        PROGRAM-ID. ERASEON.\n"
+            + "        DATA DIVISION.\n"
+            + "        WORKING-STORAGE SECTION.\n"
+            + "        01 WS-STATUS PIC X(4).\n"
+            + "        PROCEDURE DIVISION.\n"
+            + "            ERASE EMPLR-REC FROM LR-AREA ON ANY-STATUS\n"
+            + "               MOVE 'DONE' TO WS-STATUS\n"
+            + "            END-IF.\n";
+    AnalysisResult result = analyze(source);
+
+    assertEquals(1, PersistentData.fragmentCount(),
+        "ERASE ... FROM ... ON <path-status> must produce exactly one extraction: the ON clause "
+            + "belongs to the nested eraseStoreModifyLrStatementsOptions, which must not record a "
+            + "second fragment on top of the enclosing statement's");
+    // Semantic diagnostics are expected and are not what this test is about: the logical-record name
+    // resolves against the subschema copybook, which this harness supplies empty, so LR-AREA is
+    // reported undefined. Only syntax diagnostics would mean the substituted document stopped being
+    // parseable COBOL. (The ERASE ... WHERE ... ON form is additionally covered end-to-end, with no
+    // diagnostics at all, by TestIdmsEraseLRStatement.)
+    List<Diagnostic> syntaxErrors =
+        result.getDiagnostics().values().stream()
+            .flatMap(List::stream)
+            .filter(d -> d.getSeverity() == DiagnosticSeverity.Error)
+            .filter(d -> d.getCode() == null || !String.valueOf(d.getCode().get()).startsWith("semantics."))
+            .collect(Collectors.toList());
+    assertTrue(syntaxErrors.isEmpty(),
+        "The _IF_ prefixed, filler-blanked replacement must still parse as a COBOL "
+            + "dialectIfStatment; got: " + syntaxErrors);
   }
 
   // ---------- helper ----------

@@ -33,6 +33,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.copybook.CopybookProcessingMode;
+import org.eclipse.lsp.cobol.common.dialects.CobolDialect;
 import org.eclipse.lsp.cobol.common.dialects.CobolLanguageId;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
 import org.eclipse.lsp.cobol.common.error.SyntaxError;
@@ -76,8 +77,12 @@ class IdmsSubstitutingVisitorEquivalenceTest {
 
   private static final String URI = "file:///idms.cbl";
 
-  /** {@code CobolDialect.FILLER}: the zero-width space every dialect blanks its source with. */
-  private static final char FILLER = '​';
+  /**
+   * The zero-width space every dialect blanks its source with. Taken from {@link CobolDialect} rather
+   * than written as a literal: a raw U+200B in a char literal is invisible in every editor and is
+   * silently mangled by any re-encoding of this file.
+   */
+  private static final char FILLER = CobolDialect.FILLER.charAt(0);
 
   /**
    * Reaches every override {@link IdmsSubstitutingVisitor} declares except the {@code ON}
@@ -240,6 +245,58 @@ class IdmsSubstitutingVisitorEquivalenceTest {
           + "               MOVE 1 TO WS-X\n"
           + "            END-IF.\n";
 
+  /**
+   * The other {@code ON} path-status shape: the clause belongs to a <em>nested</em>
+   * {@code eraseStoreModifyLrStatementsOptions} rather than to {@code idmsStatements} itself, so the
+   * outer {@code ctx.imperativeStatementCall()} is null and {@code visitIdmsStatements} delegates.
+   * Upstream's {@code visitEraseStoreModifyLrStatementsOptions} then re-substitutes
+   * {@code ctx.getParent()} — the whole {@code eraseStatement}/{@code modifyStatement}, sharing its
+   * start token with the statement already blanked — through the space-clearing path, wiping the
+   * filler anchor that had just been written.
+   *
+   * <p>Both alternatives of {@code eraseStoreModifyLrStatementsOptions} that can carry the clause:
+   *
+   * <ul>
+   *   <li>line 7, {@code ERASE ... FROM LR-AREA ON ANY-STATUS} — the
+   *       {@code FROM altLogicalRecordLocation (WHERE booleanExpression)? imperativeStatementCall?}
+   *       alternative
+   *   <li>line 10, {@code MODIFY ... WHERE FLD1 = 'A' ON ANY-STATUS} — the
+   *       {@code WHERE booleanExpression imperativeStatementCall?} alternative
+   * </ul>
+   */
+  private static final String NESTED_ON_TEXT =
+      "        IDENTIFICATION DIVISION.\n"
+          + "        PROGRAM-ID. IDMSERA.\n"
+          + "        DATA DIVISION.\n"
+          + "        WORKING-STORAGE SECTION.\n"
+          + "        01 WS-STATUS PIC X(4).\n"
+          + "        PROCEDURE DIVISION.\n"
+          + "            ERASE EMPLR-REC FROM LR-AREA ON ANY-STATUS\n"
+          + "               MOVE 'DONE' TO WS-STATUS\n"
+          + "            END-IF.\n"
+          + "            MODIFY EMPLR-REC WHERE FLD1 = 'A' ON ANY-STATUS\n"
+          + "               MOVE 'DONE' TO WS-STATUS\n"
+          + "            END-IF.\n";
+
+  /** The exact document {@link #NESTED_ON_TEXT} must become under {@link IdmsSubstitutingVisitor}. */
+  private static final String EXPECTED_SUBSTITUTED_NESTED_ON_TEXT =
+      "        IDENTIFICATION DIVISION.\n"
+          + "        PROGRAM-ID. IDMSERA.\n"
+          + "        DATA DIVISION.\n"
+          + "        WORKING-STORAGE SECTION.\n"
+          + "        01 WS-STATUS PIC X(4).\n"
+          + "        PROCEDURE DIVISION.\n"
+          // ERASE EMPLR-REC FROM LR-AREA ON ANY-STATUS
+          + "            _IF_ " + f(5) + " " + f(9) + " " + f(4) + " " + f(7) + " " + f(2) + " "
+          + f(10) + "\n"
+          + "               MOVE 'DONE' TO WS-STATUS\n"
+          + "            END-IF.\n"
+          // MODIFY EMPLR-REC WHERE FLD1 = 'A' ON ANY-STATUS
+          + "            _IF_ " + f(6) + " " + f(9) + " " + f(5) + " " + f(4) + " " + f(1) + " "
+          + f(3) + " " + f(2) + " " + f(10) + "\n"
+          + "               MOVE 'DONE' TO WS-STATUS\n"
+          + "            END-IF.\n";
+
   /** A run of {@code n} FILLER characters. */
   private static String f(int n) {
     StringBuilder builder = new StringBuilder(n);
@@ -311,11 +368,11 @@ class IdmsSubstitutingVisitorEquivalenceTest {
     return expected.substring(0, expected.length() - 1);
   }
 
+  /** Deliberately unsorted, so that a change in node <em>ordering</em> is a failure too. */
   private static List<String> nodeShapes(List<Node> nodes) {
     return nodes.stream()
         .flatMap(Node::getDepthFirstStream)
         .map(n -> n.getClass().getSimpleName() + "@" + n.getLocality().getRange())
-        .sorted()
         .collect(Collectors.toList());
   }
 
@@ -430,6 +487,66 @@ class IdmsSubstitutingVisitorEquivalenceTest {
         render(document),
         "Each ON path-status statement must be blanked with FILLER behind an _IF_ prefix, leaving"
             + " the trailing COBOL imperative statement intact (each ~ is one FILLER character)");
+  }
+
+  /**
+   * Upstream's half of the nested-clause contrast, and the reason
+   * {@link IdmsSubstitutingVisitor#visitEraseStoreModifyLrStatementsOptions} exists. Note this is
+   * strictly worse than the {@link #ON_TEXT} case: there, delegating merely fails to <em>create</em>
+   * an anchor; here it destroys one that had already been written by the enclosing statement.
+   */
+  @Test
+  void upstreamDestroysTheFillerAnchorForANestedOnPathStatusClause() {
+    PersistentData.reset();
+    DialectProcessingContext context = freshContext(NESTED_ON_TEXT);
+    run(new IdmsVisitor(context), context);
+    String document = substitutedDocument(context);
+
+    assertEquals(
+        -1,
+        document.indexOf(FILLER),
+        "Upstream re-substitutes the enclosing ERASE/MODIFY statement via the space-clearing path"
+            + " after it has already been blanked with FILLER, so not one zero-width space survives."
+            + " Rendered: " + render(document));
+    assertTrue(
+        document.contains("IF 1 + 1 = 2"),
+        "Upstream writes the literal text \"IF 1 + 1 = 2\" over the nested imperative statement call");
+  }
+
+  /** The subclass's half: the anchor must survive at the recorded fragment's own position. */
+  @Test
+  void nestedOnPathStatusClauseKeepsItsFillerAnchor() {
+    PersistentData.reset();
+    DialectProcessingContext context = freshContext(NESTED_ON_TEXT);
+    run(new IdmsSubstitutingVisitor(context), context);
+    String document = substitutedDocument(context);
+
+    assertFalse(
+        document.contains("IF 1 + 1 = 2"),
+        "The subclass must not let upstream's space-clearing path run over a nested ON path-status"
+            + " clause; rendered: " + render(document));
+    assertEquals(
+        render(goldenDocument(EXPECTED_SUBSTITUTED_NESTED_ON_TEXT)),
+        render(document),
+        "A nested ON path-status clause must leave the enclosing statement blanked with FILLER behind"
+            + " an _IF_ prefix, so a dialectNodeFiller still appears where the fragment was recorded"
+            + " (each ~ is one FILLER character)");
+
+    // The fragment is recorded by visitIdmsStatements, but without the override above there would be
+    // no filler for smojol to claim it against. Check both statements' anchors, not just the count.
+    for (int line : new int[] {7, 10}) {
+      PersistentData.Fragment fragment = PersistentData.fragmentAt(line, 12);
+      assertNotNull(fragment, "Line " + line + " must record a fragment at its start column");
+      assertSame(
+          fragment,
+          PersistentData.fragmentAt(line, 17),
+          "Line " + line + "'s fragment must also be reachable from the filler run's own column,"
+              + " five to the right of the recorded start because of the _IF_ prefix");
+      assertEquals(
+          FILLER,
+          document.split("\n", -1)[line - 1].charAt(17),
+          "Line " + line + " must carry a real filler character at the column smojol looks at");
+    }
   }
 
   // --------------------------------------------------------------- fragments
