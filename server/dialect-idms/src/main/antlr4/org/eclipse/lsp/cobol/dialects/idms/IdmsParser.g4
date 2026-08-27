@@ -148,15 +148,8 @@ idmsIfStatement
     ;
 
 idmsStatements
-    : idmsOptTermStatement | idmsMandTermStatement
-    ;
-
-idmsOptTermStatement
     : idmsStmtsOptTermOn endClause? imperativeStatementCall? idmsOnClause?
-    ;
-
-idmsMandTermStatement
-    : idmsStmtsMandTermOn (SEMICOLON_FS idmsOnClause? | DOT_FS | imperativeStatementCall)
+    | idmsStmtsMandTermOn (SEMICOLON_FS idmsOnClause? | DOT_FS | imperativeStatementCall)
     ;
 
 

@@ -219,7 +219,7 @@ public final class IdmsDialect implements CobolDialect {
    */
   @Override
   public ResultWithErrors<DialectOutcome> processText(DialectProcessingContext context) {
-    IdmsVisitor visitor = new IdmsVisitor(context);
+    IdmsVisitor visitor = new IdmsSubstitutingVisitor(context);
     List<SyntaxError> errors = new ArrayList<>();
     IdmsParser.StartRuleContext startRuleContext =
         parseIdms(

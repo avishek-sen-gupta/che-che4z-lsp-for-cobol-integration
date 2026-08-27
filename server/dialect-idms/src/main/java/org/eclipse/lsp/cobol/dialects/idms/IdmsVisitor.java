@@ -32,8 +32,6 @@ import org.eclipse.lsp.cobol.common.error.SyntaxError;
 import org.eclipse.lsp.cobol.common.model.Locality;
 import org.eclipse.lsp.cobol.common.model.SectionType;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
-import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
-import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.common.model.tree.SectionNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.QualifiedReferenceNode;
 import org.eclipse.lsp.cobol.common.model.tree.variable.VariableDefinitionNode;
@@ -51,7 +49,6 @@ import org.eclipse.lsp4j.Range;
 class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
   private static final String IF = "_IF_ ";
   private final DialectProcessingContext context;
-  @Getter private int extractions = 0;
 
   @Getter private final List<SyntaxError> errors = new LinkedList<>();
 
@@ -61,44 +58,27 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
 
   @Override
   public List<Node> visitIdmsStatements(IdmsStatementsContext ctx) {
-      // An ON path-status clause is followed by a COBOL imperative statement (optionally closed by
-      // END-IF) which stays in the extended document, so the substitution has to keep an IF around
-      // it. The _IF_ marker makes the COBOL parser treat it as a dialectIfStatment.
-      replaceWithMetadata(ctx, imperativeStatementCallOf(ctx) == null ? "" : IF);
-      return visitChildren(ctx);
+    if (ctx.imperativeStatementCall() == null) addReplacementContext(ctx);
+    else addReplacementImperativeStatementContext(ctx, ctx.imperativeStatementCall());
+    return visitChildren(ctx);
   }
 
-  private static ImperativeStatementCallContext imperativeStatementCallOf(IdmsStatementsContext ctx) {
-    if (ctx.idmsOptTermStatement() != null) {
-      return ctx.idmsOptTermStatement().imperativeStatementCall();
-    }
-    if (ctx.idmsMandTermStatement() != null) {
-      return ctx.idmsMandTermStatement().imperativeStatementCall();
-    }
-    return null;
-  }
-
-    @Override
-    public List<Node> visitIdmsStmtsOptTermOn(IdmsStmtsOptTermOnContext ctx) {
-        return super.visitIdmsStmtsOptTermOn(ctx);
-    }
-
-    @Override
+  @Override
   public List<Node> visitIdmsSections(IdmsSectionsContext ctx) {
-      replaceWithMetadata(ctx, "");
-        return visitChildren(ctx);
+    addReplacementContext(ctx);
+    return visitChildren(ctx);
   }
 
   @Override
   public List<Node> visitIdmsIfStatement(IdmsIfStatementContext ctx) {
-      replaceWithMetadata(ctx, IF);
-      return visitChildren(ctx);
+    addReplacementContext(ctx, IF);
+    return visitChildren(ctx);
   }
 
   @Override
   public List<Node> visitIdmsIfCondition(IdmsIfConditionContext ctx) {
-      replaceWithMetadata(ctx, "");
-      return visitChildren(ctx);
+    addReplacementContext(ctx);
+    return visitChildren(ctx);
   }
 
   @Override
@@ -191,9 +171,6 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
 
   @Override
   public List<Node> visitSchemaSection(SchemaSectionContext ctx) {
-    // No substitution here: schemaSection is a direct child of idmsSections, which
-    // visitIdmsSections has already substituted and recorded. Substituting again would
-    // create a second fragment with the same start position.
     return addTreeNode(ctx, locality -> new SectionNode(locality, SectionType.SCHEMA));
   }
 
@@ -257,12 +234,6 @@ class IdmsVisitor extends IdmsParserBaseVisitor<List<Node>> {
     }
     context.getExtendedDocument().replace(DialectUtils.constructRange(ctx), newText);
   }
-
-    private void replaceWithMetadata(ParserRuleContext ctx, String staticPrefix) {
-        PersistentData.record(ctx, LocalisedDialect.IDMS);
-        addReplacementContext(ctx, staticPrefix);
-        extractions++;
-    }
 
   private void addReplacementImperativeStatementContext(
       ParserRuleContext ctx, ImperativeStatementCallContext imperativeStatementCallContext) {
