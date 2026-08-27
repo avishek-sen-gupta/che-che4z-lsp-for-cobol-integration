@@ -185,18 +185,21 @@ class CicsSubstitutingVisitorEquivalenceTest {
     PersistentData.reset();
     run(CICSVisitorBuilder.SUBSTITUTING, freshContext());
 
-    // Exact, not a lower bound: an exact count is what makes a lost anchor fail loudly.
-    assertEquals(
-        4,
-        PersistentData.fragmentCount(),
-        "Each of the four EXEC CICS blocks must record exactly one positional fragment");
-
-    // Every block must be reachable by document position, which is the whole premise of
-    // positional correlation. Coordinates are ANTLR's: 1-based line, 0-based column.
+    // One anchor per block, checked before the count so that a lost anchor fails with the line and
+    // the construct rather than with an off-by-one total. Every block must be reachable by document
+    // position, which is the whole premise of positional correlation.
+    // Coordinates are ANTLR's: 1-based line, 0-based column.
     assertFragmentAt(7, "SEND");
     assertFragmentAt(8, "ABEND");
     assertFragmentAt(9, "READ");
     assertFragmentAt(10, "LINK");
+
+    // Exact, not a lower bound: this is what catches a *spurious* extra fragment, which no
+    // per-line anchor can see.
+    assertEquals(
+        4,
+        PersistentData.fragmentCount(),
+        "Each of the four EXEC CICS blocks must record exactly one positional fragment");
   }
 
   private static void assertFragmentAt(int line, String expectedToken) {
