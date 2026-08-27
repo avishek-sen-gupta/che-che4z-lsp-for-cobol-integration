@@ -461,7 +461,7 @@ dataDivisionSection
    ;
 
 dialectSection
-   : dialectSectionBlock | dialectNodeFiller
+   : dialectNodeFiller
    ;
 
 // -- file section ----------------------------------
@@ -1021,7 +1021,7 @@ acceptStatement
    ;
 
 dialectStatement
-   : ZERO_WIDTH_SPACE | dialectIfStatment | dialectNodeFiller
+   : dialectIfStatment | dialectNodeFiller
    ;
 
 acceptFromDateStatement
@@ -1385,11 +1385,6 @@ goToStatement
 dialectIfStatment
    : DIALECT_IF dialectNodeFiller* ifThen ifElse? END_IF?
    ;
-
-dialectSectionBlock
-   : DIALECT_SCHEMA_SECTION dialectNodeFiller*
-   ;
-
 ifStatement
    : IF condition ifThen
    (
@@ -2408,7 +2403,6 @@ literal
    : NONNUMERICLITERAL | figurativeConstant | numericLiteral | booleanLiteral | charString | dialectLiteral | utfLiteral | hexadecimalUtfLiteral
    ;
 
-dialectGuid: integerLiteral;
 dialectLiteral: dialectNodeFiller+ DOT_FS?;
 
 utfLiteral: U_CHAR NONNUMERICLITERAL;
@@ -2472,19 +2466,9 @@ allowedCobolKeywords
    ;
 
 dialectNodeFiller
-    : (DIALECT_MARKER dialectGuid DOT_FS? eater) | whatever
-    ;
-
-whatever: eater;
-// NEWLINE should probably be removed
-eater
     : ZERO_WIDTH_SPACE+ DOT_FS? EOF?
     ;
 
 dot_fs
     : DOT_FS
     ;
-
-//dialectNodeFiller
-//    : ZERO_WIDTH_SPACE+
-//    ;

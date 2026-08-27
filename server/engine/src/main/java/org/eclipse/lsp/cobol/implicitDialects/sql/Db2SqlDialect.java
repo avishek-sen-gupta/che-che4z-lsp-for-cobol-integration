@@ -17,18 +17,15 @@ package org.eclipse.lsp.cobol.implicitDialects.sql;
 
 import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonElement;
+import java.util.*;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.eclipse.lsp.cobol.common.AnalysisConfig;
 import org.eclipse.lsp.cobol.common.ResultWithErrors;
 import org.eclipse.lsp.cobol.common.SqlProcessing;
-import org.eclipse.lsp.cobol.common.copybook.CopybookModel;
-import org.eclipse.lsp.cobol.common.copybook.CopybookName;
-import org.eclipse.lsp.cobol.common.copybook.CopybookService;
-import org.eclipse.lsp.cobol.common.copybook.SQLBackend;
+import org.eclipse.lsp.cobol.common.copybook.*;
 import org.eclipse.lsp.cobol.common.dialects.CobolDialect;
 import org.eclipse.lsp.cobol.common.dialects.DialectOutcome;
 import org.eclipse.lsp.cobol.common.dialects.DialectProcessingContext;
@@ -37,27 +34,17 @@ import org.eclipse.lsp.cobol.common.file.WorkspaceFileService;
 import org.eclipse.lsp.cobol.common.message.MessageService;
 import org.eclipse.lsp.cobol.common.model.tree.Node;
 import org.eclipse.lsp.cobol.common.model.tree.SectionNode;
-import org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;
-import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
-import org.eclipse.lsp.cobol.common.poc.PersistentData;
 import org.eclipse.lsp.cobol.common.processor.ProcessingPhase;
 import org.eclipse.lsp.cobol.common.processor.ProcessorDescription;
 import org.eclipse.lsp.cobol.common.utils.ImplicitCodeUtils;
 import org.eclipse.lsp.cobol.common.utils.KeywordsUtils;
 import org.eclipse.lsp.cobol.common.utils.PredefinedCopybooks;
-import org.eclipse.lsp.cobol.implicitDialects.cics.MarkerDb2SqlVisitor;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2DataAndProcedureDivisionNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2DeclareVariableNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2ProcedureDivisionNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.node.Db2WorkingAndLinkageSectionNode;
 import org.eclipse.lsp.cobol.implicitDialects.sql.processor.*;
 import org.eclipse.lsp.cobol.service.settings.SettingsParametersEnum;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 /** Db2 SQL dialect */
 @Slf4j
@@ -95,7 +82,7 @@ public class Db2SqlDialect implements CobolDialect {
   @Override
   public ResultWithErrors<DialectOutcome> processText(DialectProcessingContext context) {
     boolean isSqlProcessingEnabled = getSqlProcessingEnabled(context);
-    MarkerDb2SqlVisitor db2SqlVisitor =
+    Db2SqlVisitor db2SqlVisitor =
         visitorBuilder.visitor(context, messageService, copybookService, isSqlProcessingEnabled);
 
     List<SyntaxError> parseError = new ArrayList<>();
@@ -174,8 +161,6 @@ public class Db2SqlDialect implements CobolDialect {
     parser.setErrorHandler(new Db2ErrorStrategy(messageService));
 
     Db2SqlParser.StartRuleContext result = parser.startRule();
-    setDialectRecursively(result, LocalisedDialect.DB2_SQL);
-    PersistentData.addDialectTree(result);
     errors.addAll(listener.getErrors());
     return result;
   }
@@ -217,15 +202,5 @@ public class Db2SqlDialect implements CobolDialect {
 
     LOG.debug("Db2 Predefined copybook: {}", copybookModel);
     return copybookModel;
-  }
-
-  private void setDialectRecursively(ParseTree node, LocalisedDialect dialect) {
-    if (node instanceof TerminalNode) return;
-    AnnotatedParserRuleContext annotatedNode = (AnnotatedParserRuleContext) node;
-    annotatedNode.dialect = dialect;
-    if (annotatedNode.children == null) return;
-    for (ParseTree child: annotatedNode.children) {
-      setDialectRecursively(child, dialect);
-    }
   }
 }

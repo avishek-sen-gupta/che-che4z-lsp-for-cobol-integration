@@ -13,7 +13,7 @@
  */
 
 parser grammar Db2SqlParser;
-options {tokenVocab = Db2SqlLexer; superClass = MessageServiceParser; contextSuperClass = org.eclipse.lsp.cobol.common.poc.AnnotatedParserRuleContext;}
+options {tokenVocab = Db2SqlLexer; superClass = MessageServiceParser;}
 
 startRule: (
       execRule

@@ -131,7 +131,6 @@ literal
    : NONNUMERICLITERAL | figurativeConstant | numericLiteral | booleanLiteral | charString | dialectLiteral | utfLiteral | hexadecimalUtfLiteral
    ;
 
-dialectGuid: integerLiteral;
 dialectLiteral: dialectNodeFiller+;
 
 utfLiteral: U_CHAR NONNUMERICLITERAL;
@@ -143,11 +142,6 @@ charString
    ;
 
 dialectNodeFiller
-    : (DIALECT_MARKER dialectGuid DOT_FS? eater) | whatever
-    ;
-
-whatever: eater;
-eater
     : (ZERO_WIDTH_SPACE)+
     ;
 

@@ -15,28 +15,43 @@
 package org.eclipse.lsp.cobol.dialects.idms.usecases;
 
 import com.google.common.collect.ImmutableList;
-import org.antlr.v4.runtime.tree.ParseTree;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.DiagnosticSeverity;
 import org.eclipse.lsp.cobol.common.AnalysisResult;
 import org.eclipse.lsp.cobol.common.poc.LocalisedDialect;
 import org.eclipse.lsp.cobol.common.poc.PersistentData;
+import org.eclipse.lsp.cobol.common.poc.PersistentData.Fragment;
 import org.eclipse.lsp.cobol.dialects.idms.IdmsDialect;
 import org.eclipse.lsp.cobol.dialects.idms.utils.Fixtures;
 import org.eclipse.lsp.cobol.test.engine.UseCase;
 import org.eclipse.lsp.cobol.test.engine.UseCaseUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Verifies the smojol-fork extraction mechanism: after IDMS dialect preprocessing, each DML
- * statement is replaced by a {@code _DIALECT_ N .} placeholder, and the original IDMS parse
- * tree node is registered in {@link PersistentData} under the key {@code "IDMS-N"}.
+ * statement has been blanked out of the extended document length-preservingly, and the region it
+ * occupied — start line, start column, end line — is recorded in {@link PersistentData} together
+ * with the original IDMS parse tree and the dialect that produced it.
  *
- * <p>These tests verify the <em>extraction</em> half of the pipeline (che4z side).
- * The <em>reinjection</em> half ({@code DialectIntegratorListener}) is tested separately
- * in {@code IdmsDialectIntegrationTest} in the smojol-toolkit module.
+ * <p>Correlation is purely positional: because the blanking preserves length, the recorded start
+ * position is still the position of the filler run the COBOL parser later produces in the
+ * fragment's place. No marker text is injected into the document.
+ *
+ * <p>These tests verify the <em>extraction</em> half of the pipeline (che4z side). The
+ * <em>reinjection</em> half ({@code DialectIntegratorListener}) is tested separately in {@code
+ * IdmsDialectIntegrationTest} in the smojol-toolkit module.
+ *
+ * <p>{@link PersistentData} is static mutable state, so this class must not run in parallel with
+ * anything else that analyses source.
  */
+@Execution(ExecutionMode.SAME_THREAD)
 class TestPersistentDataExtraction {
 
   private static final String BOILERPLATE =
@@ -58,27 +73,22 @@ class TestPersistentDataExtraction {
     String source = BOILERPLATE + "            FINISH.\n";
     analyze(source);
 
-    assertEquals(1, PersistentData.counter,
-        "Expected exactly one extraction for a single FINISH statement");
+    assertEquals(1, PersistentData.fragmentCount(),
+        "Expected exactly one recorded fragment for a single FINISH statement");
   }
 
   @Test
-  void extractedNodeIsRetrievableFromPersistentData() {
+  void recordedFragmentCarriesIdmsDialectAndAParseTree() {
     String source = BOILERPLATE + "            FINISH.\n";
     analyze(source);
 
-    ParseTree node = PersistentData.getDialectNode("IDMS-1");
-    assertNotNull(node, "getDialectNode(\"IDMS-1\") must return the extracted IDMS node");
-  }
-
-  @Test
-  void extractedNodeHasIdmsDialectAnnotation() {
-    String source = BOILERPLATE + "            FINISH.\n";
-    analyze(source);
-
-    LocalisedDialect dialect = PersistentData.dialect("IDMS-1");
-    assertEquals(LocalisedDialect.IDMS, dialect,
-        "Extracted IDMS node must carry LocalisedDialect.IDMS");
+    // FINISH sits on line 7 (BOILERPLATE + subschema copy header + statement), indented 12 columns.
+    Fragment fragment = PersistentData.fragmentAt(7, 12);
+    assertNotNull(fragment, "A fragment must cover the FINISH statement at 7:12");
+    assertEquals(LocalisedDialect.IDMS, fragment.dialect);
+    assertNotNull(fragment.tree, "The recorded fragment must carry the IDMS parse tree");
+    assertTrue(fragment.tree.getText().toUpperCase().contains("FINISH"),
+        "The recorded tree must be the IDMS statement, got: " + fragment.tree.getText());
   }
 
   // ---------- multi-statement extraction ----------
@@ -92,38 +102,8 @@ class TestPersistentDataExtraction {
             + "            FINISH.\n";
     analyze(source);
 
-    assertEquals(3, PersistentData.counter,
-        "Expected three extractions for BIND + READY + FINISH");
-  }
-
-  @Test
-  void allExtractedNodesAreRetrievable() {
-    String source =
-        BOILERPLATE
-            + "            BIND RUN-UNIT.\n"
-            + "            READY.\n"
-            + "            FINISH.\n";
-    analyze(source);
-
-    for (int id = 1; id <= 3; id++) {
-      assertNotNull(PersistentData.getDialectNode("IDMS-" + id),
-          "Expected node for IDMS-" + id + " to be present in PersistentData");
-    }
-  }
-
-  @Test
-  void allExtractedNodesHaveIdmsDialect() {
-    String source =
-        BOILERPLATE
-            + "            BIND RUN-UNIT.\n"
-            + "            READY.\n"
-            + "            FINISH.\n";
-    analyze(source);
-
-    for (int id = 1; id <= 3; id++) {
-      assertEquals(LocalisedDialect.IDMS, PersistentData.dialect("IDMS-" + id),
-          "Node IDMS-" + id + " must carry LocalisedDialect.IDMS");
-    }
+    assertEquals(3, PersistentData.fragmentCount(),
+        "Expected three recorded fragments for BIND + READY + FINISH");
   }
 
   // ---------- interleaved COBOL + IDMS ----------
@@ -140,31 +120,27 @@ class TestPersistentDataExtraction {
     analyze(source);
 
     // Only FIND and FINISH should have been extracted
-    assertEquals(2, PersistentData.counter,
-        "Expected exactly 2 extractions (FIND + FINISH); MOVE statements must not be extracted");
+    assertEquals(2, PersistentData.fragmentCount(),
+        "Expected exactly 2 recorded fragments (FIND + FINISH); "
+            + "MOVE statements must not be extracted");
   }
 
   @Test
-  void resetClearsTreesListBetweenAnalysisCalls() {
+  void resetClearsFragmentsBetweenAnalysisCalls() {
     String source = BOILERPLATE + "            FINISH.\n";
 
-    // First analysis call — multiple dialects (IDMS, CICS, DB2) each add their tree,
-    // so treeCount() > 0 after one analysis.
     analyze(source);
-    int treesAfterFirst = PersistentData.treeCount();
-    assertTrue(treesAfterFirst > 0,
-        "After first analysis, trees list must be non-empty");
+    int afterFirst = PersistentData.fragmentCount();
+    assertTrue(afterFirst > 0, "After first analysis, at least one fragment must be recorded");
 
-    // reset() must bring the count back to zero so a subsequent analysis starts clean.
     PersistentData.reset();
-    assertEquals(0, PersistentData.treeCount(),
-        "After reset(), trees list must be empty");
+    assertEquals(0, PersistentData.fragmentCount(), "After reset(), no fragments must remain");
 
-    // Second analysis call — must populate the list again with the same count.
     analyze(source);
-    int treesAfterSecond = PersistentData.treeCount();
-    assertEquals(treesAfterFirst, treesAfterSecond,
-        "A fresh analysis after reset() must produce the same tree count as the first analysis");
+    assertEquals(
+        afterFirst,
+        PersistentData.fragmentCount(),
+        "A fresh analysis after reset() must record the same fragment count as the first");
   }
 
   // ---------- IF statement extraction (Issue 2 investigation) ----------
@@ -183,8 +159,8 @@ class TestPersistentDataExtraction {
   @Test
   void idmsIfEmptyConditionProducesExactlyOneExtraction() {
     // WORKING-STORAGE variables needed so the COBOL semantic analyzer recognises
-    // the identifiers; the extraction counter is set during IDMS preprocessing
-    // (before COBOL analysis), so it is not affected by semantic errors.
+    // the identifiers; the fragments are recorded during IDMS preprocessing
+    // (before COBOL analysis), so they are not affected by semantic errors.
     String source =
         "        IDENTIFICATION DIVISION.\n"
             + "        PROGRAM-ID. IFTEST.\n"
@@ -196,7 +172,7 @@ class TestPersistentDataExtraction {
             + "            IF IX-EMP EMPTY MOVE 'X' TO MT-FLAG.\n";
     analyze(source);
 
-    assertEquals(1, PersistentData.counter,
+    assertEquals(1, PersistentData.fragmentCount(),
         "IF <entity> EMPTY must produce exactly one extraction "
             + "(visitIdmsIfCondition called once; no double-extraction)");
   }
@@ -218,7 +194,7 @@ class TestPersistentDataExtraction {
             + "            IF NOT IX-EMP MEMBER MOVE 'X' TO MT-FLAG.\n";
     analyze(source);
 
-    assertEquals(1, PersistentData.counter,
+    assertEquals(1, PersistentData.fragmentCount(),
         "IF NOT <entity> MEMBER must produce exactly one extraction "
             + "(visitIdmsIfCondition called once; no double-extraction)");
   }
@@ -239,7 +215,7 @@ class TestPersistentDataExtraction {
             + "            INQUIRE MAP EMPMAP IF INPUT CHANGED.\n";
     analyze(source);
 
-    assertEquals(1, PersistentData.counter,
+    assertEquals(1, PersistentData.fragmentCount(),
         "INQUIRE MAP <name> IF INPUT CHANGED must produce exactly one extraction "
             + "(visitIdmsIfStatement called once; visitIdmsIfCondition must NOT fire for inqMapIfPhrase)");
   }
@@ -264,33 +240,54 @@ class TestPersistentDataExtraction {
             + "            INQUIRE MAP EMPMAP IF INPUT CHANGED.\n";
     analyze(source);
 
-    assertEquals(2, PersistentData.counter,
+    assertEquals(2, PersistentData.fragmentCount(),
         "One IF <condition> + one INQUIRE MAP IF must produce exactly 2 extractions; "
             + "if the count differs from 2, double-extraction or missed extraction has occurred");
   }
 
   /**
-   * Verifies that after an IDMS IF extraction, the extracted node is retrievable from
-   * {@code PersistentData} under the expected key. Complements
-   * {@link #idmsIfEmptyConditionProducesExactlyOneExtraction} by checking both counter and
-   * lookup.
+   * End-to-end counterpart of {@code IdmsSubstitutingVisitorEquivalenceTest}'s
+   * {@code nestedOnPathStatusClauseKeepsItsFillerAnchor}. That test pins the substituted document;
+   * this one pins that the COBOL parser actually accepts it, because the {@code _IF_ } prefix the
+   * subclass writes for a nested {@code ON} path-status clause is only useful if it matches
+   * {@code dialectIfStatment : DIALECT_IF dialectNodeFiller* ifThen ifElse? END_IF?}.
+   *
+   * <p>Before {@code visitEraseStoreModifyLrStatementsOptions} was overridden, upstream's
+   * space-clearing path removed every filler character from this program, so the statement was
+   * recorded but had no {@code dialectNodeFiller} left to be grafted onto.
    */
   @Test
-  void idmsIfConditionNodeIsRetrievableFromPersistentData() {
+  void nestedOnPathStatusClauseIsExtractedAndStillParsesAsCobol() {
     String source =
         "        IDENTIFICATION DIVISION.\n"
-            + "        PROGRAM-ID. IFTEST.\n"
+            + "        PROGRAM-ID. ERASEON.\n"
             + "        DATA DIVISION.\n"
             + "        WORKING-STORAGE SECTION.\n"
-            + "        01 IX-EMP PIC X.\n"
-            + "        01 MT-FLAG PIC X.\n"
+            + "        01 WS-STATUS PIC X(4).\n"
             + "        PROCEDURE DIVISION.\n"
-            + "            IF IX-EMP EMPTY MOVE 'X' TO MT-FLAG.\n";
-    analyze(source);
+            + "            ERASE EMPLR-REC FROM LR-AREA ON ANY-STATUS\n"
+            + "               MOVE 'DONE' TO WS-STATUS\n"
+            + "            END-IF.\n";
+    AnalysisResult result = analyze(source);
 
-    ParseTree node = PersistentData.getDialectNode("IDMS-1");
-    assertNotNull(node,
-        "getDialectNode(\"IDMS-1\") must return the extracted IDMS IF condition node");
+    assertEquals(1, PersistentData.fragmentCount(),
+        "ERASE ... FROM ... ON <path-status> must produce exactly one extraction: the ON clause "
+            + "belongs to the nested eraseStoreModifyLrStatementsOptions, which must not record a "
+            + "second fragment on top of the enclosing statement's");
+    // Semantic diagnostics are expected and are not what this test is about: the logical-record name
+    // resolves against the subschema copybook, which this harness supplies empty, so LR-AREA is
+    // reported undefined. Only syntax diagnostics would mean the substituted document stopped being
+    // parseable COBOL. (The ERASE ... WHERE ... ON form is additionally covered end-to-end, with no
+    // diagnostics at all, by TestIdmsEraseLRStatement.)
+    List<Diagnostic> syntaxErrors =
+        result.getDiagnostics().values().stream()
+            .flatMap(List::stream)
+            .filter(d -> d.getSeverity() == DiagnosticSeverity.Error)
+            .filter(d -> d.getCode() == null || !String.valueOf(d.getCode().get()).startsWith("semantics."))
+            .collect(Collectors.toList());
+    assertTrue(syntaxErrors.isEmpty(),
+        "The _IF_ prefixed, filler-blanked replacement must still parse as a COBOL "
+            + "dialectIfStatment; got: " + syntaxErrors);
   }
 
   // ---------- helper ----------

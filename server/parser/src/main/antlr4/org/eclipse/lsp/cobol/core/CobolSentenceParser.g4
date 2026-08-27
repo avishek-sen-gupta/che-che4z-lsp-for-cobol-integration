@@ -2109,7 +2109,6 @@ literal
    : NONNUMERICLITERAL | figurativeConstant | numericLiteral | booleanLiteral | charString | dialectLiteral | utfLiteral | hexadecimalUtfLiteral
    ;
 
-dialectGuid: integerLiteral;
 dialectLiteral: dialectNodeFiller+;
 
 utfLiteral: U_CHAR NONNUMERICLITERAL;
@@ -2170,15 +2169,5 @@ cobolKeywords
    ;
 
 dialectNodeFiller
-    : (DIALECT_MARKER dialectGuid DOT_FS? eater) | whatever
-    ;
-
-whatever: eater;
-// NEWLINE should probably be removed
-eater
     : (ZERO_WIDTH_SPACE)+
     ;
-
-//dialectNodeFiller
-//    : ZERO_WIDTH_SPACE+
-//    ;

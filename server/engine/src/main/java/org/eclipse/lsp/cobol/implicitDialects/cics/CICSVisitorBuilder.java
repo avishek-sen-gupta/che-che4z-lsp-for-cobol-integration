@@ -26,9 +26,9 @@ public interface CICSVisitorBuilder {
      * Creates the appropriate visitor
      * @param context
      * @param messageService
-     * @return ErrorHandlingCICSVisitor
+     * @return CICSVisitor
      */
-    ErrorHandlingCICSVisitor visitor(DialectProcessingContext context, MessageService messageService);
+    CICSVisitor visitor(DialectProcessingContext context, MessageService messageService);
     CICSVisitorBuilder ORIGINAL = CICSVisitor::new;
     CICSVisitorBuilder SUBSTITUTING = CicsSubstitutingVisitor::new;
 }
